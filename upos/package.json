@@ -8,7 +8,7 @@
     "dev": "concurrently -n api,portal -c cyan,green \"pnpm --filter api dev\" \"pnpm --filter portal dev\"",
     "dev:mock": "concurrently -n mock,portal -c magenta,green \"pnpm --filter api mock\" \"pnpm --filter portal dev\"",
     "dev:all": "concurrently -n api,parent,admin,pos,kiosk -c cyan,green,yellow,magenta,blue \"pnpm --filter api dev\" \"pnpm --filter parent-web dev\" \"pnpm --filter admin dev\" \"pnpm --filter pos dev\" \"pnpm --filter kiosk dev\"",
-    "build": "pnpm -r build",
+    "build": "echo 'Railway: build step skipped, using bun runtime'",
     "seed": "pnpm --filter api seed"
   },
   "devDependencies": {
