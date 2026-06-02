@@ -1,6 +1,6 @@
 {
-  "installCommand": "npm install -g pnpm@9",
-  "buildCommand": "cd upos && pnpm install && pnpm --filter portal build",
+  "installCommand": "echo done",
+  "buildCommand": "cd upos && npx pnpm@9 install --no-frozen-lockfile && npx pnpm@9 --filter portal build",
   "outputDirectory": "upos/apps/portal/dist",
   "framework": null,
   "rewrites": [
