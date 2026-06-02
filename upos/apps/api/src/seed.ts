@@ -57,7 +57,7 @@ const student2 = await User.create({
 const parent = await User.create({
   uid: 'PRT-0001',
   role: 'parent',
-  email: 'suchart@example.com',
+  email: 'suchat@dulwich.ac.th',
   phone: '0812345678',
   passwordHash: hash('Demo1234!'),
   firstName: 'สุชาติ',
