@@ -207,3 +207,44 @@ export const authController = new Elysia({ prefix: '/auth' })
       password:    t.String({ minLength: 1 }),
     }),
   })
+
+  .post('/parent-login-v2', async ({ body, set, request }) => {
+    const { contact, password } = body
+    const normalized = contact.toLowerCase().trim()
+
+    const user = await User.findOne({
+      $or: [{ email: normalized }, { phone: normalized }],
+      role: { $in: ['parent', 'admin', 'supervisor', 'cashier', 'teacher'] },
+      status: 'active',
+    }).lean()
+
+    if (!user || !user.passwordHash) {
+      set.status = 401
+      return { error: { code: 'NOT_FOUND', message: 'ไม่พบบัญชีหรือรหัสผ่านไม่ถูกต้อง' } }
+    }
+
+    const valid = await bcrypt.compare(password, user.passwordHash)
+    if (!valid) {
+      set.status = 401
+      return { error: { code: 'AUTH_001', message: 'ไม่พบบัญชีหรือรหัสผ่านไม่ถูกต้อง' } }
+    }
+
+    const payload = { userId: String(user._id), role: user.role, uid: user.uid }
+    const accessToken  = signAccessToken(payload as any)
+    const refreshToken = signRefreshToken(payload as any)
+
+    await AuditLog.create({
+      actorUserId: user._id,
+      actorRole:   user.role,
+      action:      'login',
+      ip:          request.headers.get('x-forwarded-for') ?? 'unknown',
+    })
+
+    const { passwordHash: _ph, ...safeUser } = user
+    return { accessToken, refreshToken, user: safeUser }
+  }, {
+    body: t.Object({
+      contact:  t.String({ minLength: 1 }),
+      password: t.String({ minLength: 1 }),
+    }),
+  })
