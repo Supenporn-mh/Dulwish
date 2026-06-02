@@ -11,7 +11,9 @@
     <aside :class="['sidebar', { 'sidebar--hidden': !sidebarOpen && isMobile }]">
       <!-- Logo -->
       <div class="sidebar-logo">
-        <div class="sidebar-logo-icon">🏫</div>
+        <div class="sidebar-logo-icon">
+          <PhBuildings :size="26" weight="fill" style="color: #1264E3" />
+        </div>
         <div>
           <div class="sidebar-logo-title">UPOS</div>
           <div class="sidebar-logo-sub">Admin</div>
@@ -27,7 +29,13 @@
           :class="['sidebar-link', { 'sidebar-link--active': isActive(link.to) }]"
           @click="isMobile && (sidebarOpen = false)"
         >
-          <span class="sidebar-link-icon">{{ link.icon }}</span>
+          <span class="sidebar-link-icon">
+            <component
+              :is="link.icon"
+              :size="20"
+              :weight="isActive(link.to) ? 'fill' : 'regular'"
+            />
+          </span>
           <span class="sidebar-link-label">{{ link.label }}</span>
         </RouterLink>
       </nav>
@@ -82,6 +90,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import {
+  PhSquaresFour, PhUsers, PhStudent, PhForkKnife,
+  PhReceipt, PhChartLine, PhClipboardText, PhGear, PhCalendarDots,
+  PhBuildings, PhSignOut,
+} from '@phosphor-icons/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -90,14 +103,15 @@ const sidebarOpen = ref(true)
 const isMobile = ref(false)
 
 const navLinks = [
-  { to: '/admin/dashboard', icon: '📊', label: 'Dashboard' },
-  { to: '/admin/users', icon: '👥', label: 'ผู้ใช้งาน' },
-  { to: '/admin/students', icon: '🎒', label: 'นักเรียน' },
-  { to: '/admin/menu', icon: '🍽', label: 'เมนู' },
-  { to: '/admin/transactions', icon: '💳', label: 'รายการ' },
-  { to: '/admin/reports', icon: '📈', label: 'รายงาน' },
-  { to: '/admin/audit', icon: '📋', label: 'Audit' },
-  { to: '/admin/policies', icon: '⚙️', label: 'นโยบาย' },
+  { to: '/admin/dashboard',    icon: PhSquaresFour,   label: 'Dashboard'  },
+  { to: '/admin/users',        icon: PhUsers,         label: 'ผู้ใช้งาน'  },
+  { to: '/admin/students',     icon: PhStudent,       label: 'นักเรียน'   },
+  { to: '/admin/menu',         icon: PhForkKnife,     label: 'เมนู'       },
+  { to: '/admin/transactions', icon: PhReceipt,       label: 'รายการ'     },
+  { to: '/admin/reports',      icon: PhChartLine,     label: 'รายงาน'     },
+  { to: '/admin/audit',        icon: PhClipboardText, label: 'Audit'      },
+  { to: '/admin/policies',     icon: PhGear,          label: 'นโยบาย'        },
+  { to: '/admin/academic-year', icon: PhCalendarDots, label: 'ตั้งค่าภาคเรียน' },
 ]
 
 const pageTitles: Record<string, string> = {
@@ -108,7 +122,8 @@ const pageTitles: Record<string, string> = {
   '/admin/transactions': 'รายการ',
   '/admin/reports': 'รายงาน',
   '/admin/audit': 'Audit Log',
-  '/admin/policies': 'นโยบาย',
+  '/admin/policies':      'นโยบาย',
+  '/admin/academic-year': 'ตั้งค่าภาคเรียน',
 }
 
 const currentPageTitle = computed(() => pageTitles[route.path] ?? 'Admin')

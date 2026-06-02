@@ -1,130 +1,99 @@
 <template>
-  <div class="users-view">
-    <!-- Section header -->
-    <div class="ios-section-header">จัดการผู้ใช้งาน</div>
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <h2 style="font-size:22px;font-weight:500;color:#1C1C1E">จัดการผู้ใช้งาน</h2>
+    </div>
 
-    <!-- Filter card -->
-    <div class="ios-card filter-card">
-      <div class="filter-row">
-        <el-input
-          v-model="search"
-          placeholder="ค้นหาชื่อ / อีเมล"
-          clearable
-          class="filter-input"
-          @input="handleFilterChange"
-        >
-          <template #prefix>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="margin-right:2px">
-              <circle cx="6" cy="6" r="5" stroke="#AEAEB2" stroke-width="1.5"/>
-              <path d="M10 10l2.5 2.5" stroke="#AEAEB2" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-          </template>
-        </el-input>
-
-        <el-select
-          v-model="filterRole"
-          placeholder="บทบาท"
-          clearable
-          class="filter-select"
-          @change="handleFilterChange"
-        >
-          <el-option label="ทั้งหมด" value="" />
-          <el-option label="Admin" value="admin" />
-          <el-option label="Supervisor" value="supervisor" />
-          <el-option label="Cashier" value="cashier" />
-          <el-option label="Parent" value="parent" />
-          <el-option label="Student" value="student" />
-        </el-select>
-
-        <el-select
-          v-model="filterStatus"
-          placeholder="สถานะ"
-          clearable
-          class="filter-select filter-select--sm"
-          @change="handleFilterChange"
-        >
-          <el-option label="ทั้งหมด" value="" />
-          <el-option label="Active" value="active" />
-          <el-option label="Inactive" value="inactive" />
-        </el-select>
-
-        <button class="search-btn" @click="fetchUsers">
-          ค้นหา
-        </button>
+    <!-- Filters -->
+    <div class="adm-table-wrap p-4" style="border-radius:10px">
+      <div class="flex flex-wrap gap-3">
+        <input v-model="search" class="adm-filter-input" placeholder="ค้นหาชื่อ / อีเมล..." @input="handleFilterChange" />
+        <select v-model="filterRole" class="adm-filter-select" @change="handleFilterChange">
+          <option value="">บทบาททั้งหมด</option>
+          <option value="admin">Admin</option>
+          <option value="supervisor">Supervisor</option>
+          <option value="cashier">Cashier</option>
+          <option value="parent">Parent</option>
+          <option value="student">Student</option>
+        </select>
+        <select v-model="filterStatus" class="adm-filter-select" @change="handleFilterChange">
+          <option value="">สถานะทั้งหมด</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <button class="adm-search-btn" @click="fetchUsers">ค้นหา</button>
       </div>
     </div>
 
-    <!-- Table card -->
-    <div class="ios-card table-card">
-      <el-table
-        v-loading="loading"
-        :data="pagedUsers"
-        style="width: 100%"
-        :header-cell-style="{
-          background: '#F2F2F7',
-          color: '#6E6E73',
-          fontWeight: '600',
-          fontSize: '13px',
-          borderBottom: '1px solid rgba(198,198,200,0.4)'
-        }"
-        :cell-style="{ fontSize: '14px', color: '#000000' }"
-        :row-style="{ cursor: 'default' }"
-      >
-        <el-table-column label="UID" prop="id" min-width="80">
-          <template #default="{ row }">
-            <span class="uid">{{ row.id }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="ชื่อ" prop="name" min-width="150">
-          <template #default="{ row }">
-            <span style="font-weight:500; color:#000000">{{ row.name }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="บทบาท" prop="role" min-width="120">
-          <template #default="{ row }">
-            <span
-              class="role-badge"
-              :style="roleBadgeStyle(row.role)"
-            >{{ row.role }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="อีเมล" prop="email" min-width="200">
-          <template #default="{ row }">
-            <span style="font-size:13px; color:#3C3C43">{{ row.email }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="สถานะ" prop="status" min-width="110">
-          <template #default="{ row }">
-            <el-switch
-              :model-value="row.status === 'active'"
-              :loading="togglingId === row.id"
-              style="--el-switch-on-color: #1264E3; --el-switch-off-color: #C6C6C8"
-              @change="(val: boolean) => toggleStatus(row, val)"
-            />
-          </template>
-        </el-table-column>
-
-        <el-table-column label="จัดการ" min-width="100" align="center">
-          <template #default="{ row }">
-            <button class="edit-btn" @click="editUser(row)">แก้ไข</button>
-          </template>
-        </el-table-column>
-      </el-table>
+    <!-- Table -->
+    <div class="adm-table-wrap">
+      <table class="adm-table">
+        <thead>
+          <tr>
+            <th class="center" style="width:52px">ลำดับ</th>
+            <th>รหัสผู้ใช้</th>
+            <th>ชื่อ-นามสกุล</th>
+            <th>บทบาท</th>
+            <th>อีเมล</th>
+            <th class="center">สถานะ</th>
+            <th class="center" style="width:100px">จัดการ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="loading">
+            <td colspan="7" class="center" style="padding:32px;color:#8E8E93">กำลังโหลด...</td>
+          </tr>
+          <tr v-else-if="pagedUsers.length === 0">
+            <td colspan="7" class="center" style="padding:32px;color:#8E8E93">ไม่มีรายการ</td>
+          </tr>
+          <tr v-for="(user, i) in pagedUsers" :key="user.id">
+            <td class="num center">{{ (currentPage-1)*pageSize + i + 1 }}</td>
+            <td><span class="adm-code">{{ user.id }}</span></td>
+            <td style="font-weight:500;color:var(--color-primary)">{{ user.name }}</td>
+            <td>
+              <span :class="['adm-badge', `adm-badge-${user.role}`]">{{ user.role }}</span>
+            </td>
+            <td style="color:#3C3C43;font-size:13px">{{ user.email }}</td>
+            <td class="center">
+              <span class="adm-status">
+                <span :class="['adm-dot', user.status === 'active' ? 'adm-dot-success' : 'adm-dot-gray']" />
+                <span :style="{color: user.status==='active' ? '#028A60' : '#8E8E93'}">
+                  {{ user.status === 'active' ? 'เปิดใช้งาน' : 'ปิดใช้งาน' }}
+                </span>
+              </span>
+            </td>
+            <td>
+              <div class="adm-actions">
+                <button class="adm-action-btn" title="แก้ไข" @click="editUser(user)">
+                  <PhPencilSimple :size="15" />
+                </button>
+                <button
+                  class="adm-action-btn"
+                  :title="user.status === 'active' ? 'ปิดใช้งาน' : 'เปิดใช้งาน'"
+                  @click="toggleStatus(user, user.status !== 'active')"
+                >
+                  <PhToggleLeft v-if="user.status !== 'active'" :size="15" />
+                  <PhToggleRight v-else :size="15" style="color:var(--color-primary)" />
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
 
       <!-- Pagination -->
-      <div class="pagination-row">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :total="filteredUsers.length"
-          :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next"
-          background
-        />
+      <div class="adm-pagination">
+        <span>ทั้งหมด {{ filteredUsers.length }} รายการ</span>
+        <div class="adm-page-btns">
+          <button class="adm-page-btn" :disabled="currentPage === 1" @click="currentPage--">‹</button>
+          <button
+            v-for="p in totalPages" :key="p"
+            :class="['adm-page-btn', currentPage === p ? 'active' : '']"
+            @click="currentPage = p"
+          >{{ p }}</button>
+          <button class="adm-page-btn" :disabled="currentPage === totalPages" @click="currentPage++">›</button>
+        </div>
       </div>
     </div>
   </div>
@@ -133,6 +102,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { PhPencilSimple, PhToggleLeft, PhToggleRight } from '@phosphor-icons/vue'
 
 const API_BASE = 'http://localhost:4000'
 
@@ -175,10 +145,11 @@ const filteredUsers = computed(() => {
   })
 })
 
-const pagedUsers = computed(() => {
+const pagedUsers  = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   return filteredUsers.value.slice(start, start + pageSize.value)
 })
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredUsers.value.length / pageSize.value)))
 
 function handleFilterChange() {
   currentPage.value = 1
@@ -269,6 +240,21 @@ onMounted(fetchUsers)
 </script>
 
 <style scoped>
+.adm-filter-select,
+.adm-filter-input {
+  height: 36px; padding: 0 12px; border-radius: 8px;
+  border: 1px solid #E8E8E8; background: #fff;
+  font-size: 13px; color: #1C1C1E; outline: none; min-width: 130px;
+}
+.adm-filter-select:focus, .adm-filter-input:focus { border-color: var(--color-primary); }
+.adm-search-btn {
+  height: 36px; padding: 0 16px; border-radius: 8px;
+  background: var(--color-primary); color: #fff;
+  font-size: 13px; font-weight: 500; border: none; cursor: pointer;
+}
+.adm-search-btn:active { opacity: 0.8; }
+
+/* keep old classes for compat */
 .users-view {
   display: flex;
   flex-direction: column;

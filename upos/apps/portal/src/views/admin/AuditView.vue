@@ -18,44 +18,54 @@
       <el-button @click="fetchLogs" type="primary">ค้นหา</el-button>
     </div>
 
-    <el-table
-      :data="pagedLogs"
-      v-loading="loading"
-      stripe
-      border
-      size="small"
-      style="width:100%"
-      @row-click="openDetail"
-    >
-      <el-table-column
-        label="วัน/เวลา"
-        width="160"
-        :formatter="(r: any) => new Date(r.createdAt).toLocaleString('th-TH', { hour12: false })"
-      />
-      <el-table-column prop="actor" label="ผู้กระทำ" min-width="160" />
-      <el-table-column label="Action" width="150">
-        <template #default="{ row }">
-          <el-tag :type="actionColor(row.action)" size="small">{{ row.action }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="entity" label="Entity" min-width="140" />
-      <el-table-column prop="reason" label="เหตุผล" min-width="180" show-overflow-tooltip />
-      <el-table-column label="" width="70" align="center">
-        <template #default="{ row }">
-          <el-button size="small" text type="primary" @click.stop="openDetail(row)">ดู</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <div class="mt-4 flex justify-end">
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :total="filteredLogs.length"
-        :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
-        background
-      />
+    <div class="adm-table-wrap">
+      <table class="adm-table">
+        <thead>
+          <tr>
+            <th class="center" style="width:52px">ลำดับ</th>
+            <th>วัน/เวลา</th>
+            <th>ผู้กระทำ</th>
+            <th>Action</th>
+            <th>Entity</th>
+            <th>เหตุผล</th>
+            <th class="center" style="width:70px">ดู</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="loading">
+            <td colspan="7" class="center" style="padding:32px;color:#AEAEB2">กำลังโหลด...</td>
+          </tr>
+          <tr v-else-if="pagedLogs.length === 0">
+            <td colspan="7" class="center" style="padding:32px;color:#AEAEB2">ไม่มีรายการ</td>
+          </tr>
+          <tr v-for="(log, i) in pagedLogs" :key="log.id ?? i" style="cursor:pointer" @click="openDetail(log)">
+            <td class="num center">{{ (currentPage-1)*pageSize + i + 1 }}</td>
+            <td style="color:#8E8E93;white-space:nowrap;font-size:12px">
+              {{ new Date(log.createdAt).toLocaleString('th-TH',{hour12:false}) }}
+            </td>
+            <td style="color:#1C1C1E">{{ log.actor ?? log.actorRole ?? '-' }}</td>
+            <td><span :class="['adm-badge', actionBadgeClass(log.action)]">{{ log.action }}</span></td>
+            <td style="color:#3C3C43;font-size:12px">{{ log.entity ?? log.entityType ?? '-' }}</td>
+            <td style="color:#3C3C43;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              {{ log.reason || '—' }}
+            </td>
+            <td class="center">
+              <button class="adm-action-btn" @click.stop="openDetail(log)" title="ดูรายละเอียด">
+                <PhEye :size="15" />
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="adm-pagination">
+        <span>ทั้งหมด {{ filteredLogs.length }} รายการ</span>
+        <div class="adm-page-btns">
+          <button class="adm-page-btn" :disabled="currentPage===1" @click="currentPage--">‹</button>
+          <button v-for="p in Math.ceil(filteredLogs.length/pageSize)" :key="p"
+            :class="['adm-page-btn', currentPage===p?'active':'']" @click="currentPage=p">{{ p }}</button>
+          <button class="adm-page-btn" :disabled="currentPage===Math.ceil(filteredLogs.length/pageSize)" @click="currentPage++">›</button>
+        </div>
+      </div>
     </div>
 
     <!-- Detail dialog -->
@@ -96,6 +106,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { PhEye } from '@phosphor-icons/vue'
 import api from '@/api/axios'
 
 interface AuditLog {
@@ -141,6 +152,10 @@ const actionOptions = [
 
 function actionColor(a: string): 'info' | 'success' | 'danger' | 'warning' | '' {
   return ({ login: 'info', topup: 'success', void_txn: 'danger', policy_change: 'warning' } as Record<string, 'info' | 'success' | 'danger' | 'warning'>)[a] ?? ''
+}
+
+function actionBadgeClass(a: string) {
+  return { login: 'adm-badge-topup', topup: 'adm-badge-topup', void_txn: 'adm-badge-void', policy_change: 'adm-badge-buffet', purchase: 'adm-badge-purchase', buffet: 'adm-badge-buffet', user_update: 'adm-badge-student' }[a] ?? 'adm-badge-voided'
 }
 
 const filteredLogs = computed(() => {

@@ -27,13 +27,27 @@
             <canvas ref="buffetChart" />
           </div>
         </el-card>
-        <el-table :data="buffetData" class="mt-4" size="small" stripe>
-          <el-table-column prop="entryDate" label="วันที่" width="120" />
-          <el-table-column label="มื้อ">
-            <template #default="{ row }">{{ row.mealPeriodId?.name ?? row.mealPeriodId }}</template>
-          </el-table-column>
-          <el-table-column prop="priceCharged" label="ราคา (฿)" width="100" align="right" />
-        </el-table>
+        <div class="adm-table-wrap mt-4">
+          <table class="adm-table">
+            <thead>
+              <tr>
+                <th style="width:120px">วันที่</th>
+                <th>มื้ออาหาร</th>
+                <th class="right" style="width:100px">ราคา (฿)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="buffetData.length === 0">
+                <td colspan="3" class="center" style="padding:32px;color:#AEAEB2">ไม่มีรายการ</td>
+              </tr>
+              <tr v-for="(row, i) in buffetData" :key="i">
+                <td style="color:#8E8E93;white-space:nowrap;font-size:12px">{{ row.entryDate }}</td>
+                <td><span class="adm-badge adm-badge-buffet">{{ row.mealPeriodId?.name ?? row.mealPeriodId }}</span></td>
+                <td class="right" style="font-variant-numeric:tabular-nums">{{ row.priceCharged }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </el-tab-pane>
     </el-tabs>
   </div>

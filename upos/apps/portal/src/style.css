@@ -722,3 +722,186 @@ html, body, #app {
   .ios-page { min-height: 100%; padding-bottom: 72px; background: var(--color-bg-page); }
   .ios-page-nosafe { min-height: 100%; background: var(--color-bg-page); }
 }
+
+/* ═══ Admin Data Table ══════════════════════════════════════════════ */
+.adm-table-wrap {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #EBEBEB;
+  overflow: hidden;
+}
+.adm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.adm-table thead tr {
+  background: #ffffff;
+  border-bottom: 1px solid #EBEBEB;
+}
+.adm-table thead th {
+  padding: 10px 20px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 400;
+  color: #AEAEB2;
+  white-space: nowrap;
+}
+.adm-table thead th.right  { text-align: right; }
+.adm-table thead th.center { text-align: center; }
+
+.adm-table tbody tr {
+  border-bottom: 1px solid #F5F5F7;
+  transition: background 0.1s;
+}
+.adm-table tbody tr:last-child { border-bottom: none; }
+.adm-table tbody tr:hover { background: #FAFAFA; }
+
+.adm-table td {
+  padding: 18px 20px;
+  vertical-align: middle;
+  color: #1C1C1E;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.adm-table td.right  { text-align: right; }
+.adm-table td.center { text-align: center; }
+.adm-table td.num    { color: #8E8E93; font-size: 13px; font-weight: 400; width: 52px; }
+
+/* Code badge */
+.adm-code {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #F2F2F7;
+  color: #3C3C43;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+/* Amount */
+.adm-amount-pos { color: var(--color-success); font-weight: 500; }
+.adm-amount-neg { color: var(--color-danger);  font-weight: 500; }
+
+/* Status dot */
+.adm-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 400;
+}
+.adm-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.adm-dot-success { background: var(--color-success); }
+.adm-dot-danger  { background: var(--color-danger);  }
+.adm-dot-warning { background: var(--color-warning); }
+.adm-dot-gray    { background: #C7C7CC; }
+
+/* Type/role badge — pill style (design system colors) */
+.adm-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.adm-badge-topup    { background: var(--color-success-bg); color: #028A60; }
+.adm-badge-purchase { background: var(--color-warning-bg); color: #C67100; }
+.adm-badge-buffet   { background: var(--color-primary-tint); color: var(--color-primary); }
+.adm-badge-refund   { background: #EEEDFE; color: #3C3489; }
+.adm-badge-void     { background: var(--color-danger-bg); color: #CC3333; }
+.adm-badge-admin    { background: var(--color-danger-bg); color: #CC3333; }
+.adm-badge-supervisor { background: #FAECE7; color: #993C1D; }
+.adm-badge-cashier  { background: var(--color-warning-bg); color: #C67100; }
+.adm-badge-parent   { background: #EEEDFE; color: #3C3489; }
+.adm-badge-student  { background: var(--color-primary-tint); color: var(--color-primary-dark); }
+.adm-badge-success  { background: var(--color-success-bg); color: #028A60; }
+.adm-badge-pending  { background: var(--color-warning-bg); color: #C67100; }
+.adm-badge-failed   { background: var(--color-danger-bg); color: #CC3333; }
+.adm-badge-voided   { background: #F1EFE8; color: #5F5E5A; }
+
+/* Quota progress */
+.adm-quota { display: flex; flex-direction: column; gap: 5px; min-width: 90px; }
+.adm-quota-text { font-size: 14px; font-weight: 500; color: #1C1C1E; }
+.adm-quota-bar  { height: 3px; border-radius: 2px; background: #E8E8E8; overflow: hidden; width: 100%; }
+.adm-quota-fill { height: 100%; border-radius: 2px; background: var(--color-primary); transition: width 0.3s; }
+
+/* iOS-style toggle — ตาม design system §10: 40×22px · knob 16×16px */
+.adm-toggle {
+  position: relative;
+  width: 40px; height: 22px;
+  border-radius: 20px;
+  background: var(--color-border-secondary);
+  border: none; cursor: pointer;
+  transition: background 0.25s;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.adm-toggle.on { background: var(--color-primary); }
+.adm-toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.20);
+  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+}
+.adm-toggle.on::after { transform: translateX(18px); }
+
+/* Name link style */
+.adm-name-link { color: var(--color-primary); font-weight: 500; cursor: pointer; text-decoration: none; }
+.adm-name-link:hover { text-decoration: underline; }
+
+/* Action buttons — design system btn-sm: height 30px */
+.adm-actions { display: flex; gap: 6px; align-items: center; justify-content: center; }
+.adm-action-btn {
+  width: 30px; height: 30px;
+  border-radius: var(--radius-md);   /* 8px */
+  background: var(--color-bg-secondary);
+  border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--color-text-secondary);  /* #666 — ชัดพอ */
+  transition: background 0.15s, color 0.15s;
+}
+.adm-action-btn:hover         { background: var(--color-border-tertiary); color: var(--color-text-primary); }
+.adm-action-btn.danger:hover  { background: var(--color-danger-bg); color: var(--color-danger); }
+
+/* Pagination row */
+.adm-pagination {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px;
+  border-top: 1px solid #F0F0F0;
+  font-size: 13px;
+  color: #AEAEB2;
+}
+.adm-page-btns { display: flex; gap: 4px; align-items: center; }
+.adm-page-btn {
+  min-width: 32px; height: 32px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid #EBEBEB;
+  background: #fff;
+  font-size: 13px; font-weight: 500;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #3C3C43;
+  transition: background 0.1s, border-color 0.1s;
+}
+.adm-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.adm-page-btn.active {
+  background: #1C1C1E;
+  border-color: #1C1C1E;
+  color: #fff;
+}
+.adm-page-btn:not(.active):not(:disabled):hover { background: #F2F2F7; }

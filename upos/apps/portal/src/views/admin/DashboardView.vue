@@ -12,7 +12,7 @@
           class="ios-card metric-card"
         >
           <div class="metric-icon-wrap" :style="{ background: card.iconBg }">
-            <span class="metric-icon">{{ card.icon }}</span>
+            <component :is="card.icon" :size="24" weight="fill" :style="{ color: card.color }" />
           </div>
           <div class="metric-value" :style="{ color: card.color }">
             {{ card.formatted }}
@@ -25,66 +25,48 @@
 
     <!-- Recent transactions -->
     <div>
-      <div class="ios-section-header">รายการล่าสุด</div>
-      <div class="ios-card table-card">
-        <el-table
-          :data="recentTransactions"
-          :loading="loading"
-          style="width: 100%"
-          size="small"
-          :header-cell-style="{ background: '#F2F2F7', color: '#6E6E73', fontWeight: '600', fontSize: '13px' }"
-          :cell-style="{ fontSize: '14px', color: '#000000' }"
-        >
-          <el-table-column label="วัน/เวลา" prop="createdAt" min-width="130">
-            <template #default="{ row }">
-              <span style="font-size:13px; color:#6E6E73">{{ formatDateTime(row.createdAt) }}</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="RefNo" prop="refNo" min-width="150">
-            <template #default="{ row }">
-              <span class="refno">{{ row.refNo }}</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="ประเภท" prop="type" min-width="100">
-            <template #default="{ row }">
-              <el-tag
-                :color="typeTagColor(row.type).bg"
-                :style="{ color: typeTagColor(row.type).text, border: 'none', borderRadius: '6px', fontWeight: '600', fontSize: '12px' }"
-                size="small"
-              >
-                {{ typeLabel(row.type) }}
-              </el-tag>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="จำนวน" prop="amount" min-width="110" align="right">
-            <template #default="{ row }">
-              <span :class="amountClass(row.type)" style="font-weight:700; font-size:15px">
-                {{ amountSign(row.type) }}{{ formatAmount(row.amount) }}
-              </span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="ช่องทาง" prop="channel" min-width="100">
-            <template #default="{ row }">
-              <span style="font-size:13px; color:#3C3C43">{{ row.channel }}</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="สถานะ" prop="status" min-width="90">
-            <template #default="{ row }">
-              <el-tag
-                :color="statusTagColor(row.status).bg"
-                :style="{ color: statusTagColor(row.status).text, border: 'none', borderRadius: '6px', fontWeight: '600', fontSize: '12px' }"
-                size="small"
-              >
-                {{ row.status }}
-              </el-tag>
-            </template>
-          </el-table-column>
-        </el-table>
+      <p style="font-size:13px;font-weight:500;color:#AEAEB2;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:12px">
+        รายการล่าสุด
+      </p>
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead>
+            <tr>
+              <th>วัน/เวลา</th>
+              <th>RefNo</th>
+              <th>ประเภท</th>
+              <th class="right">จำนวน</th>
+              <th>ช่องทาง</th>
+              <th>สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="loading">
+              <td colspan="6" class="center" style="padding:32px;color:#AEAEB2">กำลังโหลด...</td>
+            </tr>
+            <tr v-for="tx in recentTransactions" :key="tx._id ?? tx.id">
+              <td style="color:#8E8E93;white-space:nowrap">{{ formatDateTime(tx.createdAt) }}</td>
+              <td><span class="adm-code">{{ tx.refNo }}</span></td>
+              <td>
+                <span :class="['adm-badge', `adm-badge-${tx.type}`]">{{ typeLabel(tx.type) }}</span>
+              </td>
+              <td class="right">
+                <span :class="tx.amount > 0 ? 'adm-amount-pos' : 'adm-amount-neg'">
+                  {{ tx.amount > 0 ? '+' : '' }}฿{{ Math.abs(tx.amount).toLocaleString() }}
+                </span>
+              </td>
+              <td style="color:#3C3C43">{{ tx.channel }}</td>
+              <td>
+                <span class="adm-status">
+                  <span :class="['adm-dot', tx.status === 'success' ? 'adm-dot-success' : tx.status === 'pending' ? 'adm-dot-warning' : 'adm-dot-danger']" />
+                  <span :style="{color: tx.status==='success'?'#028A60':tx.status==='pending'?'#C67100':'#CC3333'}">
+                    {{ tx.status }}
+                  </span>
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -92,6 +74,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { PhMoney, PhArrowUp, PhForkKnife, PhWarningCircle } from '@phosphor-icons/vue'
 
 const API_BASE = 'http://localhost:4000'
 
@@ -144,7 +127,7 @@ const DEMO_TRANSACTIONS: Transaction[] = [
 const metricCards = computed(() => [
   {
     key: 'revenue',
-    icon: '💰',
+    icon: PhMoney,
     label: 'รายรับวันนี้',
     formatted: `฿${dashboardData.value.todayRevenue.toLocaleString()}`,
     sub: 'Total today revenue',
@@ -153,7 +136,7 @@ const metricCards = computed(() => [
   },
   {
     key: 'topups',
-    icon: '⬆️',
+    icon: PhArrowUp,
     label: 'เติมเงิน',
     formatted: `฿${dashboardData.value.topUps.toLocaleString()}`,
     sub: 'Top-up amount today',
@@ -162,7 +145,7 @@ const metricCards = computed(() => [
   },
   {
     key: 'buffet',
-    icon: '🍽️',
+    icon: PhForkKnife,
     label: 'Buffet วันนี้',
     formatted: dashboardData.value.buffetEntries.toString(),
     sub: 'Buffet entries today',
@@ -171,7 +154,7 @@ const metricCards = computed(() => [
   },
   {
     key: 'low',
-    icon: '⚠️',
+    icon: PhWarningCircle,
     label: 'ยอดต่ำ',
     formatted: dashboardData.value.lowBalance.toString(),
     sub: 'Students with low balance',

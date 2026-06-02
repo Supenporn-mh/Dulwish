@@ -24,69 +24,58 @@
         </button>
       </div>
 
-      <div class="ios-card table-card">
-        <el-table
-          v-loading="loading"
-          :data="menuItems"
-          style="width: 100%"
-          size="small"
-          :header-cell-style="{
-            background: '#F2F2F7',
-            color: '#6E6E73',
-            fontWeight: '600',
-            fontSize: '13px',
-          }"
-          :cell-style="{ fontSize: '14px', color: '#000000' }"
-        >
-          <el-table-column label="SKU" prop="sku" min-width="110">
-            <template #default="{ row }">
-              <span class="sku-badge">{{ row.sku }}</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="ชื่อ" prop="name" min-width="150">
-            <template #default="{ row }">
-              <span style="font-weight:500">{{ row.name }}</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="ร้าน" prop="shop" min-width="130">
-            <template #default="{ row }">
-              <span style="color:#3C3C43; font-size:13px">{{ row.shop }}</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="ราคา" prop="price" min-width="80" align="right">
-            <template #default="{ row }">
-              <span style="font-weight:600; color:#1264E3">฿{{ row.price }}</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="สั่งล่วงหน้า" prop="preorderable" min-width="110" align="center">
-            <template #default="{ row }">
-              <el-switch
-                v-model="row.preorderable"
-                style="--el-switch-on-color: #1264E3; --el-switch-off-color: #C6C6C8"
-              />
-            </template>
-          </el-table-column>
-
-          <el-table-column label="Active" prop="active" min-width="90" align="center">
-            <template #default="{ row }">
-              <el-switch
-                v-model="row.active"
-                style="--el-switch-on-color: #34C759; --el-switch-off-color: #C6C6C8"
-              />
-            </template>
-          </el-table-column>
-
-          <el-table-column label="จัดการ" min-width="130" align="center">
-            <template #default="{ row }">
-              <button class="action-btn action-btn--edit" @click="openEditDialog(row)">แก้ไข</button>
-              <button class="action-btn action-btn--delete" @click="deleteItem(row)">ลบ</button>
-            </template>
-          </el-table-column>
-        </el-table>
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead>
+            <tr>
+              <th class="center" style="width:52px">ลำดับ</th>
+              <th>SKU</th>
+              <th>ชื่อเมนู</th>
+              <th>ร้าน</th>
+              <th class="right">ราคา</th>
+              <th class="center">สั่งล่วงหน้า</th>
+              <th class="center">เปิดขาย</th>
+              <th class="center" style="width:90px">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="loading">
+              <td colspan="8" class="center" style="padding:32px;color:#AEAEB2">กำลังโหลด...</td>
+            </tr>
+            <tr v-else-if="menuItems.length === 0">
+              <td colspan="8" class="center" style="padding:32px;color:#AEAEB2">ไม่มีเมนูอาหาร</td>
+            </tr>
+            <tr v-for="(item, i) in menuItems" :key="item.id ?? i">
+              <td class="num center">{{ i + 1 }}</td>
+              <td><span class="adm-code">{{ item.sku }}</span></td>
+              <td style="font-weight:500;color:var(--color-primary)">{{ item.name }}</td>
+              <td style="color:#3C3C43">{{ item.shop }}</td>
+              <td class="right" style="font-weight:500;color:var(--color-primary)">฿{{ item.price }}</td>
+              <td class="center">
+                <button
+                  :class="['adm-toggle', item.preorderable ? 'on' : '']"
+                  @click="item.preorderable = !item.preorderable"
+                />
+              </td>
+              <td class="center">
+                <button
+                  :class="['adm-toggle', item.active ? 'on' : '']"
+                  @click="item.active = !item.active"
+                />
+              </td>
+              <td>
+                <div class="adm-actions">
+                  <button class="adm-action-btn" title="แก้ไข" @click="openEditDialog(item)">
+                    <PhPencilSimple :size="15" />
+                  </button>
+                  <button class="adm-action-btn danger" title="ลบ" @click="deleteItem(item)">
+                    <PhTrash :size="15" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -171,6 +160,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { PhPencilSimple, PhTrash } from '@phosphor-icons/vue'
 
 const API_BASE = 'http://localhost:4000'
 
