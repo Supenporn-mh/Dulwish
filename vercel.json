@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npm install -g pnpm && pnpm install && pnpm --filter portal build",
+  "outputDirectory": "upos/apps/portal/dist",
+  "installCommand": "echo skip",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
