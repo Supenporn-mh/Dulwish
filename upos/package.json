@@ -1,0 +1,18 @@
+{
+  "name": "upos",
+  "private": true,
+  "version": "1.0.0",
+  "description": "UPOS Dulwich School Canteen System",
+  "scripts": {
+    "dev": "concurrently -n api,portal -c cyan,green \"pnpm --filter api dev\" \"pnpm --filter portal dev\"",
+    "dev:mock": "concurrently -n mock,portal -c magenta,green \"pnpm --filter api mock\" \"pnpm --filter portal dev\"",
+    "dev:all": "concurrently -n api,parent,admin,pos,kiosk -c cyan,green,yellow,magenta,blue \"pnpm --filter api dev\" \"pnpm --filter parent-web dev\" \"pnpm --filter admin dev\" \"pnpm --filter pos dev\" \"pnpm --filter kiosk dev\"",
+    "build": "pnpm -r build",
+    "seed": "pnpm --filter api seed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "concurrently": "^9.1.2",
+    "playwright": "^1.60.0"
+  }
+}

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Dulwich Canteen Kiosk</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      html,
+      body,
+      #app {
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        background: #1e4490;
+        font-family: 'Segoe UI', 'Noto Sans Thai', 'Helvetica Neue', Arial, sans-serif;
+      }
+
+      /* Hide scrollbars globally */
+      ::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* Allow text in textareas/inputs to be selectable */
+      input,
+      textarea {
+        -webkit-user-select: auto;
+        user-select: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

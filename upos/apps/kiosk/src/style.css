@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-size: 1.5rem;
+    line-height: 2rem;
+  }
+}
+
+@layer utilities {
+  .kiosk-btn {
+    @apply flex items-center justify-center gap-3 rounded-kiosk font-bold transition-all duration-150 active:scale-95 select-none;
+    min-height: 4rem;
+    font-size: 1.5rem;
+  }
+
+  .kiosk-btn-primary {
+    @apply kiosk-btn bg-white text-dulwich-700 shadow-lg hover:bg-dulwich-50 active:bg-dulwich-100;
+  }
+
+  .kiosk-btn-outline {
+    @apply kiosk-btn border-4 border-white text-white hover:bg-white/10 active:bg-white/20;
+  }
+
+  .kiosk-btn-danger {
+    @apply kiosk-btn bg-red-500 text-white hover:bg-red-600 active:bg-red-700;
+  }
+
+  .kiosk-card {
+    @apply rounded-kiosk bg-white/10 backdrop-blur-sm border border-white/20 p-6;
+  }
+}
