@@ -1,0 +1,8 @@
+{
+  "build": {
+    "cmd": "pnpm install --frozen-lockfile"
+  },
+  "deploy": {
+    "startCmd": "pnpm --filter api start"
+  }
+}

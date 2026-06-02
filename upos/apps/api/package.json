@@ -7,7 +7,7 @@
     "build": "bun build src/index.ts --outdir dist --target bun",
     "mock": "bun run src/mock-server.ts",
     "seed": "bun run src/seed.ts",
-    "start": "bun run dist/index.js"
+    "start": "bun run src/index.ts"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.3.1",
