@@ -15,7 +15,15 @@ await connectDB()
 
 const app = new Elysia()
   .use(cors({
-    origin: ['http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003', 'http://localhost:3004'],
+    origin: (request) => {
+      const origin = request.headers.get('origin') ?? ''
+      const allowed = [
+        /^http:\/\/localhost:\d+$/,           // localhost dev
+        /^https:\/\/.*\.vercel\.app$/,         // Vercel deployments
+        /^https:\/\/dulwish\.vercel\.app$/,    // production
+      ]
+      return allowed.some(r => r.test(origin))
+    },
     credentials: true,
   }))
   .use(swagger({
