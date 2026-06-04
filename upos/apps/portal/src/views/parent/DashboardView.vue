@@ -114,11 +114,11 @@ function scrollToChild(id: string) {
 }
 
 // ── Data fetching ────────────────────────────────────────────────────────────
-async function fetchBookings(childId: string) {
+async function fetchBookings(_childId: string) {
   try {
-    const child = children.value.find(c => c.id === childId)
-    const uid   = child?.studentCode ?? childId
-    const res   = await api.get(`/orders/today?studentId=${uid}`)
+    const d = new Date()
+    const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    const res = await api.get(`/orders?from=${today}&to=${today}`)
     apiBookings.value = (res.data?.orders ?? []) as Booking[]
   } catch {
     apiBookings.value = []

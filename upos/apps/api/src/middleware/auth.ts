@@ -31,8 +31,8 @@ export function verifyRefreshToken(token: string): JwtPayload {
 
 // Elysia plugin — attaches `user` to context, guards by allowed roles
 export function authPlugin(allowedRoles?: UserRole[]) {
-  return new Elysia({ name: `auth:${allowedRoles?.join(',') ?? 'any'}` })
-    .derive({ as: 'global' }, async ({ headers, set }) => {
+  return new Elysia()
+    .derive(async ({ headers, set }) => {
       const authHeader = headers.authorization
       if (!authHeader?.startsWith('Bearer ')) {
         set.status = 401
