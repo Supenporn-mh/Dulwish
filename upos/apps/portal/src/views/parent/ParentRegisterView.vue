@@ -37,6 +37,38 @@ const canRegister = computed(() =>
   password.value.length >= 8 && !pwMismatch.value
 )
 
+// contact auto-detect
+const contactType = computed<'email' | 'phone' | 'unknown'>(() => {
+  const v = contact.value.trim()
+  if (!v) return 'unknown'
+  if (/^0[0-9]{1,9}$/.test(v) || /^\+66/.test(v)) return 'phone'
+  if (v.includes('@') || /^[a-zA-Z]/.test(v)) return 'email'
+  return 'unknown'
+})
+
+const contactInputMode = computed(() =>
+  contactType.value === 'phone' ? 'tel' : 'email'
+)
+
+const contactError = computed(() => {
+  const v = contact.value.trim()
+  if (!v) return ''
+  if (contactType.value === 'phone') {
+    return /^0[0-9]{9}$/.test(v) ? '' : 'เบอร์มือถือต้องเริ่มด้วย 0 และมี 10 หลัก'
+  }
+  if (contactType.value === 'email') {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? '' : 'รูปแบบอีเมลไม่ถูกต้อง'
+  }
+  return ''
+})
+
+const canSendOtp = computed(() =>
+  !!foundStudent.value &&
+  contact.value.trim().length > 0 &&
+  contactError.value === '' &&
+  contactType.value !== 'unknown'
+)
+
 function goBack() {
   if (step.value > 1) { step.value--; return }
   router.back()
@@ -182,10 +214,27 @@ async function handleRegister() {
         <!-- Contact input (shown after student found) -->
         <div v-if="foundStudent" class="card mb-4">
           <div class="card-body">
-            <label class="text-caption mb-1 block" style="color: var(--color-text-secondary)">อีเมล หรือ เบอร์มือถือ</label>
-            <input v-model="contact" type="text" inputmode="email" placeholder="example@email.com หรือ 08xxxxxxxx"
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-caption" style="color: var(--color-text-secondary)">อีเมล หรือ เบอร์มือถือ</label>
+              <span v-if="contactType === 'email'" class="contact-type-pill contact-type-email">
+                <i class="ti ti-mail" style="font-size:11px" /> อีเมล
+              </span>
+              <span v-else-if="contactType === 'phone'" class="contact-type-pill contact-type-phone">
+                <i class="ti ti-device-mobile" style="font-size:11px" /> เบอร์มือถือ
+              </span>
+            </div>
+            <input
+              v-model="contact"
+              type="text"
+              :inputmode="contactInputMode"
+              placeholder="example@email.com หรือ 08xxxxxxxx"
               class="w-full text-body-md bg-transparent outline-none"
-              style="border: none; color: var(--color-text-primary);" />
+              style="border: none; color: var(--color-text-primary);"
+              @keydown.enter="canSendOtp && sendOtp()"
+            />
+            <p v-if="contactError" class="mt-1" style="font-size:11px;color:var(--color-danger)">
+              {{ contactError }}
+            </p>
           </div>
         </div>
 
@@ -194,7 +243,7 @@ async function handleRegister() {
           <div class="notif-content"><p class="notif-desc">{{ step1Error }}</p></div>
         </div>
 
-        <button v-if="foundStudent" @click="sendOtp" :disabled="sendLoading || !contact.trim()"
+        <button v-if="foundStudent" @click="sendOtp" :disabled="sendLoading || !canSendOtp"
           class="btn-lg btn-primary w-full">
           <span v-if="sendLoading" class="flex items-center justify-center gap-2">
             <span class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -297,3 +346,12 @@ async function handleRegister() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.contact-type-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 100px;
+}
+.contact-type-email { background: #EBF5FF; color: #1D4ED8; }
+.contact-type-phone { background: #F0FDF4; color: #15803D; }
+</style>

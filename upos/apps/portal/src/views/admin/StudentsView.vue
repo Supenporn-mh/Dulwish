@@ -5,11 +5,6 @@
     <div class="flex items-center justify-between flex-wrap gap-3">
       <h2 style="font-size:22px;font-weight:500;color:#1C1C1E">จัดการนักเรียน</h2>
       <div class="flex gap-2 flex-wrap">
-        <!-- Promote class -->
-        <button class="adm-hdr-btn adm-hdr-btn-warn" @click="showPromoteModal = true">
-          <PhArrowUp :size="14" />
-          เลื่อนชั้นเรียน
-        </button>
         <!-- Import Excel -->
         <button class="adm-hdr-btn adm-hdr-btn-ghost" @click="showImportModal = true">
           <PhUploadSimple :size="14" />
@@ -24,7 +19,51 @@
       </div>
     </div>
 
-    <!-- Filters -->
+    <!-- Stat cards -->
+    <div class="stat-row">
+      <!-- นักเรียนทั้งหมด -->
+      <div class="stat-card stat-card-primary">
+        <PhStudent :size="28" weight="light" class="stat-icon" />
+        <div class="stat-body">
+          <span class="stat-label">นักเรียนทั้งหมด</span>
+          <span class="stat-value">{{ statTotal }}</span>
+        </div>
+      </div>
+      <!-- ติดตามแล้ว -->
+      <div class="stat-card stat-card-success">
+        <PhSmiley :size="28" weight="light" class="stat-icon" />
+        <div class="stat-body">
+          <span class="stat-label">ติดตามแล้ว</span>
+          <span class="stat-value">{{ statLinked }}</span>
+        </div>
+      </div>
+      <!-- ผู้ปกครองติดตาม -->
+      <div class="stat-card stat-card-info">
+        <PhSmiley :size="28" weight="light" class="stat-icon" />
+        <div class="stat-body">
+          <span class="stat-label">ผู้ปกครองติดตาม</span>
+          <span class="stat-value">{{ statLinked }}</span>
+        </div>
+      </div>
+      <!-- ยังไม่ติดตาม -->
+      <div class="stat-card stat-card-danger">
+        <PhSmileySad :size="28" weight="light" class="stat-icon" />
+        <div class="stat-body">
+          <span class="stat-label">ยังไม่ติดตาม</span>
+          <span class="stat-value">{{ statUnlinked }}</span>
+        </div>
+      </div>
+      <!-- ผู้ปกครองยังไม่ติดตาม -->
+      <div class="stat-card stat-card-ghost">
+        <PhHandWaving :size="28" weight="light" class="stat-icon" />
+        <div class="stat-body">
+          <span class="stat-label">ผู้ปกครองยังไม่ติดตาม</span>
+          <span class="stat-value">{{ statUnlinked }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters + action buttons -->
     <div class="adm-table-wrap p-4" style="border-radius:10px">
       <div class="flex flex-wrap gap-3">
         <input v-model="search" class="adm-filter-input" placeholder="ค้นหาชื่อ / รหัสนักเรียน..." style="min-width:220px" />
@@ -43,6 +82,17 @@
         </select>
         <button class="adm-search-btn" @click="currentPage = 1">ค้นหา</button>
       </div>
+      <!-- Sub-action row -->
+      <div class="flex flex-wrap gap-2" style="margin-top:12px;padding-top:12px;border-top:1px solid #F0F0F0">
+        <button class="adm-hdr-btn adm-hdr-btn-soft" @click="openPromoteModal">
+          <PhArrowUp :size="14" />
+          เลื่อนชั้นเรียน
+        </button>
+        <button class="adm-hdr-btn adm-hdr-btn-soft" :disabled="exportingCodes" @click="downloadEnrollmentCodes">
+          <PhDownloadSimple :size="14" />
+          {{ exportingCodes ? 'กำลังสร้าง...' : 'ดาวน์โหลด Enrollment Code' }}
+        </button>
+      </div>
     </div>
 
     <!-- Table -->
@@ -59,7 +109,7 @@
             <th class="center">ผู้ปกครอง</th>
             <th class="center">สิทธิ</th>
             <th class="center">สถานะ</th>
-            <th class="center" style="width:90px">จัดการ</th>
+            <th class="center" style="width:152px">จัดการ</th>
           </tr>
         </thead>
         <tbody>
@@ -126,14 +176,15 @@
             <!-- สิทธิ -->
             <td class="center">
               <div class="flex flex-col items-center gap-1">
-                <span :class="['adm-badge', s.canPreorder ? 'adm-badge-buffet' : 'adm-badge-voided']"
-                  style="font-size:10px;padding:2px 8px">
-                  {{ s.canPreorder ? 'Pre-order ✓' : 'Pre-order ✗' }}
+                <span
+                  v-for="w in enabledWallets"
+                  :key="w.id"
+                  class="adm-badge adm-badge-topup"
+                  style="font-size:10px;padding:2px 8px;white-space:nowrap"
+                >
+                  {{ w.name }}
                 </span>
-                <span :class="['adm-badge', s.buffetGroup === 'primary' ? 'adm-badge-topup' : 'adm-badge-purchase']"
-                  style="font-size:10px;padding:2px 8px">
-                  {{ s.buffetGroup === 'primary' ? 'Buffet: P' : 'Buffet: S' }}
-                </span>
+                <span v-if="enabledWallets.length === 0" style="font-size:11px;color:#AEAEB2">—</span>
               </div>
             </td>
 
@@ -150,14 +201,19 @@
             <!-- จัดการ -->
             <td>
               <div class="adm-actions">
-                <button class="adm-action-btn" title="แก้ไข">
+                <button class="adm-action-btn" title="แก้ไข" @click="openEditModal(s)">
                   <PhPencilSimple :size="14" />
                 </button>
-                <button class="adm-action-btn" title="บัตร RFID">
-                  <PhCreditCard :size="14" />
+                <button class="adm-action-btn" title="Enrollment Code" @click="openCodeModal(s)">
+                  <PhKey :size="14" />
                 </button>
-                <button class="adm-action-btn danger" title="ปิดใช้งาน">
-                  <PhProhibit :size="14" />
+                <button
+                  :class="['adm-action-btn', s.status === 'active' ? 'danger' : 'success']"
+                  :title="s.status === 'active' ? 'ปิดใช้งาน' : 'เปิดใช้งาน'"
+                  @click="toggleStatus(s)"
+                >
+                  <PhProhibit v-if="s.status === 'active'" :size="14" />
+                  <PhCheckCircle v-else :size="14" />
                 </button>
               </div>
             </td>
@@ -167,7 +223,16 @@
 
       <!-- Pagination -->
       <div class="adm-pagination">
-        <span>ทั้งหมด {{ filtered.length }} คน · สรุป: ใช้งาน {{ activeCount }} / ปิด {{ inactiveCount }}</span>
+        <div class="adm-pagination-left">
+          <span>ทั้งหมด {{ filtered.length }} คน</span>
+          <span class="adm-pagination-sep">|</span>
+          <span>แสดงผล</span>
+          <select v-model="pageSize" class="adm-page-size">
+            <option :value="10">10 รายการ</option>
+            <option :value="25">25 รายการ</option>
+            <option :value="50">50 รายการ</option>
+          </select>
+        </div>
         <div class="adm-page-btns">
           <button class="adm-page-btn" :disabled="currentPage===1" @click="currentPage--">‹</button>
           <button v-for="p in totalPages" :key="p"
@@ -307,22 +372,291 @@
       </Transition>
     </Teleport>
 
+    <!-- ── Edit Student Modal ─────────────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="modal-bg">
+        <div v-if="showEditModal" class="modal-backdrop" @click="showEditModal = false" />
+      </Transition>
+      <Transition name="modal-up">
+        <div v-if="showEditModal && editTarget" class="imp-modal" style="max-width:460px">
+          <div class="imp-header">
+            <h3 class="imp-title">แก้ไขข้อมูลนักเรียน</h3>
+            <button class="imp-close" @click="showEditModal = false"><PhX :size="18" weight="bold" /></button>
+          </div>
+          <div class="imp-divider" />
+          <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+            <div class="edit-field-row">
+              <div class="edit-field">
+                <label class="promo-label">ชื่อ</label>
+                <input v-model="editTarget.firstName" class="edit-input" />
+              </div>
+              <div class="edit-field">
+                <label class="promo-label">นามสกุล</label>
+                <input v-model="editTarget.lastName" class="edit-input" />
+              </div>
+            </div>
+            <div class="edit-field-row">
+              <div class="edit-field">
+                <label class="promo-label">ชั้นปี</label>
+                <select v-model="editTarget.gradeLevel" class="promo-select">
+                  <option v-for="g in GRADES" :key="g" :value="g">{{ g }}</option>
+                </select>
+              </div>
+              <div class="edit-field">
+                <label class="promo-label">ห้องเรียน</label>
+                <input v-model="editTarget.className" class="edit-input" />
+              </div>
+            </div>
+            <div class="edit-field">
+              <label class="promo-label">อีเมล / เบอร์ผู้ปกครอง</label>
+              <input v-model="editTarget.guardianEmail" class="edit-input" placeholder="parent@example.com หรือ 08xxxxxxxx" />
+            </div>
+            <!-- RFID -->
+            <div class="promo-divider" style="margin:4px -24px;width:calc(100% + 48px)" />
+            <div class="edit-field-row" style="align-items:flex-end">
+              <div class="edit-field" style="flex:2">
+                <label class="promo-label">รหัสบัตร RFID <span style="color:#AEAEB2;font-weight:400">(ถ้ามี)</span></label>
+                <input v-model="editTarget.cardUid" class="edit-input" placeholder="04A3B5C6..." style="font-family:monospace" />
+              </div>
+              <div class="edit-field" style="flex:1">
+                <label class="promo-label">สถานะบัตร</label>
+                <select v-model="editTarget.cardStatus" class="promo-select" :disabled="!editTarget.cardUid">
+                  <option value="active">ใช้งาน</option>
+                  <option value="inactive">ปิด</option>
+                  <option value="lost">หาย</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="imp-footer">
+            <button class="imp-btn-cancel" @click="showEditModal = false">ยกเลิก</button>
+            <button class="imp-btn-confirm imp-btn-confirm-active" @click="saveEdit">บันทึก</button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- ── Enrollment Code Modal ─────────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="modal-bg">
+        <div v-if="showCodeModal" class="modal-backdrop" @click="showCodeModal = false" />
+      </Transition>
+      <Transition name="modal-up">
+        <div v-if="showCodeModal" class="code-modal">
+
+          <!-- Header -->
+          <div class="code-header">
+            <h3 class="code-title">Enrollment Code</h3>
+            <button class="promo-close" @click="showCodeModal = false">
+              <PhX :size="18" weight="bold" />
+            </button>
+          </div>
+          <div class="promo-divider" />
+
+          <div class="code-body">
+            <!-- Student info -->
+            <div v-if="codeData" class="code-student-name">
+              {{ codeData.firstName }} {{ codeData.lastName }}
+              <span class="code-grade-badge">{{ codeData.gradeLevel }}</span>
+            </div>
+            <div v-else class="code-student-name" style="color:#AEAEB2">กำลังโหลด...</div>
+
+            <!-- Code box -->
+            <div class="code-box-wrap">
+              <div v-if="codeData?.code" class="code-box">
+                <span class="code-text">{{ codeData.code }}</span>
+                <button class="code-copy-btn" :title="copied ? 'คัดลอกแล้ว' : 'คัดลอก'" @click="copyCode">
+                  <PhCheckCircle v-if="copied" :size="16" weight="fill" style="color:#059669" />
+                  <PhCopy v-else :size="16" />
+                </button>
+              </div>
+              <div v-else class="code-box code-box-empty">
+                <span style="color:#AEAEB2;font-size:13px">ยังไม่มี Code — กด "สร้าง Code" ด้านล่าง</span>
+              </div>
+            </div>
+
+            <!-- Expiry / status -->
+            <div v-if="codeData?.code" class="code-expiry-row">
+              <span v-if="codeData.used" class="code-status code-status-used">ใช้งานแล้ว</span>
+              <span v-else-if="codeData.expired" class="code-status code-status-expired">หมดอายุ</span>
+              <span v-else class="code-status code-status-active">ใช้งานได้</span>
+              <span class="code-expiry-text">หมดอายุ {{ formatExpiry(codeData.expiresAt) }}</span>
+            </div>
+
+            <!-- Warning if used/expired -->
+            <div v-if="codeData?.code && (codeData.used || codeData.expired)" class="code-warn">
+              <PhWarning :size="14" weight="fill" style="flex-shrink:0" />
+              <span>{{ codeData.used ? 'Code นี้ถูกใช้งานไปแล้ว กรุณาสร้าง Code ใหม่' : 'Code หมดอายุแล้ว กรุณาสร้าง Code ใหม่' }}</span>
+            </div>
+          </div>
+
+          <div class="promo-divider" />
+
+          <!-- Footer -->
+          <div class="code-footer">
+            <button
+              class="code-generate-btn"
+              :disabled="generatingCode"
+              @click="generateCode"
+            >
+              <PhArrowClockwise :size="15" :class="{ 'spin': generatingCode }" />
+              {{ generatingCode ? 'กำลังสร้าง...' : 'สร้าง Code ใหม่' }}
+            </button>
+            <p class="code-footer-note">Code มีอายุ 14 วัน นับจากวันที่สร้าง</p>
+          </div>
+
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- ── Promote Modal ─────────────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="modal-bg">
-        <div v-if="showPromoteModal" class="modal-backdrop" @click="showPromoteModal=false" />
+        <div v-if="showPromoteModal" class="modal-backdrop" @click="closePromoteModal" />
       </Transition>
       <Transition name="modal-up">
-        <div v-if="showPromoteModal" class="modal-box">
-          <h3 class="modal-title">เลื่อนชั้นเรียน</h3>
-          <p class="modal-sub">ระบบจะเลื่อนชั้นนักเรียนทั้งหมด (K1→K2, K2→P1, ... P6→S1, S6→จบการศึกษา) และปรับกลุ่มราคา Buffet อัตโนมัติ</p>
-          <div class="modal-warn">
-            ⚠️ การเลื่อนชั้นไม่สามารถย้อนกลับได้ — กรุณาตรวจสอบข้อมูลก่อนดำเนินการ
+        <div v-if="showPromoteModal" class="promo-modal">
+
+          <!-- Header -->
+          <div class="promo-header">
+            <div>
+              <div class="promo-title">
+                <PhArrowCircleUp :size="20" weight="fill" style="color:var(--color-primary);flex-shrink:0" />
+                เลื่อนชั้นนักเรียน
+              </div>
+              <p class="promo-subtitle">เลื่อนชั้นนักเรียนที่เลือกไปยังปีการศึกษาถัดไป</p>
+            </div>
+            <button class="promo-close" @click="closePromoteModal">
+              <PhX :size="18" weight="bold" />
+            </button>
           </div>
-          <div class="modal-actions">
-            <button class="adm-hdr-btn adm-hdr-btn-ghost" @click="showPromoteModal=false">ยกเลิก</button>
-            <button class="adm-hdr-btn adm-hdr-btn-warn" @click="promoteAll">ยืนยันเลื่อนชั้น</button>
+
+          <div class="promo-divider" />
+
+          <!-- Year selectors -->
+          <div class="promo-body">
+            <div class="promo-year-row">
+              <div class="promo-year-col">
+                <label class="promo-label">จากปีการศึกษา</label>
+                <select v-model="promoteFromYear" class="promo-select">
+                  <option v-for="y in ACADEMIC_YEARS" :key="y" :value="y">{{ y }}</option>
+                </select>
+              </div>
+              <div class="promo-year-col">
+                <label class="promo-label">ไปยังปีการศึกษา</label>
+                <div class="promo-year-readonly">{{ promoteToYear }}</div>
+              </div>
+            </div>
+
+            <!-- Search -->
+            <div class="promo-search-wrap">
+              <PhMagnifyingGlass :size="15" style="color:#AEAEB2;flex-shrink:0" />
+              <input v-model="promoteSearch" class="promo-search" placeholder="Search..." />
+            </div>
+
+            <!-- Section header -->
+            <div class="promo-section-title-row">
+              <span class="promo-section-title">ตัวอย่างการเลื่อนชั้น (เลือก {{ totalToPromote }} คน)</span>
+              <button class="promo-select-all-btn" @click="toggleSelectAll">
+                {{ isAllSelected ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด' }}
+              </button>
+            </div>
+
+            <!-- Grade groups list -->
+            <div class="promo-list">
+              <div v-for="group in promoteGroups" :key="group.from" class="promo-row-wrap">
+                <!-- Grade header row -->
+                <div class="promo-row">
+                  <!-- Expand toggle -->
+                  <button class="promo-expand-btn" @click="toggleExpand(group.from)">
+                    <PhCaretRight
+                      :size="13"
+                      weight="bold"
+                      :style="{
+                        color: '#8E8E93',
+                        transition: 'transform 0.15s',
+                        transform: expandedGrades.has(group.from) ? 'rotate(90deg)' : 'rotate(0deg)',
+                      }"
+                    />
+                  </button>
+                  <!-- Grade select-all checkbox -->
+                  <input
+                    type="checkbox"
+                    class="promo-grade-checkbox"
+                    :checked="isGradeAllSelected(group)"
+                    :indeterminate="isGradePartial(group)"
+                    @change="toggleGradeAll(group)"
+                  />
+                  <span class="promo-grade-from">{{ group.from }}</span>
+                  <PhArrowRight :size="13" style="color:#AEAEB2;flex-shrink:0" />
+                  <span v-if="group.to" class="promo-grade-to">{{ group.to }}</span>
+                  <span v-else class="promo-grade-grad">
+                    <PhGraduationCap :size="14" weight="fill" />
+                    จบการศึกษา
+                  </span>
+                  <span :class="['promo-count', isGradePartial(group) ? 'promo-count-partial' : '']">
+                    {{ gradeSelectedCount(group) }}/{{ group.students.length }} คน
+                  </span>
+                </div>
+                <!-- Expanded student list -->
+                <div v-if="expandedGrades.has(group.from)" class="promo-student-list">
+                  <label
+                    v-for="s in group.students"
+                    :key="s.uid"
+                    class="promo-student-row"
+                    @click.prevent="toggleStudent(s.uid)"
+                  >
+                    <input
+                      type="checkbox"
+                      class="promo-grade-checkbox"
+                      :checked="selectedUids.has(s.uid)"
+                      @change="toggleStudent(s.uid)"
+                    />
+                    <span class="promo-student-name">{{ s.firstName }} {{ s.lastName }}</span>
+                    <span class="promo-student-uid">{{ s.uid }}</span>
+                  </label>
+                </div>
+              </div>
+              <div v-if="promoteGroups.length === 0" class="promo-empty">
+                ไม่พบนักเรียนที่ตรงกับการค้นหา
+              </div>
+            </div>
+
+            <!-- Graduation warning -->
+            <div v-if="hasGraduates && !promoteSearch" class="promo-warn-grad">
+              <PhWarning :size="15" weight="fill" style="flex-shrink:0;margin-top:1px" />
+              <span>นักเรียน S6 จะถูกบันทึกเป็นจบการศึกษา</span>
+            </div>
           </div>
+
+          <div class="promo-divider" />
+
+          <!-- Confirmation checkbox -->
+          <div class="promo-confirm-wrap">
+            <label class="promo-confirm-label">
+              <input v-model="promoteConfirmed" type="checkbox" class="promo-checkbox" />
+              <div>
+                <div class="promo-confirm-title">ยืนยันการเลื่อนชั้น</div>
+                <div class="promo-confirm-sub">
+                  เลื่อนชั้นนักเรียน {{ selectedUids.size }} คน ไปยัง {{ promoteToYear }} การกระทำนี้ไม่สามารถยกเลิกได้
+                </div>
+              </div>
+            </label>
+          </div>
+
+          <!-- Footer -->
+          <div class="promo-footer">
+            <button class="promo-btn-cancel" @click="closePromoteModal">ยกเลิก</button>
+            <button
+              :class="['promo-btn-confirm', promoteConfirmed ? 'promo-btn-confirm-active' : '']"
+              :disabled="!promoteConfirmed || promoting"
+              @click="promoteAll"
+            >
+              <PhArrowCircleUp :size="15" weight="fill" />
+              {{ promoting ? 'กำลังเลื่อนชั้น...' : `เลื่อนชั้น ${totalToPromote} คน` }}
+            </button>
+          </div>
+
         </div>
       </Transition>
     </Teleport>
@@ -332,10 +666,14 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useWalletsStore } from '@/stores/wallets'
 import {
   PhArrowUp, PhUploadSimple, PhDownloadSimple, PhPlus,
-  PhPencilSimple, PhCreditCard, PhProhibit,
+  PhPencilSimple, PhProhibit,
   PhX, PhCloudArrowUp, PhFileXls,
+  PhArrowCircleUp, PhMagnifyingGlass, PhCaretRight, PhArrowRight,
+  PhGraduationCap, PhWarning, PhKey, PhCopy, PhCheckCircle, PhArrowClockwise,
+  PhStudent, PhSmiley, PhSmileySad, PhHandWaving,
 } from '@phosphor-icons/vue'
 import * as XLSX from 'xlsx'
 import api from '@/api/axios'
@@ -348,6 +686,7 @@ interface Student {
   gradeLevel:    string
   className:     string
   guardianEmail?: string
+  walletIds?:     string[]
   cardUid?:      string
   cardStatus?:   'active' | 'inactive' | 'lost'
   balance:       number
@@ -360,7 +699,8 @@ interface Student {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const GRADES = ['K1','K2','P1','P2','P3','P4','P5','P6','S1','S2','S3','S4','S5','S6']
-const PRE_ORDER_GRADES = ['K1','K2']  // configurable via policy
+const PRE_ORDER_GRADES = ['K1','K2']
+const ACADEMIC_YEARS  = ['2023/2024','2024/2025','2025/2026','2026/2027','2027/2028']
 
 // ── Demo data ─────────────────────────────────────────────────────────────────
 const DEMO: Student[] = [
@@ -385,6 +725,180 @@ const showPromoteModal = ref(false)
 const showAddModal     = ref(false)
 const csvInput         = ref<HTMLInputElement | null>(null)
 
+// ── Export enrollment codes ────────────────────────────────────────────────
+const exportingCodes = ref(false)
+
+async function downloadEnrollmentCodes() {
+  exportingCodes.value = true
+  try {
+    const res  = await api.get('/admin/students/codes')
+    const rows = res.data?.students ?? []
+
+    const wb = XLSX.utils.book_new()
+
+    // ── Sheet 1: Enrollment Codes ──────────────────────────────────────
+    const headers = ['ลำดับ', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ชั้น / ห้อง', 'Enrollment Code', 'วันหมดอายุ', 'อีเมล / เบอร์ผู้ปกครอง']
+    const data = rows.map((s: any, i: number) => {
+      const exp = s.expiresAt ? new Date(s.expiresAt).toLocaleDateString('th-TH', {
+        day: 'numeric', month: 'short', year: 'numeric',
+      }) : '—'
+      return [
+        i + 1,
+        s.uid,
+        `${s.firstName} ${s.lastName}`,
+        `${s.gradeLevel} / ${s.className}`,
+        s.code,
+        exp,
+        s.guardianContact || '—',
+      ]
+    })
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...data])
+    ws['!cols'] = [
+      { wch: 6 }, { wch: 16 }, { wch: 22 }, { wch: 12 },
+      { wch: 20 }, { wch: 18 }, { wch: 28 },
+    ]
+
+    // bold header row (limited in free xlsx)
+    XLSX.utils.book_append_sheet(wb, ws, 'Enrollment Codes')
+
+    // ── Sheet 2: Instructions ──────────────────────────────────────────
+    const instrWs = XLSX.utils.aoa_to_sheet([
+      ['คำแนะนำสำหรับผู้ปกครอง'],
+      [''],
+      ['1. เปิดแอป UPOS หรือเว็บไซต์ของโรงเรียน'],
+      ['2. เลือก "ลงทะเบียนผู้ปกครอง"'],
+      ['3. กรอกรหัสนักเรียน (คอลัมน์ ข)'],
+      ['4. กรอกอีเมลหรือเบอร์มือถือของผู้ปกครอง'],
+      ['5. รับ OTP และยืนยัน'],
+      ['6. กรอกชื่อ-นามสกุล และตั้งรหัสผ่าน'],
+      [''],
+      ['* Enrollment Code มีอายุ 14 วัน หากหมดอายุให้ติดต่อโรงเรียนเพื่อขอรหัสใหม่'],
+    ])
+    instrWs['!cols'] = [{ wch: 60 }]
+    XLSX.utils.book_append_sheet(wb, instrWs, 'คำแนะนำ')
+
+    const today = new Date().toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')
+    XLSX.writeFile(wb, `Enrollment_Codes_${today}.xlsx`)
+  } catch (err) {
+    // fallback: export from local students data
+    const wb = XLSX.utils.book_new()
+    const headers = ['ลำดับ', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ชั้น / ห้อง', 'อีเมล / เบอร์ผู้ปกครอง', 'หมายเหตุ']
+    const data = students.value.map((s, i) => [
+      i + 1, s.uid, `${s.firstName} ${s.lastName}`,
+      `${s.gradeLevel} / ${s.className}`, s.guardianEmail || '—',
+      'ไม่สามารถดึง Code ได้ กรุณา restart mock server',
+    ])
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...data])
+    ws['!cols'] = [{ wch: 6 }, { wch: 16 }, { wch: 22 }, { wch: 12 }, { wch: 28 }, { wch: 40 }]
+    XLSX.utils.book_append_sheet(wb, ws, 'นักเรียน')
+    XLSX.writeFile(wb, 'Students_Export.xlsx')
+  } finally {
+    exportingCodes.value = false
+  }
+}
+
+// Edit modal state
+const showEditModal = ref(false)
+const editTarget    = ref<Student | null>(null)
+
+function openEditModal(s: Student) {
+  editTarget.value    = { ...s }
+  showEditModal.value = true
+}
+function saveEdit() {
+  if (!editTarget.value) return
+  const idx = students.value.findIndex(s => s.uid === editTarget.value!.uid)
+  if (idx >= 0) students.value[idx] = { ...editTarget.value }
+  showEditModal.value = false
+}
+
+// Toggle active/inactive
+function toggleStatus(s: Student) {
+  const idx = students.value.findIndex(x => x.uid === s.uid)
+  if (idx >= 0) {
+    students.value[idx] = {
+      ...students.value[idx],
+      status: students.value[idx].status === 'active' ? 'inactive' : 'active',
+    }
+  }
+}
+
+// Enrollment code modal state
+const showCodeModal   = ref(false)
+const codeData        = ref<any>(null)
+const generatingCode  = ref(false)
+const copied          = ref(false)
+let   copiedTimer: ReturnType<typeof setTimeout> | null = null
+
+async function openCodeModal(student: Student) {
+  showCodeModal.value = true
+  codeData.value      = null
+  try {
+    const res = await api.get(`/admin/students/${student.uid}/code`)
+    codeData.value = res.data
+  } catch {
+    codeData.value = {
+      studentUid: student.uid,
+      firstName:  student.firstName,
+      lastName:   student.lastName,
+      gradeLevel: student.gradeLevel,
+      code:       null,
+      expiresAt:  null,
+      used:       false,
+      expired:    false,
+    }
+  }
+}
+
+async function generateCode() {
+  if (!codeData.value || generatingCode.value) return
+  generatingCode.value = true
+  try {
+    const res = await api.post(`/admin/students/${codeData.value.studentUid}/code/generate`)
+    codeData.value = res.data
+  } catch {
+    // fallback: local generation
+    const hex = () => Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0')
+    const exp  = new Date(); exp.setDate(exp.getDate() + 14); exp.setHours(23, 59, 59, 0)
+    codeData.value = {
+      ...codeData.value,
+      code:      `${hex().slice(0,8)}-${hex().slice(0,4)}`,
+      expiresAt: exp.toISOString(),
+      used:      false,
+      expired:   false,
+    }
+  } finally {
+    generatingCode.value = false
+  }
+}
+
+function copyCode() {
+  if (!codeData.value?.code) return
+  navigator.clipboard.writeText(codeData.value.code).then(() => {
+    copied.value = true
+    if (copiedTimer) clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => { copied.value = false }, 2000)
+  })
+}
+
+function formatExpiry(iso: string | Date | null): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return d.toLocaleString('th-TH', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  }) + ' น.'
+}
+
+// Promote modal state
+const promoteFromYear  = ref('2025/2026')
+const promoteSearch    = ref('')
+const expandedGrades   = ref<Set<string>>(new Set())
+const promoteConfirmed = ref(false)
+const promoting        = ref(false)
+const selectedUids     = ref<Set<string>>(new Set())
+
 // ── Computed ──────────────────────────────────────────────────────────────────
 const availableClasses = computed(() => {
   const classes = [...new Set(students.value
@@ -406,10 +920,73 @@ const filtered = computed(() => {
   })
 })
 
+// Wallet permissions (from shared store)
+const walletsStore   = useWalletsStore()
+const enabledWallets = computed(() => walletsStore.wallets.filter(w => w.enabled))
+
+// Stat cards
+const statTotal    = computed(() => students.value.length)
+const statLinked   = computed(() => students.value.filter(s => s.parentCount > 0).length)
+const statUnlinked = computed(() => students.value.filter(s => s.parentCount === 0 && s.status === 'active').length)
+
 const totalPages   = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize.value)))
 const paginated    = computed(() => filtered.value.slice((currentPage.value-1)*pageSize.value, currentPage.value*pageSize.value))
 const activeCount  = computed(() => filtered.value.filter(s => s.status === 'active').length)
 const inactiveCount= computed(() => filtered.value.filter(s => s.status !== 'active').length)
+
+// Promote computed
+const promoteToYear = computed(() => {
+  const parts = promoteFromYear.value.split('/')
+  if (parts.length !== 2) return ''
+  return `${+parts[0] + 1}/${+parts[1] + 1}`
+})
+
+const promoteGroups = computed(() => {
+  const q = promoteSearch.value.toLowerCase()
+  const groups: { from: string; to: string | null; students: Student[] }[] = []
+  const activeStudents = students.value.filter(s => s.status === 'active')
+
+  for (const grade of GRADES) {
+    let list = activeStudents.filter(s => s.gradeLevel === grade)
+    if (q) list = list.filter(s =>
+      `${s.firstName} ${s.lastName}`.toLowerCase().includes(q) ||
+      s.uid.toLowerCase().includes(q)
+    )
+    if (list.length === 0) continue
+    const idx  = GRADES.indexOf(grade)
+    const next = idx < GRADES.length - 1 ? GRADES[idx + 1] : null
+    groups.push({ from: grade, to: next, students: list })
+  }
+  return groups
+})
+
+const totalToPromote = computed(() => selectedUids.value.size)
+
+const hasGraduates = computed(() =>
+  promoteGroups.value.some(g => g.from === 'S6' && g.students.some(s => selectedUids.value.has(s.uid)))
+)
+
+const allActiveUids = computed(() =>
+  students.value
+    .filter(s => s.status === 'active' && GRADES.includes(s.gradeLevel))
+    .map(s => s.uid)
+)
+
+const isAllSelected = computed(() =>
+  allActiveUids.value.length > 0 &&
+  allActiveUids.value.every(uid => selectedUids.value.has(uid))
+)
+
+function isGradeAllSelected(group: { students: Student[] }) {
+  return group.students.length > 0 && group.students.every(s => selectedUids.value.has(s.uid))
+}
+function isGradePartial(group: { students: Student[] }) {
+  const cnt = group.students.filter(s => selectedUids.value.has(s.uid)).length
+  return cnt > 0 && cnt < group.students.length
+}
+function gradeSelectedCount(group: { students: Student[] }) {
+  return group.students.filter(s => selectedUids.value.has(s.uid)).length
+}
 
 // ── Methods ───────────────────────────────────────────────────────────────────
 // ── Column definitions (ตรงกับ template) ─────────────────────────────────────
@@ -422,14 +999,15 @@ const TEMPLATE_COLUMNS = [
   { key: 'dob',           header: 'วันเกิด',             example: '01/01/2563',            note: 'DD/MM/YYYY (ปี พ.ศ.)' },
   { key: 'guardianEmail', header: 'อีเมลผู้ปกครอง',     example: 'parent@example.com',    note: 'ใช้ส่งรหัส Verification' },
   { key: 'cardUid',       header: 'รหัสบัตร RFID',       example: '04A3B5C6D7E8',          note: 'UID จากบัตร RFID/NFC (ถ้ามี)' },
+  { key: 'walletIds',    header: 'รหัสสิทธิ์',          example: 'W001,W003',             note: 'รหัส Wallet คั่นด้วย , เช่น W001,W003 (ถ้ามี)' },
 ]
 
 const EXAMPLE_ROWS = [
-  ['STD-K1-0001', 'สมหญิง',  'ใจดี',     'K1', 'K1-A', '15/03/2562', 'suchart@dulwich.ac.th', '04A3B5C6'],
-  ['STD-K1-0002', 'สมชาย',   'ใจดี',     'K1', 'K1-A', '22/07/2562', 'suchart@dulwich.ac.th', '04B1C2D3'],
-  ['STD-K2-0008', 'มานี',    'สุขดี',    'K2', 'K2-A', '10/11/2561', 'somying@gmail.com',      '04C3D4E5'],
-  ['STD-P3-0015', 'วิชัย',   'รักเรียน', 'P3', 'P3-B', '05/05/2559', 'vichai.p@example.com',   '04D5E6F7'],
-  ['STD-S1-0003', 'อรุณี',   'ดีงาม',    'S1', 'S1-B', '30/09/2555', 'arunee.d@example.com',   ''],
+  ['STD-K1-0001', 'สมหญิง',  'ใจดี',     'K1', 'K1-A', '15/03/2562', 'suchart@dulwich.ac.th', '04A3B5C6', 'W001,W004'],
+  ['STD-K1-0002', 'สมชาย',   'ใจดี',     'K1', 'K1-A', '22/07/2562', 'suchart@dulwich.ac.th', '04B1C2D3', 'W001'],
+  ['STD-K2-0008', 'มานี',    'สุขดี',    'K2', 'K2-A', '10/11/2561', 'somying@gmail.com',      '04C3D4E5', 'W001,W003'],
+  ['STD-P3-0015', 'วิชัย',   'รักเรียน', 'P3', 'P3-B', '05/05/2559', 'vichai.p@example.com',   '04D5E6F7', ''],
+  ['STD-S1-0003', 'อรุณี',   'ดีงาม',    'S1', 'S1-B', '30/09/2555', 'arunee.d@example.com',   '',         'W001,W005'],
 ]
 
 // ── Import result state ────────────────────────────────────────────────────────
@@ -475,7 +1053,7 @@ function downloadTemplate() {
   const ws = XLSX.utils.aoa_to_sheet(rows)
 
   // Column widths
-  ws['!cols'] = TEMPLATE_COLUMNS.map((_, i) => ({ wch: [18, 12, 14, 10, 12, 14, 26, 18][i] ?? 16 }))
+  ws['!cols'] = TEMPLATE_COLUMNS.map((_, i) => ({ wch: [18, 12, 14, 10, 12, 14, 26, 18, 22][i] ?? 16 }))
 
   // Style header row (row 0) — note: xlsx free tier has limited styling
   XLSX.utils.book_append_sheet(wb, ws, 'รายชื่อนักเรียน')
@@ -488,6 +1066,8 @@ function downloadTemplate() {
     ...TEMPLATE_COLUMNS.map(c => [c.header.replace('*',''), c.note, c.example, c.header.includes('*') ? 'ใช่' : 'ไม่จำเป็น']),
     [''],
     ['ชั้นปีที่รองรับ:', 'K1, K2, P1, P2, P3, P4, P5, P6, S1, S2, S3, S4, S5, S6'],
+    ['รหัสสิทธิ์ที่ใช้ได้:', 'W001=กระเป๋าหลัก, W002=ชำระค่าอาหาร, W003=Pre-order, W004=Buffet Primary(฿170), W005=Buffet Secondary(฿150)'],
+    ['ตัวอย่างรหัสสิทธิ์:', 'W001,W003  หรือ  W001,W004,W005  (คั่นด้วยเครื่องหมาย ,)'],
     ['รูปแบบรหัสนักเรียน:', 'STD-{ชั้น}-{ลำดับ 4 หลัก}  เช่น STD-K1-0001, STD-P3-0015'],
     ['ตัวอย่างห้องเรียน:', 'K1-A, K1-B, P3-A, P3-B, S1-C'],
   ]
@@ -533,7 +1113,8 @@ function processFile(file: File) {
         const r = rows[i]
         if (!r || r.every(c => !c)) continue  // skip empty rows
 
-        const [uid, firstName, lastName, gradeLevel, className, dob, guardianEmail, cardUid] = r.map(c => String(c ?? '').trim())
+        const [uid, firstName, lastName, gradeLevel, className, dob, guardianEmail, cardUid, walletIdsRaw] = r.map(c => String(c ?? '').trim())
+        const walletIds = walletIdsRaw ? walletIdsRaw.split(',').map(w => w.trim()).filter(Boolean) : []
 
         if (!uid || !firstName || !lastName || !gradeLevel || !className) {
           errors.push(`แถว ${i+1}: ข้อมูลจำเป็นไม่ครบ (รหัส/ชื่อ/ชั้น/ห้อง)`)
@@ -549,6 +1130,7 @@ function processFile(file: File) {
           guardianEmail: guardianEmail || undefined,
           cardUid:       cardUid || undefined,
           cardStatus:    cardUid ? 'active' : undefined,
+          walletIds,
           balance:       0,
           lowThreshold:  200,
           parentCount:   guardianEmail ? 0 : 0,
@@ -580,21 +1162,90 @@ function processFile(file: File) {
   reader.readAsArrayBuffer(file)
 }
 
-function promoteAll() {
-  // Demo: simulate promotion
-  students.value = students.value.map(s => {
-    const idx = GRADES.indexOf(s.gradeLevel)
-    if (idx < 0 || idx >= GRADES.length - 1) return s
-    const newGrade = GRADES[idx + 1]
-    return {
-      ...s,
-      gradeLevel: newGrade,
-      canPreorder: PRE_ORDER_GRADES.includes(newGrade),
-      buffetGroup: ['K1','K2','P1','P2','P3','P4','P5','P6'].includes(newGrade) ? 'primary' : 'secondary',
-    }
-  })
+function openPromoteModal() {
+  // pre-select all active students
+  selectedUids.value = new Set(
+    students.value
+      .filter(s => s.status === 'active' && GRADES.includes(s.gradeLevel))
+      .map(s => s.uid)
+  )
+  promoteConfirmed.value = false
+  promoteSearch.value    = ''
+  expandedGrades.value   = new Set()
+  showPromoteModal.value = true
+}
+
+function closePromoteModal() {
   showPromoteModal.value = false
-  alert('เลื่อนชั้นเรียบร้อย (Demo)')
+  promoteSearch.value    = ''
+  promoteConfirmed.value = false
+  expandedGrades.value   = new Set()
+  selectedUids.value     = new Set()
+}
+
+function toggleExpand(grade: string) {
+  const next = new Set(expandedGrades.value)
+  next.has(grade) ? next.delete(grade) : next.add(grade)
+  expandedGrades.value = next
+}
+
+function toggleStudent(uid: string) {
+  const next = new Set(selectedUids.value)
+  next.has(uid) ? next.delete(uid) : next.add(uid)
+  selectedUids.value     = next
+  promoteConfirmed.value = false
+}
+
+function toggleGradeAll(group: { students: Student[] }) {
+  const next      = new Set(selectedUids.value)
+  const allChosen = group.students.every(s => next.has(s.uid))
+  for (const s of group.students) {
+    allChosen ? next.delete(s.uid) : next.add(s.uid)
+  }
+  selectedUids.value     = next
+  promoteConfirmed.value = false
+}
+
+function toggleSelectAll() {
+  if (isAllSelected.value) {
+    selectedUids.value = new Set()
+  } else {
+    selectedUids.value = new Set(allActiveUids.value)
+  }
+  promoteConfirmed.value = false
+}
+
+async function promoteAll() {
+  if (!promoteConfirmed.value || promoting.value || selectedUids.value.size === 0) return
+  promoting.value = true
+  try {
+    await api.post('/admin/promote', {
+      fromYear:     promoteFromYear.value,
+      toYear:       promoteToYear.value,
+      studentUids:  [...selectedUids.value],
+    })
+    await fetchStudents()
+    closePromoteModal()
+  } catch {
+    // fallback: update local state only
+    const uids = selectedUids.value
+    students.value = students.value.map(s => {
+      if (!uids.has(s.uid)) return s
+      const idx = GRADES.indexOf(s.gradeLevel)
+      if (idx < 0) return s
+      if (idx === GRADES.length - 1) return { ...s, status: 'inactive' as const }
+      const newGrade = GRADES[idx + 1]
+      return {
+        ...s,
+        gradeLevel:  newGrade,
+        canPreorder: PRE_ORDER_GRADES.includes(newGrade),
+        buffetGroup: ['K1','K2','P1','P2','P3','P4','P5','P6'].includes(newGrade) ? 'primary' : 'secondary',
+      }
+    })
+    closePromoteModal()
+  } finally {
+    promoting.value = false
+  }
 }
 
 async function fetchStudents() {
@@ -644,21 +1295,11 @@ onMounted(fetchStudents)
 .adm-hdr-btn-primary { background: var(--color-primary); color: #fff; }
 .adm-hdr-btn-ghost   { background: #fff; color: var(--color-text-secondary); border: 1px solid var(--color-border-tertiary); }
 .adm-hdr-btn-warn    { background: var(--color-warning-bg); color: var(--color-warning); border: 1px solid #FFCC80; }
+.adm-hdr-btn-soft    { background: var(--color-primary-tint); color: var(--color-primary); border: 1px solid transparent; }
+.adm-hdr-btn-soft:hover { background: #d6e8fb; }
 
 /* Filter inputs */
-.adm-filter-select,
-.adm-filter-input {
-  height: 36px; padding: 0 12px; border-radius: 8px;
-  border: 1px solid #E8E8E8; background: #fff;
-  font-size: 13px; color: #1C1C1E; outline: none; min-width: 130px;
-}
-.adm-filter-select:focus, .adm-filter-input:focus { border-color: var(--color-primary); }
-.adm-search-btn {
-  height: 36px; padding: 0 16px; border-radius: 8px;
-  background: var(--color-primary); color: #fff;
-  font-size: 13px; font-weight: 500; border: none; cursor: pointer;
-}
-.adm-search-btn:active { opacity: 0.8; }
+/* adm-filter-* and adm-search-btn moved to global style.css */
 
 /* Modal */
 .modal-backdrop {
@@ -783,4 +1424,328 @@ onMounted(fetchStudents)
   background:var(--color-primary); color:#fff; cursor:pointer;
 }
 .imp-btn-confirm-active:active { opacity:0.8; }
+
+/* ── Promote modal ──────────────────────────────────────────────────── */
+.promo-modal {
+  position: fixed; top: 50%; left: 50%; z-index: 51;
+  transform: translate(-50%,-50%);
+  background: #fff; border-radius: 16px;
+  width: calc(100vw - 48px); max-width: 520px;
+  max-height: 90vh; display: flex; flex-direction: column;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.16);
+  overflow: hidden;
+}
+.promo-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 20px 24px 16px;
+  flex-shrink: 0;
+}
+.promo-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 17px; font-weight: 500; color: #1C1C1E; margin-bottom: 4px;
+}
+.promo-subtitle { font-size: 13px; color: #8E8E93; }
+.promo-close {
+  background: none; border: none; cursor: pointer;
+  color: #8E8E93; padding: 4px; border-radius: 6px;
+  display: flex; align-items: center; flex-shrink: 0;
+  transition: background 0.1s;
+}
+.promo-close:hover { background: #F2F2F7; }
+.promo-divider { height: 1px; background: #F0F0F0; flex-shrink: 0; }
+
+.promo-body {
+  padding: 18px 24px 4px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex; flex-direction: column; gap: 14px;
+}
+
+/* Year row */
+.promo-year-row { display: flex; gap: 14px; }
+.promo-year-col { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.promo-label    { font-size: 12px; font-weight: 500; color: #8E8E93; }
+.promo-select {
+  height: 38px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid #E8E8E8; background: #fff;
+  font-size: 14px; color: #1C1C1E; outline: none; cursor: pointer;
+  font-family: inherit;
+}
+.promo-select:focus { border-color: var(--color-primary); }
+.promo-year-readonly {
+  height: 38px; padding: 0 12px; border-radius: 8px;
+  border: 1px solid #E8E8E8; background: #F9F9F9;
+  font-size: 14px; color: #3C3C43;
+  display: flex; align-items: center;
+}
+
+/* Search */
+.promo-search-wrap {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid #E8E8E8; border-radius: 8px;
+  padding: 0 12px; height: 38px; background: #fff;
+}
+.promo-search {
+  border: none; outline: none; flex: 1;
+  font-size: 14px; color: #1C1C1E; background: transparent;
+  font-family: inherit;
+}
+.promo-search::placeholder { color: #AEAEB2; }
+
+/* Section title row */
+.promo-section-title-row {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.promo-section-title {
+  font-size: 13px; font-weight: 500; color: #3C3C43;
+}
+.promo-select-all-btn {
+  font-size: 12px; color: var(--color-primary); background: none;
+  border: none; cursor: pointer; padding: 0; font-family: inherit;
+  font-weight: 500;
+}
+.promo-select-all-btn:hover { opacity: 0.8; }
+
+/* Grade list */
+.promo-list {
+  display: flex; flex-direction: column; gap: 2px;
+  border: 1px solid #F0F0F0; border-radius: 10px;
+  overflow: hidden;
+}
+.promo-row-wrap { border-bottom: 1px solid #F0F0F0; }
+.promo-row-wrap:last-child { border-bottom: none; }
+.promo-row {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; background: none;
+  transition: background 0.1s;
+}
+.promo-row:hover { background: #F9F9F9; }
+.promo-expand-btn {
+  background: none; border: none; cursor: pointer; padding: 2px;
+  display: flex; align-items: center; flex-shrink: 0;
+}
+.promo-grade-checkbox {
+  width: 15px; height: 15px; cursor: pointer;
+  accent-color: var(--color-primary); flex-shrink: 0;
+}
+.promo-grade-from { font-size: 14px; color: #3C3C43; font-weight: 500; }
+.promo-grade-to   { font-size: 14px; color: #059669; font-weight: 500; }
+.promo-grade-grad {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 14px; color: #059669; font-weight: 500;
+}
+.promo-count {
+  margin-left: auto;
+  font-size: 12px; color: #8E8E93;
+  background: #F2F2F7; padding: 2px 10px; border-radius: 100px;
+  white-space: nowrap; transition: background 0.15s, color 0.15s;
+}
+.promo-count-partial {
+  background: #EBF5FF; color: var(--color-primary);
+}
+.promo-student-list {
+  padding: 4px 14px 10px 50px;
+  display: flex; flex-direction: column; gap: 4px;
+  background: #FAFAFA;
+}
+.promo-student-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 6px; border-radius: 6px; cursor: pointer;
+  transition: background 0.1s;
+}
+.promo-student-row:hover { background: #F0F0F0; }
+.promo-student-name { font-size: 13px; color: #1C1C1E; flex: 1; }
+.promo-student-uid  { font-size: 11px; color: #AEAEB2; font-family: monospace; }
+.promo-empty { padding: 24px; text-align: center; font-size: 13px; color: #AEAEB2; }
+
+/* Graduation warning */
+.promo-warn-grad {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 10px 14px; border-radius: 8px;
+  background: #FFFBEB; color: #92400E;
+  font-size: 13px; border: 1px solid #FDE68A;
+}
+
+/* Confirmation checkbox */
+.promo-confirm-wrap { padding: 14px 24px 16px; flex-shrink: 0; }
+.promo-confirm-label {
+  display: flex; align-items: flex-start; gap: 10px;
+  cursor: pointer;
+}
+.promo-checkbox {
+  width: 16px; height: 16px; cursor: pointer;
+  accent-color: var(--color-primary); flex-shrink: 0; margin-top: 2px;
+}
+.promo-confirm-title { font-size: 14px; font-weight: 500; color: #1C1C1E; margin-bottom: 2px; }
+.promo-confirm-sub   { font-size: 12px; color: #8E8E93; line-height: 1.5; }
+
+/* Footer */
+.promo-footer {
+  display: flex; gap: 10px; padding: 14px 24px 20px;
+  border-top: 1px solid #F0F0F0; flex-shrink: 0;
+}
+.promo-btn-cancel {
+  flex: 1; height: 44px; border-radius: 10px;
+  border: 1px solid #E8E8E8; background: #fff;
+  font-size: 14px; font-weight: 500; color: #3C3C43;
+  cursor: pointer; transition: background 0.1s; font-family: inherit;
+}
+.promo-btn-cancel:hover { background: #F2F2F7; }
+.promo-btn-confirm {
+  flex: 2; height: 44px; border-radius: 10px;
+  border: none; background: #E5E5EA; color: #AEAEB2;
+  font-size: 14px; font-weight: 500; cursor: not-allowed;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: background 0.15s, color 0.15s; font-family: inherit;
+}
+.promo-btn-confirm-active {
+  background: var(--color-primary); color: #fff; cursor: pointer;
+}
+.promo-btn-confirm-active:hover  { opacity: 0.9; }
+.promo-btn-confirm-active:active { opacity: 0.8; }
+
+/* ── Enrollment Code modal ──────────────────────────────────────────── */
+.code-modal {
+  position: fixed; top: 50%; left: 50%; z-index: 51;
+  transform: translate(-50%,-50%);
+  background: #fff; border-radius: 16px;
+  width: calc(100vw - 48px); max-width: 400px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.16);
+  overflow: hidden;
+}
+.code-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 20px 14px;
+}
+.code-title { font-size: 16px; font-weight: 500; color: #1C1C1E; }
+.code-body  { padding: 18px 20px 14px; display: flex; flex-direction: column; gap: 14px; }
+
+.code-student-name {
+  font-size: 18px; font-weight: 500; color: #1C1C1E;
+  display: flex; align-items: center; gap: 8px;
+}
+.code-grade-badge {
+  font-size: 11px; font-weight: 500; color: var(--color-primary);
+  background: var(--color-primary-tint); padding: 2px 8px; border-radius: 100px;
+}
+
+/* Code box */
+.code-box-wrap { margin: 2px 0; }
+.code-box {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #F2F2F7; border-radius: 10px; padding: 12px 14px;
+  border: 1px solid #E8E8E8;
+}
+.code-box-empty { justify-content: center; padding: 14px; }
+.code-text {
+  font-family: 'Courier New', monospace;
+  font-size: 18px; font-weight: 500; color: #1C1C1E;
+  letter-spacing: 0.04em;
+}
+.code-copy-btn {
+  background: none; border: none; cursor: pointer;
+  color: #8E8E93; display: flex; align-items: center;
+  padding: 4px; border-radius: 6px; transition: background 0.1s;
+  flex-shrink: 0;
+}
+.code-copy-btn:hover { background: #E8E8E8; }
+
+/* Expiry row */
+.code-expiry-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: #3C3C43;
+}
+.code-status {
+  font-size: 11px; font-weight: 500; padding: 2px 8px;
+  border-radius: 100px; white-space: nowrap;
+}
+.code-status-active  { background: #D1FAE5; color: #065F46; }
+.code-status-expired { background: #FEE2E2; color: #991B1B; }
+.code-status-used    { background: #F3F4F6; color: #6B7280; }
+.code-expiry-text    { font-size: 14px; color: #1C1C1E; }
+
+/* Warning */
+.code-warn {
+  display: flex; align-items: flex-start; gap: 7px;
+  padding: 10px 12px; border-radius: 8px;
+  background: #FFFBEB; color: #92400E;
+  font-size: 13px; border: 1px solid #FDE68A;
+}
+
+/* Footer */
+.code-footer {
+  padding: 14px 20px 18px;
+  border-top: 1px solid #F0F0F0;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.code-generate-btn {
+  width: 100%; height: 46px; border-radius: 12px;
+  background: var(--color-primary); color: #fff;
+  border: none; cursor: pointer; font-size: 15px; font-weight: 500;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  font-family: inherit; transition: opacity 0.15s;
+}
+.code-generate-btn:hover   { opacity: 0.9; }
+.code-generate-btn:active  { opacity: 0.8; }
+.code-generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.code-footer-note {
+  font-size: 12px; color: #AEAEB2;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.8s linear infinite; }
+
+/* ── Stat cards ─────────────────────────────────────────────────────── */
+.stat-row {
+  display: flex; gap: 12px; flex-wrap: wrap;
+}
+.stat-card {
+  flex: 1; min-width: 150px;
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 18px; border-radius: 12px;
+  border: 1px solid transparent;
+}
+.stat-icon { flex-shrink: 0; opacity: 0.85; }
+.stat-body { display: flex; flex-direction: column; gap: 2px; }
+.stat-label { font-size: 12px; font-weight: 400; color: inherit; opacity: 0.75; }
+.stat-value { font-size: 22px; font-weight: 500; color: inherit; line-height: 1.1; }
+
+.stat-card-primary {
+  background: #fff;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.stat-card-success {
+  background: #fff;
+  border-color: var(--color-border-tertiary);
+  color: #028A60;
+}
+.stat-card-info {
+  background: #fff;
+  border-color: var(--color-border-tertiary);
+  color: var(--color-primary-dark);
+}
+.stat-card-danger {
+  background: #fff;
+  border-color: var(--color-border-tertiary);
+  color: #CC3333;
+}
+.stat-card-ghost {
+  background: #fff;
+  border-color: var(--color-border-tertiary);
+  color: var(--color-text-secondary);
+}
+
+/* ── Edit / RFID fields ─────────────────────────────────────────────── */
+.edit-field-row { display: flex; gap: 12px; }
+.edit-field     { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.edit-input {
+  height: 38px; padding: 0 12px; border-radius: 8px;
+  border: 1px solid #E8E8E8; font-size: 14px; color: #1C1C1E;
+  outline: none; font-family: inherit; background: #fff;
+  transition: border-color 0.15s;
+}
+.edit-input:focus { border-color: var(--color-primary); }
+
+/* success action button */
+.adm-action-btn.success:hover { background: #D1FAE5; color: #065F46; }
 </style>

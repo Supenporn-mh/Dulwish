@@ -24,9 +24,25 @@ const USERS: Record<string, any> = {
   'CSH-001':  { _id: 'csh001', uid: 'CSH-001',  role: 'cashier',    firstName: 'หนอง',   lastName: 'แคชเชียร์', email: 'nong@school.local',  passwordPlain: 'Cashier123!' },
 }
 
-const STUDENTS: Record<string, any> = {
-  'STD-K1-0001': { _id: 'std001', uid: 'STD-K1-0001', role: 'student', firstName: 'สมหญิง', lastName: 'ใจดี', studentProfile: { gradeLevel: 'K1', className: 'K1-A' } },
-  'STD-P3-0015': { _id: 'std002', uid: 'STD-P3-0015', role: 'student', firstName: 'สมชาย',  lastName: 'ใจดี', studentProfile: { gradeLevel: 'P3', className: 'P3-B' } },
+const GRADES_ORDER = ['K1','K2','P1','P2','P3','P4','P5','P6','S1','S2','S3','S4','S5','S6']
+const PRE_ORDER_GRADES = ['K1','K2']
+
+let STUDENTS: Record<string, any> = {
+  'STD-K1-0001': { _id: 'std001', uid: 'STD-K1-0001', role: 'student', firstName: 'สมหญิง',  lastName: 'ใจดี',      studentProfile: { gradeLevel: 'K1', className: 'K1-A' }, guardianEmail: 'suchat@dulwich.ac.th', cardUid: '04A3B5C6', cardStatus: 'active',   balance: 850,  lowThreshold: 200, parentCount: 1, status: 'active' },
+  'STD-K1-0012': { _id: 'std010', uid: 'STD-K1-0012', role: 'student', firstName: 'ปรีชา',   lastName: 'มานะ',      studentProfile: { gradeLevel: 'K1', className: 'K1-B' }, guardianEmail: 'preecha@gmail.com',    cardUid: '04E7F8A9', cardStatus: 'lost',    balance: 0,    lowThreshold: 200, parentCount: 0, status: 'active' },
+  'STD-K2-0008': { _id: 'std003', uid: 'STD-K2-0008', role: 'student', firstName: 'มานี',    lastName: 'สุขดี',     studentProfile: { gradeLevel: 'K2', className: 'K2-A' }, guardianEmail: 'somying@gmail.com',    cardUid: '04C3D4E5', cardStatus: 'active',   balance: 150,  lowThreshold: 200, parentCount: 1, status: 'active' },
+  'STD-P1-0005': { _id: 'std011', uid: 'STD-P1-0005', role: 'student', firstName: 'กานดา',   lastName: 'ศรีสวัสดิ์', studentProfile: { gradeLevel: 'P1', className: 'P1-A' }, guardianEmail: 'kanda.s@example.com',  cardUid: '04F1A2B3', cardStatus: 'active',   balance: 400,  lowThreshold: 200, parentCount: 1, status: 'active' },
+  'STD-P2-0003': { _id: 'std012', uid: 'STD-P2-0003', role: 'student', firstName: 'ธีรพงษ์', lastName: 'จันทร์งาม', studentProfile: { gradeLevel: 'P2', className: 'P2-A' }, guardianEmail: 'thira@example.com',    cardUid: '04G4H5I6', cardStatus: 'active',   balance: 220,  lowThreshold: 200, parentCount: 1, status: 'active' },
+  'STD-P3-0015': { _id: 'std002', uid: 'STD-P3-0015', role: 'student', firstName: 'สมชาย',   lastName: 'ใจดี',      studentProfile: { gradeLevel: 'P3', className: 'P3-B' }, guardianEmail: 'suchat@dulwich.ac.th', cardUid: '04B1C2D3', cardStatus: 'active',   balance: 320,  lowThreshold: 200, parentCount: 1, status: 'active' },
+  'STD-P4-0009': { _id: 'std013', uid: 'STD-P4-0009', role: 'student', firstName: 'ลลิตา',   lastName: 'พรมมา',     studentProfile: { gradeLevel: 'P4', className: 'P4-A' }, guardianEmail: 'lalita@example.com',   cardUid: undefined,  cardStatus: undefined, balance: 190,  lowThreshold: 200, parentCount: 1, status: 'active' },
+  'STD-P5-0011': { _id: 'std014', uid: 'STD-P5-0011', role: 'student', firstName: 'นันทพร',  lastName: 'คำดี',      studentProfile: { gradeLevel: 'P5', className: 'P5-B' }, guardianEmail: 'nan.k@example.com',    cardUid: '04J7K8L9', cardStatus: 'active',   balance: 560,  lowThreshold: 200, parentCount: 1, status: 'active' },
+  'STD-P6-0022': { _id: 'std004', uid: 'STD-P6-0022', role: 'student', firstName: 'วิชัย',   lastName: 'รักเรียน',  studentProfile: { gradeLevel: 'P6', className: 'P6-A' }, guardianEmail: 'vichai.p@example.com', cardUid: '04D5E6F7', cardStatus: 'inactive', balance: 500,  lowThreshold: 200, parentCount: 1, status: 'active' },
+  'STD-S1-0003': { _id: 'std005', uid: 'STD-S1-0003', role: 'student', firstName: 'อรุณี',   lastName: 'ดีงาม',     studentProfile: { gradeLevel: 'S1', className: 'S1-B' }, guardianEmail: 'arunee.d@example.com', cardUid: undefined,  cardStatus: undefined, balance: 200,  lowThreshold: 200, parentCount: 1, status: 'active' },
+  'STD-S2-0006': { _id: 'std015', uid: 'STD-S2-0006', role: 'student', firstName: 'ปิยะ',    lastName: 'แสงดาว',    studentProfile: { gradeLevel: 'S2', className: 'S2-A' }, guardianEmail: 'piya@example.com',     cardUid: '04M1N2O3', cardStatus: 'active',   balance: 750,  lowThreshold: 200, parentCount: 1, status: 'active' },
+  'STD-S3-0007': { _id: 'std016', uid: 'STD-S3-0007', role: 'student', firstName: 'สุนิสา',  lastName: 'พลอยงาม',   studentProfile: { gradeLevel: 'S3', className: 'S3-B' }, guardianEmail: 'sunisa@example.com',   cardUid: '04P4Q5R6', cardStatus: 'active',   balance: 310,  lowThreshold: 200, parentCount: 1, status: 'active' },
+  'STD-S4-0002': { _id: 'std017', uid: 'STD-S4-0002', role: 'student', firstName: 'กิตติ',   lastName: 'วงษ์ดี',    studentProfile: { gradeLevel: 'S4', className: 'S4-A' }, guardianEmail: 'kitti@example.com',    cardUid: '04S7T8U9', cardStatus: 'active',   balance: 430,  lowThreshold: 200, parentCount: 1, status: 'active' },
+  'STD-S5-0004': { _id: 'std018', uid: 'STD-S5-0004', role: 'student', firstName: 'พิมพ์ใจ', lastName: 'ทองคำ',     studentProfile: { gradeLevel: 'S5', className: 'S5-B' }, guardianEmail: 'pimjai@example.com',   cardUid: '04V1W2X3', cardStatus: 'active',   balance: 680,  lowThreshold: 200, parentCount: 1, status: 'active' },
+  'STD-S6-0001': { _id: 'std019', uid: 'STD-S6-0001', role: 'student', firstName: 'ชานนท์',  lastName: 'บุญมา',     studentProfile: { gradeLevel: 'S6', className: 'S6-A' }, guardianEmail: 'chanon@example.com',   cardUid: '04Y4Z5A6', cardStatus: 'active',   balance: 120,  lowThreshold: 200, parentCount: 1, status: 'active' },
 }
 
 // student code → parent (1:1)
@@ -130,9 +146,26 @@ const POLICIES = [
   { key: 'preorder_max_days',      value: 7,   description: 'สั่งล่วงหน้าได้สูงสุด (วัน)' },
 ]
 
+function generateCode(): string {
+  const hex = () => Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0')
+  return `${hex().slice(0,8)}-${hex().slice(0,4)}`
+}
+function codeExpiresAt(): Date {
+  const d = new Date()
+  d.setDate(d.getDate() + 14)
+  d.setHours(23, 59, 59, 0)
+  return d
+}
+
 const ENROLLMENT_CODES: Record<string, any> = {
   'ENR-DEMO01': { studentUid: 'STD-K1-0001', used: false, expiresAt: new Date(Date.now() + 30 * 86400000) },
   'ENR-DEMO02': { studentUid: 'STD-P3-0015', used: false, expiresAt: new Date(Date.now() + 30 * 86400000) },
+}
+
+// studentUid → current active code key
+const STUDENT_ACTIVE_CODE: Record<string, string> = {
+  'STD-K1-0001': 'ENR-DEMO01',
+  'STD-P3-0015': 'ENR-DEMO02',
 }
 
 // ── Mock POS orders for card-read ─────────────────────────────────────────────
@@ -573,6 +606,148 @@ const app = new Elysia()
     byPeriod: { BREAKFAST: 15, LUNCH: 22, DINNER: 5 },
     byGroup:  { primary: 28, secondary: 10, staff: 4 },
   }))
+
+  // ── Admin: Students ────────────────────────────────────────────────────────
+  .get('/admin/students', () => ({
+    students: Object.values(STUDENTS).map((s: any) => ({
+      uid:          s.uid,
+      firstName:    s.firstName,
+      lastName:     s.lastName,
+      gradeLevel:   s.studentProfile?.gradeLevel ?? '',
+      className:    s.studentProfile?.className  ?? '',
+      guardianEmail: s.guardianEmail,
+      cardUid:      s.cardUid,
+      cardStatus:   s.cardStatus ?? 'active',
+      balance:      s.balance ?? 0,
+      lowThreshold: s.lowThreshold ?? 200,
+      parentCount:  s.parentCount ?? 0,
+      status:       s.status ?? 'active',
+    })),
+  }))
+
+  // ── Admin: Promote All Students ────────────────────────────────────────────
+  .post('/admin/promote', ({ body, set }: any) => {
+    const { fromYear, toYear, studentUids } = body ?? {}
+    const targetUids: Set<string> = studentUids?.length
+      ? new Set(studentUids)
+      : new Set(Object.keys(STUDENTS))
+
+    const graduated: string[] = []
+    const promoted: string[]  = []
+
+    for (const uid of targetUids) {
+      const s = STUDENTS[uid]
+      if (!s) continue
+      const grade = s.studentProfile?.gradeLevel ?? ''
+      const idx   = GRADES_ORDER.indexOf(grade)
+      if (idx < 0) continue
+
+      if (idx === GRADES_ORDER.length - 1) {
+        s.status = 'inactive'
+        s.studentProfile.gradeLevel = 'GRADUATED'
+        graduated.push(uid)
+      } else {
+        const nextGrade = GRADES_ORDER[idx + 1]
+        s.studentProfile.gradeLevel = nextGrade
+        s.studentProfile.className  = nextGrade + '-A'
+        s.canPreorder = PRE_ORDER_GRADES.includes(nextGrade)
+        promoted.push(uid)
+      }
+    }
+
+    return {
+      success:   true,
+      fromYear:  fromYear ?? '',
+      toYear:    toYear   ?? '',
+      promoted:  promoted.length,
+      graduated: graduated.length,
+      message:   `เลื่อนชั้นสำเร็จ ${promoted.length} คน, จบการศึกษา ${graduated.length} คน`,
+    }
+  })
+
+  // ── Admin: Export all students with enrollment codes ──────────────────────
+  .get('/admin/students/codes', () => {
+    const rows = Object.values(STUDENTS).map((s: any) => {
+      let codeKey = STUDENT_ACTIVE_CODE[s.uid]
+      let entry   = codeKey ? ENROLLMENT_CODES[codeKey] : null
+
+      // auto-generate if missing or expired/used
+      if (!entry || entry.used || new Date(entry.expiresAt) < new Date()) {
+        const newCode = generateCode()
+        const exp     = codeExpiresAt()
+        ENROLLMENT_CODES[newCode]      = { studentUid: s.uid, used: false, expiresAt: exp }
+        STUDENT_ACTIVE_CODE[s.uid]     = newCode
+        codeKey = newCode
+        entry   = ENROLLMENT_CODES[newCode]
+      }
+
+      return {
+        uid:          s.uid,
+        firstName:    s.firstName,
+        lastName:     s.lastName,
+        gradeLevel:   s.studentProfile?.gradeLevel ?? '',
+        className:    s.studentProfile?.className  ?? '',
+        guardianContact: s.guardianEmail ?? '',
+        code:         codeKey,
+        expiresAt:    entry.expiresAt,
+      }
+    })
+    // sort by grade then uid
+    rows.sort((a: any, b: any) => {
+      const gi = GRADES_ORDER.indexOf(a.gradeLevel) - GRADES_ORDER.indexOf(b.gradeLevel)
+      return gi !== 0 ? gi : a.uid.localeCompare(b.uid)
+    })
+    return { students: rows }
+  })
+
+  // ── Admin: Get enrollment code for a student ──────────────────────────────
+  .get('/admin/students/:uid/code', ({ params, set }: any) => {
+    const { uid } = params
+    if (!STUDENTS[uid]) { set.status = 404; return { error: { code: 'STD_404', message: 'ไม่พบนักเรียน' } } }
+    const codeKey  = STUDENT_ACTIVE_CODE[uid]
+    const entry    = codeKey ? ENROLLMENT_CODES[codeKey] : null
+    const s        = STUDENTS[uid]
+    return {
+      studentUid:   uid,
+      firstName:    s.firstName,
+      lastName:     s.lastName,
+      gradeLevel:   s.studentProfile?.gradeLevel ?? '',
+      code:         codeKey  ?? null,
+      expiresAt:    entry?.expiresAt ?? null,
+      used:         entry?.used      ?? false,
+      expired:      entry ? new Date(entry.expiresAt) < new Date() : false,
+    }
+  })
+
+  // ── Admin: Generate new enrollment code for a student ─────────────────────
+  .post('/admin/students/:uid/code/generate', ({ params, set }: any) => {
+    const { uid } = params
+    if (!STUDENTS[uid]) { set.status = 404; return { error: { code: 'STD_404', message: 'ไม่พบนักเรียน' } } }
+
+    // invalidate old code
+    const oldKey = STUDENT_ACTIVE_CODE[uid]
+    if (oldKey && ENROLLMENT_CODES[oldKey]) {
+      ENROLLMENT_CODES[oldKey].used = true
+    }
+
+    // create new code
+    const newCode = generateCode()
+    const exp     = codeExpiresAt()
+    ENROLLMENT_CODES[newCode] = { studentUid: uid, used: false, expiresAt: exp }
+    STUDENT_ACTIVE_CODE[uid]  = newCode
+
+    const s = STUDENTS[uid]
+    return {
+      studentUid: uid,
+      firstName:  s.firstName,
+      lastName:   s.lastName,
+      gradeLevel: s.studentProfile?.gradeLevel ?? '',
+      code:       newCode,
+      expiresAt:  exp,
+      used:       false,
+      expired:    false,
+    }
+  })
 
   .listen(4000)
 
