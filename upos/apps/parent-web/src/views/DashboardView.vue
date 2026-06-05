@@ -254,7 +254,7 @@ function onChildChange(e: Event) {
 async function loadWallet() {
   const child = auth.selectedChild
   if (!child) return
-  const userId = child.walletId ?? child._id
+  const userId = child._id
   await Promise.all([
     walletStore.fetchWallet(userId),
     walletStore.fetchTransactions(userId, true),

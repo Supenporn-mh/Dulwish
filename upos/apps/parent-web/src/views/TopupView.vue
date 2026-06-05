@@ -237,7 +237,7 @@ async function handleTopup() {
 
   try {
     const child = auth.selectedChild
-    const userId = child?.walletId ?? child?._id
+    const userId = child?._id
     if (!userId) throw new Error('ไม่พบข้อมูลนักเรียน')
 
     showQr.value = true

@@ -35,7 +35,7 @@ export const useWalletStore = defineStore('wallet', () => {
     loading.value = true
     error.value = null
     try {
-      const res = await api.get(`/wallets/user/${userId}`)
+      const res = await api.get(`/wallets/${userId}`)
       wallet.value = res.data?.wallet ?? res.data ?? null
     } catch (e: any) {
       error.value = e?.response?.data?.message ?? 'ไม่สามารถโหลดข้อมูลกระเป๋าเงินได้'
@@ -56,7 +56,7 @@ export const useWalletStore = defineStore('wallet', () => {
     loading.value = true
     error.value = null
     try {
-      const res = await api.get(`/wallets/user/${userId}/transactions`, {
+      const res = await api.get(`/wallets/${userId}/transactions`, {
         params: { page: page.value, limit: 20 },
       })
       const data: Transaction[] = res.data?.transactions ?? res.data ?? []
@@ -80,7 +80,7 @@ export const useWalletStore = defineStore('wallet', () => {
     loading.value = true
     error.value = null
     try {
-      const res = await api.post(`/wallets/user/${userId}/topup`, { amount, method })
+      const res = await api.post(`/wallets/${userId}/topup`, { amount, channel: 'mobile_web', paymentMethod: method })
       // After topup, refresh wallet
       await fetchWallet(userId)
       return res.data

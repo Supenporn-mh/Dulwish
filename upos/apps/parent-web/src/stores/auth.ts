@@ -101,10 +101,16 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function fetchChildren() {
     try {
-      const res = await api.get('/parents/children')
-      children.value = res.data?.children ?? res.data ?? []
+      const res = await api.get('/users/me/children')
+      const raw: any[] = res.data?.children ?? (Array.isArray(res.data) ? res.data : [])
+      children.value = raw.map(s => ({
+        _id: s._id,
+        name: s.name ?? `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim(),
+        studentId: s.studentId ?? s.uid ?? s._id,
+        grade: s.grade ?? s.studentProfile?.gradeLevel ?? '',
+        schoolId: s.schoolId ?? '',
+      }))
 
-      // Auto-select first child if none selected
       if (!selectedChildId.value && children.value.length > 0) {
         selectedChildId.value = children.value[0]._id
       }
