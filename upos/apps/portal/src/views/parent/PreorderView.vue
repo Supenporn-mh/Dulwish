@@ -231,8 +231,9 @@ function bookingKey(s: MealSession): string {
 // ตรวจ local ref (session ปัจจุบัน) AND parentStore (persistent ข้าม navigate)
 function isBooked(s: MealSession): boolean {
   if (bookedSessions.value.has(bookingKey(s))) return true
+  const childId = parentStore.selectedChildId
   return parentStore.todayBookings.some(
-    b => b.sessionKey === s.key && b.serveDate === selectedISO.value
+    b => b.sessionKey === s.key && b.serveDate === selectedISO.value && b.childId === childId
   )
 }
 
@@ -306,7 +307,7 @@ async function confirmCancel() {
       await api.patch(`/orders/${orderId}/cancel`, { reason: 'Parent cancelled via portal' })
     }
     // Remove from store (persistent)
-    parentStore.removeTodayBooking(s.key, selectedISO.value)
+    parentStore.removeTodayBooking(s.key, selectedISO.value, parentStore.selectedChildId)
     // Remove from local set and map
     const newSet = new Set(bookedSessions.value)
     newSet.delete(key)

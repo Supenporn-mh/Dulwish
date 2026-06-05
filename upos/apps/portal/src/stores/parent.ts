@@ -57,13 +57,13 @@ export const useParentStore = defineStore('parent', () => {
 
   function addTodayBooking(b: TodayBooking) {
     todayBookings.value = [b, ...todayBookings.value.filter(
-      x => !(x.sessionKey === b.sessionKey && x.serveDate === b.serveDate)
+      x => !(x.childId === b.childId && x.sessionKey === b.sessionKey && x.serveDate === b.serveDate)
     )]
   }
 
-  function removeTodayBooking(sessionKey: string, serveDate: string) {
+  function removeTodayBooking(sessionKey: string, serveDate: string, childId: string) {
     todayBookings.value = todayBookings.value.filter(
-      b => !(b.sessionKey === sessionKey && b.serveDate === serveDate)
+      b => !(b.childId === childId && b.sessionKey === sessionKey && b.serveDate === serveDate)
     )
   }
 
