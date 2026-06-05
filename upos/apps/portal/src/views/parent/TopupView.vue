@@ -105,8 +105,9 @@ async function simulatePayment() {
   if (qrTimer) clearInterval(qrTimer)
 
   try {
-    const walletId = activeChild.value?.walletId ?? activeChildId.value
-    await api.post(`/wallets/${walletId}/topup`, {
+    // topup route resolves the wallet by student userId (not wallet _id)
+    const userId = activeChildId.value
+    await api.post(`/wallets/${userId}/topup`, {
       amount: numericAmount.value,
       channel: 'mobile_web',
       paymentMethod: selectedMethod.value === 'promptpay' ? 'scb_qr' : 'credit_card',

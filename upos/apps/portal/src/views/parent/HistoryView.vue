@@ -359,11 +359,9 @@ onMounted(async () => {
       id:          t.id ?? t._id,
       description: t.description ?? t.note ?? '',
     }))
-    // API only returns topup/purchase/refund — always merge demo buffet+booking
-    const demoBFB = DEMO.filter(t => t.type === 'buffet' || t.type === 'booking')
-    transactions.value = apiList.length ? [...apiList, ...demoBFB] : DEMO
+    transactions.value = apiList
   } catch {
-    transactions.value = DEMO
+    transactions.value = []
   } finally { loading.value = false }
 })
 </script>

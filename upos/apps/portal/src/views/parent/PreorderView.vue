@@ -17,10 +17,12 @@ interface SessionDef {
   en:          string
   th:          string
   timeRange:   string
-  cutoffHour:  number  // booking closes at HH:00 (session end)
+  time:        string
+  cutoffHour:  number
   cutoffMin:   number
   quota:       number
   booked:      number
+  _id?:        string
 }
 interface MealSession extends SessionDef { status: 'open' | 'closed' }
 
@@ -29,39 +31,64 @@ const now = ref(new Date())
 const clockTick = setInterval(() => { now.value = new Date() }, 60_000)
 onUnmounted(() => clearInterval(clockTick))
 
-// ── Session definitions — ตรงกับ meal_periods ใน spec §2.5 ──────────────────
-// cutoffMinutes = 180 นาที ก่อน startTime (ตาม §7.1: now < start − cutoff_minutes)
-const SESSION_DEFS: SessionDef[] = [
-  { key: 'breakfast', en: 'Breakfast', th: 'เช้า',    timeRange: '07:30 – 09:00', cutoffHour: 7,  cutoffMin: 30, quota: 80,  booked: 0  },
-  { key: 'lunch',     en: 'Lunch',     th: 'กลางวัน', timeRange: '11:30 – 13:30', cutoffHour: 11, cutoffMin: 30, quota: 100, booked: 0  },
-  { key: 'dinner',    en: 'Dinner',    th: 'เย็น',    timeRange: '17:00 – 18:30', cutoffHour: 17, cutoffMin: 0,  quota: 60,  booked: 12 },
-]
+// Thai labels by code — fallback to period.name if code unknown
+const CODE_TO_TH: Record<string, string> = {
+  BREAKFAST: 'เช้า',
+  LUNCH:     'กลางวัน',
+  DINNER:    'เย็น',
+}
 
-const CUTOFF_MINUTES = 180  // §7.1: cutoff = 3 ชม. ก่อน start_time
+// Parse 'HH:MM' → total minutes from midnight
+function parseHHMM(t: string): number {
+  const [h, m] = t.split(':').map(Number)
+  return h * 60 + m
+}
 
-// Sessions status ตาม spec §7.1:
+// Sessions status ตาม spec §7.1 — derived from real mealPeriods data:
 //   past date  → ปิดทั้งหมด (ผ่านมาแล้ว)
 //   future date → เปิดทั้งหมด
-//   today       → เปิดเฉพาะ session ที่ now < startTime − cutoff_minutes
+//   today       → เปิดเฉพาะ session ที่ now < startTime − cutoffMinutes
 const sessions = computed((): MealSession[] => {
+  if (mealPeriods.value.length === 0) return []
+
   const sel = selectedISO.value
   const t   = now.value   // reactive ref — re-evaluates ทุก 60 วิ
 
-  // past date: all closed
-  if (sel < todayISO) {
-    return SESSION_DEFS.map(s => ({ ...s, time: s.timeRange, status: 'closed' as const }))
-  }
-  // future date: all open
-  if (sel > todayISO) {
-    return SESSION_DEFS.map(s => ({ ...s, time: s.timeRange, status: 'open' as const }))
-  }
-  // today: check current time vs cutoff
-  const nowMins = t.getHours() * 60 + t.getMinutes()
-  return SESSION_DEFS.map(s => {
-    const startMins  = s.cutoffHour * 60 + s.cutoffMin
-    const cutoffMins = startMins - CUTOFF_MINUTES   // must book before this
-    const status: 'open' | 'closed' = nowMins < cutoffMins ? 'open' : 'closed'
-    return { ...s, time: s.timeRange, status }
+  return mealPeriods.value.map(p => {
+    const key      = CODE_TO_KEY[p.code] ?? p.code.toLowerCase()
+    const th       = CODE_TO_TH[p.code]  ?? p.name
+    const timeRange = `${p.startTime} – ${p.endTime}`
+    const startMins = parseHHMM(p.startTime)
+    const cutoff    = p.cutoffMinutes ?? 0
+    // cutoffHour/cutoffMin: represents start time (for legacy shape compat)
+    const cutoffHour = Math.floor(startMins / 60)
+    const cutoffMin  = startMins % 60
+
+    let status: 'open' | 'closed'
+    if (sel < todayISO) {
+      status = 'closed'
+    } else if (sel > todayISO) {
+      status = 'open'
+    } else {
+      // today: open only if current time < startTime − cutoffMinutes
+      const nowMins    = t.getHours() * 60 + t.getMinutes()
+      const bookDeadline = startMins - cutoff
+      status = nowMins < bookDeadline ? 'open' : 'closed'
+    }
+
+    return {
+      key,
+      en:         p.name,
+      th,
+      timeRange,
+      time:       timeRange,
+      cutoffHour,
+      cutoffMin,
+      quota:      p.seatCapacity ?? 0,
+      booked:     0,
+      status,
+      _id:        p._id,
+    } satisfies MealSession & { _id: string; timeRange: string }
   })
 })
 
@@ -106,7 +133,7 @@ function openDatePicker() {
 }
 
 // ── Backend data ─────────────────────────────────────────────────────────────
-interface MealPeriod { _id: string; code: string; name: string; startTime: string; endTime: string }
+interface MealPeriod { _id: string; code: string; name: string; startTime: string; endTime: string; cutoffMinutes: number; seatCapacity: number }
 interface Shop       { _id: string; code: string; name: string; type: string }
 interface MenuItem   { _id: string; name: string; price: number; isPreorderable: boolean; shopId: string }
 
@@ -208,13 +235,14 @@ async function loadExistingOrders() {
       newMap.set(key, order._id)
 
       // populate store for dashboard
+      const periodData = mealPeriods.value.find(p => CODE_TO_KEY[p.code] === sessionKey)
       parentStore.addTodayBooking({
         id:          order._id,
         orderNo:     order.orderNo ?? '',
         status:      order.status ?? 'confirmed',
         sessionKey,
-        sessionTh:   SESSION_DEFS.find(d => d.key === sessionKey)?.th ?? '',
-        sessionEn:   SESSION_DEFS.find(d => d.key === sessionKey)?.en ?? '',
+        sessionTh:   periodData ? (CODE_TO_TH[periodData.code] ?? periodData.name) : '',
+        sessionEn:   periodData?.name ?? '',
         serveDate:   order.serveDate,
         totalAmount: order.totalAmount ?? 0,
         items:       (order.items ?? []).map((i: any) => ({
@@ -404,6 +432,14 @@ function statusLabel(s: MealSession) {
         class="date-hidden-input"
         aria-label="Select date"
       />
+    </div>
+
+    <!-- Empty state when no meal periods loaded -->
+    <div v-if="!loadingInit && sessions.length === 0 && !loadError" class="mx-4 mt-4 card px-4 py-6 flex flex-col items-center gap-2">
+      <PhForkKnife :size="32" style="color: var(--color-text-tertiary)" />
+      <p class="text-[14px] text-center" style="color: var(--color-text-secondary)">
+        {{ locale.t('ยังไม่มีรอบการจอง — กรุณาติดต่อผู้ดูแลระบบ', 'No meal sessions available — please contact your administrator.') }}
+      </p>
     </div>
 
     <!-- Meal session cards -->
