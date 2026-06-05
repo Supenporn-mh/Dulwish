@@ -15,6 +15,7 @@ export interface ParentChild {
 
 export interface TodayBooking {
   id:          string
+  childId:     string   // student user ID — used to filter per child on dashboard
   orderNo:     string
   status:      string
   sessionKey:  string   // 'breakfast' | 'lunch' | 'dinner'

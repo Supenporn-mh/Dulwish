@@ -239,23 +239,6 @@ async function loadExistingOrders() {
       newSet.add(key)
       newMap.set(key, order._id)
 
-      // populate store for dashboard
-      const periodData = mealPeriods.value.find(p => CODE_TO_KEY[p.code] === sessionKey)
-      parentStore.addTodayBooking({
-        id:          order._id,
-        orderNo:     order.orderNo ?? '',
-        status:      order.status ?? 'confirmed',
-        sessionKey,
-        sessionTh:   periodData ? (CODE_TO_TH[periodData.code] ?? periodData.name) : '',
-        sessionEn:   periodData?.name ?? '',
-        serveDate:   order.serveDate,
-        totalAmount: order.totalAmount ?? 0,
-        items:       (order.items ?? []).map((i: any) => ({
-          name:      i.name ?? i.menuItemName ?? '',
-          qty:       i.qty ?? i.quantity ?? 1,
-          lineTotal: i.lineTotal ?? i.price ?? 0,
-        })),
-      })
     }
 
     bookedSessions.value = newSet
@@ -370,6 +353,7 @@ async function submitBooking() {
     // Share to parentStore → DashboardView แสดง "การจองวันนี้" ทันที
     parentStore.addTodayBooking({
       id:          order?._id ?? `order-${Date.now()}`,
+      childId:     child.id,
       orderNo:     order?.orderNo ?? '',
       status:      order?.status ?? 'confirmed',
       sessionKey:  s.key,
