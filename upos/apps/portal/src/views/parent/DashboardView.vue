@@ -119,7 +119,7 @@ async function fetchBookings(_childId: string) {
     const d = new Date()
     const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
     const res = await api.get(`/orders?from=${today}&to=${today}`)
-    apiBookings.value = (res.data?.orders ?? []) as Booking[]
+    apiBookings.value = (res.data?.orders ?? []).map((o: any) => ({ ...o, id: o.id ?? o._id }))
   } catch {
     apiBookings.value = []
   }
