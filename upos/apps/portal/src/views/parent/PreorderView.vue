@@ -128,8 +128,11 @@ const displayDate = computed(() => {
 })
 
 function openDatePicker() {
-  dateInputRef.value?.showPicker?.()
-  dateInputRef.value?.click()
+  try {
+    dateInputRef.value?.showPicker()
+  } catch {
+    dateInputRef.value?.click()
+  }
 }
 
 // ── Backend data ─────────────────────────────────────────────────────────────
