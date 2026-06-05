@@ -270,6 +270,13 @@ onMounted(async () => {
   await loadExistingOrders()
 })
 
+// Re-load when parent switches child (e.g. taps a different card before navigating)
+watch(() => parentStore.selectedChildId, async () => {
+  bookedSessions.value = new Set()
+  orderIdMap.value     = new Map()
+  await loadExistingOrders()
+})
+
 // ── Cancel booking ────────────────────────────────────────────────────────────
 const cancelSession  = ref<MealSession | null>(null)
 const cancelledKey   = ref<string | null>(null)

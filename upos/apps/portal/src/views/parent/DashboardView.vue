@@ -284,6 +284,7 @@ onMounted(async () => {
           :grade="child.grade"
           :class-name="child.className"
           :updated-at="new Date()"
+          @click="parentStore.selectChild(child.id)"
         />
         <!-- Add-student last card -->
         <button class="carousel-card add-card" @click="router.push('/parent/add-student')">
