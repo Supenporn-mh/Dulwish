@@ -114,12 +114,20 @@ function scrollToChild(id: string) {
 }
 
 // ── Data fetching ────────────────────────────────────────────────────────────
+const CODE_TO_TH: Record<string, string> = { BREAKFAST: 'เช้า', LUNCH: 'กลางวัน', DINNER: 'เย็น' }
+const CODE_TO_EN: Record<string, string> = { BREAKFAST: 'Breakfast', LUNCH: 'Lunch', DINNER: 'Dinner' }
+
 async function fetchBookings(_childId: string) {
   try {
     const d = new Date()
     const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
     const res = await api.get(`/orders?from=${today}&to=${today}`)
-    apiBookings.value = (res.data?.orders ?? []).map((o: any) => ({ ...o, id: o.id ?? o._id }))
+    apiBookings.value = (res.data?.orders ?? []).map((o: any) => ({
+      ...o,
+      id: o.id ?? o._id,
+      sessionTh: CODE_TO_TH[o.mealPeriodCode] ?? o.mealPeriodName,
+      sessionEn: CODE_TO_EN[o.mealPeriodCode] ?? o.mealPeriodName,
+    }))
   } catch {
     apiBookings.value = []
   }
