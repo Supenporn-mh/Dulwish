@@ -222,8 +222,10 @@ function isBooked(s: MealSession): boolean {
 // ── Load existing orders to restore booked state ──────────────────────────────
 async function loadExistingOrders() {
   try {
+    const childId = parentStore.selectedChild?.id
+    if (!childId) return
     const res = await api.get('/orders', {
-      params: { from: todayISO, to: maxISO },
+      params: { from: todayISO, to: maxISO, student: childId },
     })
     const orders: any[] = res.data.orders ?? []
     const newSet = new Set(bookedSessions.value)
