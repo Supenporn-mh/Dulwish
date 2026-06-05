@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia'
 import { authPlugin } from '../../middleware/auth'
-import { User, Wallet, ParentStudent, Card } from '../../models'
+import { User, Wallet, ParentStudent, Card, EnrollmentCode } from '../../models'
 
 export const usersController = new Elysia({ prefix: '/users' })
   .use(authPlugin())
