@@ -7,7 +7,7 @@
         <h2 style="font-size:22px;font-weight:500;color:var(--color-text-primary)">ตั้งค่าช่วงเวลา</h2>
         <p style="font-size:13px;color:var(--color-text-secondary);margin-top:3px">กำหนดค่าช่วงเวลาการจอง จัดจำกัดความจุ</p>
       </div>
-      <button class="adm-hdr-btn adm-hdr-btn-primary" @click="openCreate">
+      <button class="adm-hdr-btn adm-hdr-btn-primary" @click="openCreate" :disabled="loading">
         <PhPlus :size="14" /> เพิ่มช่วงเวลา
       </button>
     </div>
@@ -18,6 +18,13 @@
         <PhMagnifyingGlass :size="15" style="color:var(--color-text-tertiary);flex-shrink:0" />
         <input v-model="search" class="ts-search" placeholder="ค้นหาชื่อช่วงเวลา หรือเวลาทำการ..." />
       </div>
+    </div>
+
+    <!-- Error banner -->
+    <div v-if="error" class="ts-error-banner">
+      <PhWarning :size="15" style="flex-shrink:0" />
+      <span>{{ error }}</span>
+      <button class="ts-error-dismiss" @click="error = null">✕</button>
     </div>
 
     <!-- Table card -->
@@ -38,34 +45,45 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="paginated.length === 0">
+          <tr v-if="loading">
+            <td colspan="8" class="center" style="padding:40px;color:var(--color-text-tertiary)">กำลังโหลด...</td>
+          </tr>
+          <tr v-else-if="paginated.length === 0">
             <td colspan="8" class="center" style="padding:40px;color:var(--color-text-tertiary)">ไม่พบข้อมูล</td>
           </tr>
-          <tr v-for="(s, i) in paginated" :key="s.id">
-            <td class="num center">{{ (currentPage-1)*pageSize + i + 1 }}</td>
-            <td style="font-weight:500;color:var(--color-primary)">{{ s.name }}</td>
-            <td class="center" style="font-size:13px">{{ mealLabel(s.meal) }}</td>
-            <td class="center" style="font-size:13px;font-family:monospace">{{ s.startTime }} – {{ s.endTime }}</td>
-            <td class="center" style="font-size:13px">{{ s.capacity }}</td>
-            <td class="center" style="font-size:13px">{{ s.cutoffHours }} ชั่วโมง</td>
-            <td class="center">
-              <span :class="['ts-status', s.enabled ? 'ts-status-on' : 'ts-status-off']">
-                <PhCheckCircle v-if="s.enabled" :size="13" weight="fill" />
-                <PhCircle v-else :size="13" />
-                {{ s.enabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน' }}
-              </span>
-            </td>
-            <td class="center">
-              <div class="adm-actions">
-                <button class="adm-action-btn" title="แก้ไข" @click="openEdit(s)">
-                  <PhPencilSimple :size="14" />
+          <template v-else>
+            <tr v-for="(s, i) in paginated" :key="s._id">
+              <td class="num center">{{ (currentPage-1)*pageSize + i + 1 }}</td>
+              <td style="font-weight:500;color:var(--color-primary)">{{ s.name }}</td>
+              <td class="center" style="font-size:13px">{{ mealLabel(s.meal) }}</td>
+              <td class="center" style="font-size:13px;font-family:monospace">{{ s.startTime }} – {{ s.endTime }}</td>
+              <td class="center" style="font-size:13px">{{ s.capacity }}</td>
+              <td class="center" style="font-size:13px">{{ s.cutoffHours }} ชั่วโมง</td>
+              <td class="center">
+                <button
+                  :class="['ts-status', s.enabled ? 'ts-status-on' : 'ts-status-off']"
+                  :disabled="savingId === s._id"
+                  style="border:none;cursor:pointer;background:none;padding:0"
+                  :title="s.enabled ? 'คลิกเพื่อปิดใช้งาน' : 'คลิกเพื่อเปิดใช้งาน'"
+                  @click="toggleEnabled(s)"
+                >
+                  <PhCheckCircle v-if="s.enabled" :size="13" weight="fill" />
+                  <PhCircle v-else :size="13" />
+                  {{ s.enabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน' }}
                 </button>
-                <button class="adm-action-btn danger" title="ลบ" @click="deleteSlot(s)">
-                  <PhTrash :size="14" />
-                </button>
-              </div>
-            </td>
-          </tr>
+              </td>
+              <td class="center">
+                <div class="adm-actions">
+                  <button class="adm-action-btn" title="แก้ไข" :disabled="savingId === s._id" @click="openEdit(s)">
+                    <PhPencilSimple :size="14" />
+                  </button>
+                  <button class="adm-action-btn danger" title="ลบ" :disabled="savingId === s._id" @click="deleteSlot(s)">
+                    <PhTrash :size="14" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </template>
         </tbody>
       </table>
 
@@ -153,9 +171,9 @@
 
           <!-- Footer -->
           <div style="display:flex;gap:10px;margin-top:24px;justify-content:flex-end">
-            <button class="adm-hdr-btn adm-hdr-btn-ghost" @click="showModal=false">ยกเลิก</button>
-            <button class="adm-hdr-btn adm-hdr-btn-primary" :disabled="!form.name" @click="save">
-              {{ editTarget ? 'บันทึก' : 'เพิ่มช่วงเวลา' }}
+            <button class="adm-hdr-btn adm-hdr-btn-ghost" :disabled="modalSaving" @click="showModal=false">ยกเลิก</button>
+            <button class="adm-hdr-btn adm-hdr-btn-primary" :disabled="!form.name || modalSaving" @click="save">
+              {{ modalSaving ? 'กำลังบันทึก...' : (editTarget ? 'บันทึก' : 'เพิ่มช่วงเวลา') }}
             </button>
           </div>
         </div>
@@ -166,63 +184,141 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   PhPlus, PhMagnifyingGlass, PhPencilSimple, PhTrash,
-  PhCheckCircle, PhCircle,
+  PhCheckCircle, PhCircle, PhWarning,
 } from '@phosphor-icons/vue'
+import {
+  listTimeSlots,
+  createTimeSlot,
+  updateTimeSlot,
+  deleteTimeSlot,
+} from '../../../api/booking'
+import type { BookingTimeSlot } from '../../../api/types'
 
-interface TimeSlot {
-  id: number; name: string; meal: 'breakfast'|'lunch'|'dinner'
-  startTime: string; endTime: string; capacity: number
-  cutoffHours: number; description: string; enabled: boolean
+// Backend returns Mongo documents: _id is the string ObjectId
+interface SlotDoc extends Omit<BookingTimeSlot, 'id'> {
+  _id: string
 }
 
-let nextId = 4
-const slots = ref<TimeSlot[]>([
-  { id:1, name:'Breakfast', meal:'breakfast', startTime:'07:00', endTime:'09:00', capacity:120, cutoffHours:1, description:'', enabled:true },
-  { id:2, name:'Lunch',     meal:'lunch',     startTime:'11:30', endTime:'13:30', capacity:150, cutoffHours:1, description:'', enabled:true },
-  { id:3, name:'Dinner',    meal:'dinner',    startTime:'17:00', endTime:'18:30', capacity:100, cutoffHours:1, description:'', enabled:true },
-])
+const slots       = ref<SlotDoc[]>([])
+const loading     = ref(false)
+const error       = ref<string | null>(null)
+const savingId    = ref<string | null>(null)
+const modalSaving = ref(false)
 
 const search      = ref('')
 const pageSize    = ref(10)
 const currentPage = ref(1)
 const showModal   = ref(false)
-const editTarget  = ref<TimeSlot | null>(null)
-const form        = ref({ name:'', meal:'breakfast' as any, startTime:'07:00', endTime:'09:00', capacity:120, cutoffHours:1, description:'', enabled:true })
+const editTarget  = ref<SlotDoc | null>(null)
 
-const mealLabel = (m: string) => ({ breakfast:'เช้า', lunch:'กลางวัน', dinner:'เย็น' })[m] ?? m
+type FormShape = {
+  name: string
+  meal: 'breakfast' | 'lunch' | 'dinner'
+  startTime: string
+  endTime: string
+  capacity: number
+  cutoffHours: number
+  description: string
+  enabled: boolean
+}
+
+const blankForm = (): FormShape => ({
+  name: '', meal: 'breakfast', startTime: '07:00', endTime: '09:00',
+  capacity: 120, cutoffHours: 1, description: '', enabled: true,
+})
+const form = ref<FormShape>(blankForm())
+
+const mealLabel = (m: string) => ({ breakfast: 'เช้า', lunch: 'กลางวัน', dinner: 'เย็น' }[m] ?? m)
 
 const filtered   = computed(() => {
   const q = search.value.toLowerCase()
   return slots.value.filter(s => !q || s.name.toLowerCase().includes(q) || s.startTime.includes(q))
 })
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize.value)))
-const paginated  = computed(() => filtered.value.slice((currentPage.value-1)*pageSize.value, currentPage.value*pageSize.value))
+const paginated  = computed(() => filtered.value.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value))
+
+onMounted(async () => {
+  loading.value = true
+  error.value = null
+  try {
+    slots.value = (await listTimeSlots()) as unknown as SlotDoc[]
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ'
+  } finally {
+    loading.value = false
+  }
+})
 
 function openCreate() {
   editTarget.value = null
-  form.value = { name:'', meal:'breakfast', startTime:'07:00', endTime:'09:00', capacity:120, cutoffHours:1, description:'', enabled:true }
+  form.value = blankForm()
   showModal.value = true
 }
-function openEdit(s: TimeSlot) {
+
+function openEdit(s: SlotDoc) {
   editTarget.value = s
-  form.value = { ...s }
+  form.value = {
+    name: s.name,
+    meal: s.meal,
+    startTime: s.startTime,
+    endTime: s.endTime,
+    capacity: s.capacity,
+    cutoffHours: s.cutoffHours,
+    description: s.description,
+    enabled: s.enabled,
+  }
   showModal.value = true
 }
-function save() {
+
+async function save() {
   if (!form.value.name) return
-  if (editTarget.value) {
-    const idx = slots.value.findIndex(s => s.id === editTarget.value!.id)
-    if (idx >= 0) slots.value[idx] = { ...form.value, id: editTarget.value.id }
-  } else {
-    slots.value.push({ ...form.value, id: nextId++ })
+  modalSaving.value = true
+  error.value = null
+  try {
+    if (editTarget.value) {
+      const updated = await updateTimeSlot(editTarget.value._id, form.value) as unknown as SlotDoc
+      const idx = slots.value.findIndex(s => s._id === editTarget.value!._id)
+      if (idx >= 0) slots.value[idx] = updated
+    } else {
+      const created = await createTimeSlot(form.value as Omit<BookingTimeSlot, 'id'>) as unknown as SlotDoc
+      slots.value.push(created)
+    }
+    showModal.value = false
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ'
+  } finally {
+    modalSaving.value = false
   }
-  showModal.value = false
 }
-function deleteSlot(s: TimeSlot) {
-  slots.value = slots.value.filter(x => x.id !== s.id)
+
+async function deleteSlot(s: SlotDoc) {
+  savingId.value = s._id
+  error.value = null
+  try {
+    await deleteTimeSlot(s._id)
+    slots.value = slots.value.filter(x => x._id !== s._id)
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'ลบไม่สำเร็จ'
+  } finally {
+    savingId.value = null
+  }
+}
+
+async function toggleEnabled(s: SlotDoc) {
+  savingId.value = s._id
+  error.value = null
+  try {
+    const updated = await updateTimeSlot(s._id, { enabled: !s.enabled }) as unknown as SlotDoc
+    const idx = slots.value.findIndex(x => x._id === s._id)
+    if (idx >= 0) slots.value[idx] = updated
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'เปลี่ยนสถานะไม่สำเร็จ'
+  } finally {
+    savingId.value = null
+  }
 }
 </script>
 
@@ -234,6 +330,16 @@ function deleteSlot(s: TimeSlot) {
 }
 .ts-search { border:none; outline:none; flex:1; font-size:13px; color:var(--color-text-primary); background:transparent; font-family:inherit; }
 .ts-search::placeholder { color:var(--color-text-tertiary); }
+
+.ts-error-banner {
+  display:flex; align-items:center; gap:8px;
+  background:#fff1f0; border:1px solid #ffa39e; border-radius:8px;
+  padding:10px 14px; font-size:13px; color:#cf1322;
+}
+.ts-error-dismiss {
+  margin-left:auto; border:none; background:none; cursor:pointer;
+  color:#cf1322; font-size:14px; padding:0 4px;
+}
 
 .ts-status {
   display:inline-flex; align-items:center; gap:5px;

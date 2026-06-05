@@ -17,8 +17,12 @@
       <button :class="['pd-tab', tab==='extra'?'pd-tab--active':'pd-tab--inactive']" @click="tab='extra'">ข้อมูลเพิ่มเติม</button>
     </div>
 
+    <!-- Loading / Error -->
+    <div v-if="loading" style="padding:40px;text-align:center;color:var(--color-text-tertiary)">กำลังโหลด...</div>
+    <div v-else-if="errorMsg" style="padding:20px 24px;color:var(--color-danger);font-size:14px">{{ errorMsg }}</div>
+
     <!-- ── Tab 1: ข้อมูลพื้นฐาน ──────────────────────────────────── -->
-    <div v-if="tab==='basic'" class="pd-body">
+    <div v-if="tab==='basic' && !loading" class="pd-body">
       <div class="pd-grid">
         <!-- Left/Center fields -->
         <div class="pd-fields">
@@ -109,7 +113,7 @@
     </div>
 
     <!-- ── Tab 2: ข้อมูลเพิ่มเติม ──────────────────────────────────── -->
-    <div v-else class="pd-body">
+    <div v-else-if="tab==='extra' && !loading" class="pd-body">
       <div style="display:flex;flex-direction:column;gap:0">
 
         <!-- Attribute rows -->
@@ -172,13 +176,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { PhX, PhPlus, PhTrash, PhUploadSimple } from '@phosphor-icons/vue'
+import {
+  listProducts as apiListProducts,
+  createProduct as apiCreateProduct,
+  updateProduct as apiUpdateProduct,
+} from '@/api/products'
+import type { Product } from '@/api/types'
 
 const route  = useRoute()
 const router = useRouter()
 const isNew  = computed(() => route.path.endsWith('/new'))
+const productCode = computed(() => route.params.id as string)
 
 const CATEGORIES = [
   { id:'002', name:'A: PLANT BASED' }, { id:'003', name:'B: BREAKFAST SETS' },
@@ -194,6 +205,8 @@ const ICONS = ['🍜','🍱','🥗','☕','🌿']
 
 const tab      = ref<'basic'|'extra'>('basic')
 const imgInput = ref<HTMLInputElement | null>(null)
+const loading  = ref(false)
+const errorMsg = ref('')
 
 interface AttrOption { name: string; price: number }
 interface Attribute  { name: string; type: 'single'|'number'|'multiple'; options: AttrOption[] }
@@ -206,6 +219,37 @@ const form = ref({
 
 const canSave       = computed(() => !!form.value.id && !!form.value.name)
 const attrSubmitted = ref(false)
+
+onMounted(async () => {
+  if (isNew.value) return
+  loading.value = true
+  errorMsg.value = ''
+  try {
+    const all = await apiListProducts()
+    const p   = all.find(x => x.id === productCode.value)
+    if (p) {
+      form.value.id           = p.id
+      form.value.barcode      = p.barcode ?? ''
+      form.value.name         = p.name
+      form.value.cost         = p.cost ?? null
+      form.value.price        = p.price ?? null
+      form.value.group        = p.group ?? ''
+      form.value.unit         = p.unit ?? ''
+      form.value.branch       = p.branch ?? ''
+      form.value.categoryCode = p.categoryCode ?? ''
+      form.value.imageUrl     = p.imageUrl ?? ''
+      form.value.attributes   = (p.attributes ?? []).map(a => ({
+        name: a.name,
+        type: a.type as 'single'|'number'|'multiple',
+        options: a.options.map(o => ({ name: o.name, price: o.price })),
+      }))
+    }
+  } catch (e: any) {
+    errorMsg.value = e?.response?.data?.message ?? e?.message ?? 'โหลดข้อมูลไม่สำเร็จ'
+  } finally {
+    loading.value = false
+  }
+})
 
 function onImgChange(e: Event) {
   const f = (e.target as HTMLInputElement).files?.[0]
@@ -222,9 +266,31 @@ function removeAttr(i: number)              { form.value.attributes.splice(i, 1)
 function addOption(a: Attribute)            { a.options.push({ name:'', price:0 }) }
 function removeOption(a: Attribute, i: number) { a.options.splice(i, 1) }
 
-function save() {
+async function save() {
   if (!canSave.value) return
-  router.back()
+  const payload: Omit<Product, 'id'> & { id: string } = {
+    id:           form.value.id,
+    name:         form.value.name,
+    price:        form.value.price ?? 0,
+    cost:         form.value.cost ?? undefined,
+    categoryCode: form.value.categoryCode,
+    unit:         form.value.unit,
+    barcode:      form.value.barcode || undefined,
+    group:        form.value.group || undefined,
+    branch:       form.value.branch || undefined,
+    imageUrl:     form.value.imageUrl || undefined,
+    attributes:   form.value.attributes.length > 0 ? form.value.attributes : undefined,
+  }
+  try {
+    if (isNew.value) {
+      await apiCreateProduct(payload)
+    } else {
+      await apiUpdateProduct(productCode.value, payload)
+    }
+    router.back()
+  } catch (e: any) {
+    alert(e?.response?.data?.message ?? e?.message ?? 'บันทึกไม่สำเร็จ')
+  }
 }
 </script>
 

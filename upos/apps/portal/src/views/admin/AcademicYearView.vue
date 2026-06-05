@@ -10,7 +10,25 @@
       </button>
     </div>
 
+    <!-- Loading state -->
+    <div v-if="pageLoading" style="display:flex;align-items:center;justify-content:center;padding:48px 0">
+      <span style="font-size:13px;color:#8E8E93">กำลังโหลด...</span>
+    </div>
+
+    <!-- Error state -->
+    <div
+      v-if="pageError && !pageLoading"
+      style="background:#FFF2F2;border:1px solid #FFCDD2;border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px"
+    >
+      <span style="font-size:13px;color:#C62828">{{ pageError }}</span>
+      <button
+        style="background:none;border:none;cursor:pointer;color:#8E8E93;font-size:12px;flex-shrink:0"
+        @click="pageError = ''"
+      >ปิด</button>
+    </div>
+
     <!-- Academic year cards -->
+    <template v-if="!pageLoading">
     <div v-for="yr in years" :key="yr.id" class="ay-card">
 
       <!-- Card header -->
@@ -155,6 +173,7 @@
         </div>
       </Transition>
     </div>
+    </template>
 
     <!-- ── Leave confirm modal ──────────────────────────────────────────── -->
     <Teleport to="body">
@@ -300,7 +319,7 @@
     </Teleport>
 
     <!-- Empty state -->
-    <div v-if="years.length === 0" class="ay-empty">
+    <div v-if="!pageLoading && years.length === 0" class="ay-empty">
       <PhGraduationCap :size="40" weight="thin" style="color:#D0D0D0;margin-bottom:12px" />
       <p style="font-size:15px;color:#AEAEB2">ยังไม่มีข้อมูลปีการศึกษา</p>
       <button class="ay-btn-primary" style="margin-top:16px" @click="addYear">
@@ -312,29 +331,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import {
   PhPlus, PhGraduationCap, PhCalendarBlank,
   PhCaretUp, PhCaretDown, PhTrash, PhFloppyDisk, PhWarning, PhX,
 } from '@phosphor-icons/vue'
+import type { AcademicYear, Semester } from '@/api/types'
+import {
+  listAcademicYears,
+  createAcademicYear,
+  updateAcademicYear,
+  deleteAcademicYear,
+} from '@/api/settings'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-interface Semester {
-  id:        string
-  name:      string
-  startDate: string
-  endDate:   string
+// ── UI-extended type (UI-only fields never sent to API) ───────────────────────
+interface AcademicYearUI extends AcademicYear {
+  expanded: boolean
+  isDirty:  boolean
+  saving:   boolean
+  savedAt:  Date | null
 }
-interface AcademicYear {
-  id:        string
-  year:      string
-  semesters: Semester[]
-  expanded:  boolean
-  isDirty:   boolean    // มีการเปลี่ยนแปลงที่ยังไม่บันทึก
-  saving:    boolean    // กำลัง auto-save
-  savedAt:   Date | null
-}
+
+// ── Page-level loading / error state ─────────────────────────────────────────
+const pageLoading = ref(false)
+const pageError   = ref('')
 
 // ── Add year modal state ──────────────────────────────────────────────────────
 const showAddYearModal = ref(false)
@@ -365,46 +386,49 @@ function closeAddYearModal() {
   newYearError.value = ''
 }
 
-function confirmAddYear() {
+async function confirmAddYear() {
   if (!canCreateYear.value || !newYearInput.value) return
   const y1   = newYearInput.value
   const year = `${y1}/${y1 + 1}`
-  const yr   = makeYear(`ay${y1}`, year, true, [
-    {name:'ภาคเรียนที่ 1',startDate:'',endDate:''},
-    {name:'ภาคเรียนที่ 2',startDate:'',endDate:''},
-    {name:'ภาคเรียนที่ 3',startDate:'',endDate:''},
-  ])
-  yr.isDirty = true
-  years.value.unshift(yr)
+  const semesters: Semester[] = [
+    { id: '', name: 'ภาคเรียนที่ 1', startDate: '', endDate: '' },
+    { id: '', name: 'ภาคเรียนที่ 2', startDate: '', endDate: '' },
+    { id: '', name: 'ภาคเรียนที่ 3', startDate: '', endDate: '' },
+  ]
   closeAddYearModal()
+  try {
+    const created = await createAcademicYear({ year, semesters })
+    years.value.unshift(toUI(created, true))
+  } catch (e: any) {
+    pageError.value = e?.response?.data?.message ?? e?.message ?? 'สร้างปีการศึกษาไม่สำเร็จ'
+  }
 }
 
 // ── Route guard state ────────────────────────────────────────────────────────
 const showLeaveConfirm = ref(false)
 let   pendingNavigation: (() => void) | null = null
 
-// ── Demo data ─────────────────────────────────────────────────────────────────
-function makeYear(id: string, year: string, expanded: boolean, sems: Omit<Semester,'id'>[]): AcademicYear {
-  return { id, year, expanded, isDirty: false, saving: false, savedAt: new Date(),
-    semesters: sems.map((s, i) => ({ ...s, id: `${id}-s${i+1}` })) }
+// ── Years list (empty until API loads) ───────────────────────────────────────
+const years = ref<AcademicYearUI[]>([])
+
+// ── Helper: wrap API AcademicYear with UI fields ──────────────────────────────
+function toUI(ay: AcademicYear, expanded = false): AcademicYearUI {
+  return { ...ay, expanded, isDirty: false, saving: false, savedAt: null }
 }
-const years = ref<AcademicYear[]>([
-  makeYear('ay2027','2027/2028',true,[
-    {name:'ภาคเรียนที่ 1',startDate:'2027-01-01',endDate:'2027-04-30'},
-    {name:'ภาคเรียนที่ 2',startDate:'2027-05-01',endDate:'2027-08-31'},
-    {name:'ภาคเรียนที่ 3',startDate:'2027-09-01',endDate:'2027-12-31'},
-  ]),
-  makeYear('ay2026','2026/2027',false,[
-    {name:'ภาคเรียนที่ 1',startDate:'2026-01-01',endDate:'2026-04-30'},
-    {name:'ภาคเรียนที่ 2',startDate:'2026-05-01',endDate:'2026-08-31'},
-    {name:'ภาคเรียนที่ 3',startDate:'2026-09-01',endDate:'2026-12-31'},
-  ]),
-  makeYear('ay2025','2025/2026',false,[
-    {name:'ภาคเรียนที่ 1',startDate:'2025-01-01',endDate:'2025-04-30'},
-    {name:'ภาคเรียนที่ 2',startDate:'2025-05-01',endDate:'2025-08-31'},
-    {name:'ภาคเรียนที่ 3',startDate:'2025-09-01',endDate:'2025-12-31'},
-  ]),
-])
+
+// ── Load on mount ─────────────────────────────────────────────────────────────
+onMounted(async () => {
+  pageLoading.value = true
+  pageError.value   = ''
+  try {
+    const data = await listAcademicYears()
+    years.value = data.map((ay, i) => toUI(ay, i === 0))
+  } catch (e: any) {
+    pageError.value = e?.response?.data?.message ?? e?.message ?? 'โหลดข้อมูลไม่สำเร็จ'
+  } finally {
+    pageLoading.value = false
+  }
+})
 
 const anyDirty = computed(() => years.value.some(y => y.isDirty))
 
@@ -413,7 +437,7 @@ function calcDays(start: string, end: string): number {
   const ms = new Date(end).getTime() - new Date(start).getTime()
   return Math.max(0, Math.round(ms / 86400000) + 1)
 }
-function isComplete(yr: AcademicYear): boolean {
+function isComplete(yr: AcademicYearUI): boolean {
   return yr.semesters.length > 0 && yr.semesters.every(s => s.startDate && s.endDate)
 }
 function fmtTime(d: Date): string {
@@ -421,22 +445,41 @@ function fmtTime(d: Date): string {
 }
 
 // ── Mark dirty (no auto-save) ─────────────────────────────────────────────────
-function markDirty(yr: AcademicYear) {
+function markDirty(yr: AcademicYearUI) {
   yr.isDirty = true
 }
 
 // ── Manual save ───────────────────────────────────────────────────────────────
-async function saveYear(yr: AcademicYear) {
+async function saveYear(yr: AcademicYearUI) {
   if (!isComplete(yr)) {
     alert('กรุณากรอกวันที่ให้ครบทุกภาคเรียนก่อนบันทึก')
     return
   }
   yr.saving = true
   try {
-    await new Promise(r => setTimeout(r, 500))  // simulate API
-    yr.isDirty = false
-    yr.savedAt = new Date()
-  } finally {
+    const payload: Partial<AcademicYear> = {
+      year:      yr.year,
+      semesters: yr.semesters.map(s => ({
+        id:        s.id,
+        name:      s.name,
+        startDate: s.startDate,
+        endDate:   s.endDate,
+      })),
+    }
+    const updated = await updateAcademicYear(yr.id, payload)
+    // merge API response back into local entry (preserves UI fields)
+    const idx = years.value.findIndex(y => y.id === yr.id)
+    if (idx !== -1) {
+      years.value[idx] = {
+        ...years.value[idx],
+        ...updated,
+        isDirty: false,
+        saving:  false,
+        savedAt: new Date(),
+      }
+    }
+  } catch (e: any) {
+    pageError.value = e?.response?.data?.message ?? e?.message ?? 'บันทึกไม่สำเร็จ'
     yr.saving = false
   }
 }
@@ -447,7 +490,7 @@ function addYear() {
   showAddYearModal.value = true
 }
 
-function isYearActive(yr: AcademicYear): boolean {
+function isYearActive(yr: AcademicYearUI): boolean {
   const today = new Date().toISOString().split('T')[0]
   return yr.semesters.some(s =>
     s.startDate && s.endDate &&
@@ -455,12 +498,12 @@ function isYearActive(yr: AcademicYear): boolean {
   )
 }
 
-const deleteTarget     = ref<AcademicYear | null>(null)
+const deleteTarget     = ref<AcademicYearUI | null>(null)
 const showDeleteConfirm = ref(false)
 const showActiveAlert   = ref(false)
 const activeAlertYear   = ref('')
 
-function deleteYear(yr: AcademicYear) {
+function deleteYear(yr: AcademicYearUI) {
   if (isYearActive(yr)) {
     activeAlertYear.value = yr.year
     showActiveAlert.value = true
@@ -470,11 +513,17 @@ function deleteYear(yr: AcademicYear) {
   showDeleteConfirm.value = true
 }
 
-function confirmDelete() {
+async function confirmDelete() {
   if (!deleteTarget.value) return
-  years.value = years.value.filter(y => y.id !== deleteTarget.value!.id)
+  const id = deleteTarget.value.id
   deleteTarget.value      = null
   showDeleteConfirm.value = false
+  try {
+    await deleteAcademicYear(id)
+    years.value = years.value.filter(y => y.id !== id)
+  } catch (e: any) {
+    pageError.value = e?.response?.data?.message ?? e?.message ?? 'ลบไม่สำเร็จ'
+  }
 }
 
 function cancelDelete() {
@@ -482,13 +531,13 @@ function cancelDelete() {
   showDeleteConfirm.value = false
 }
 
-function addSemester(yr: AcademicYear) {
+function addSemester(yr: AcademicYearUI) {
   const n = yr.semesters.length + 1
   yr.semesters.push({ id:`sem-${Date.now()}`, name:`ภาคเรียนที่ ${n}`, startDate:'', endDate:'' })
   markDirty(yr)
 }
 
-function removeSemester(yr: AcademicYear, idx: number) {
+function removeSemester(yr: AcademicYearUI, idx: number) {
   yr.semesters.splice(idx, 1)
   yr.semesters.forEach((s, i) => { s.name = `ภาคเรียนที่ ${i + 1}` })
   markDirty(yr)

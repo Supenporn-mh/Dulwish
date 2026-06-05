@@ -9,6 +9,11 @@
       </button>
     </div>
 
+    <!-- Error banner -->
+    <div v-if="error" style="padding:12px 16px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-size:14px;font-weight:400">
+      {{ error }}
+    </div>
+
     <!-- Search -->
     <div class="adm-table-wrap p-4" style="border-radius:10px">
       <div class="flex gap-3">
@@ -31,9 +36,13 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="paginated.length === 0">
+          <tr v-if="loading">
+            <td colspan="4" class="center" style="padding:40px;color:var(--color-text-tertiary)">กำลังโหลด...</td>
+          </tr>
+          <tr v-else-if="paginated.length === 0">
             <td colspan="4" class="center" style="padding:40px;color:var(--color-text-tertiary)">ไม่พบข้อมูล</td>
           </tr>
+          <template v-else>
           <tr v-for="(k, i) in paginated" :key="k.id">
             <td class="num center">{{ (currentPage-1)*pageSize + i + 1 }}</td>
             <td><span class="adm-code">{{ k.id }}</span></td>
@@ -43,12 +52,13 @@
                 <button class="adm-action-btn" title="แก้ไข" @click="openEdit(k)">
                   <PhPencilSimple :size="14" />
                 </button>
-                <button class="adm-action-btn danger" title="ลบ" @click="deleteKitchen(k)">
+                <button class="adm-action-btn danger" title="ลบ" @click="handleDelete(k)">
                   <PhTrash :size="14" />
                 </button>
               </div>
             </td>
           </tr>
+          </template>
         </tbody>
       </table>
 
@@ -94,7 +104,7 @@
           </div>
           <div style="display:flex;gap:10px;margin-top:24px;justify-content:flex-end">
             <button class="adm-hdr-btn adm-hdr-btn-ghost" @click="showModal=false">ยกเลิก</button>
-            <button class="adm-hdr-btn adm-hdr-btn-primary" :disabled="!form.id||!form.name" @click="save">ตกลง</button>
+            <button class="adm-hdr-btn adm-hdr-btn-primary" :disabled="!form.id||!form.name||saving" @click="save">{{ saving ? 'กำลังบันทึก...' : 'ตกลง' }}</button>
           </div>
         </div>
       </Transition>
@@ -104,17 +114,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { PhPlus, PhPencilSimple, PhTrash } from '@phosphor-icons/vue'
+import type { Kitchen } from '@/api/types'
+import {
+  listKitchens,
+  createKitchen,
+  updateKitchen,
+  deleteKitchen,
+} from '@/api/products'
 
-interface Kitchen { id: string; name: string }
-
-const kitchens = ref<Kitchen[]>([
-  { id:'K001', name:'ครัวไทย' },
-  { id:'K002', name:'ครัวญี่ปุ่น' },
-  { id:'K003', name:'ครัวฝรั่ง' },
-  { id:'K004', name:'ครัวนานาชาติ 2' },
-])
+const kitchens    = ref<Kitchen[]>([])
+const loading     = ref(false)
+const error       = ref<string | null>(null)
+const saving      = ref(false)
 
 const search      = ref('')
 const pageSize    = ref(10)
@@ -122,6 +135,18 @@ const currentPage = ref(1)
 const showModal   = ref(false)
 const editTarget  = ref<Kitchen | null>(null)
 const form        = ref({ id: '', name: '' })
+
+onMounted(async () => {
+  loading.value = true
+  error.value = null
+  try {
+    kitchens.value = await listKitchens()
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'โหลดข้อมูลล้มเหลว'
+  } finally {
+    loading.value = false
+  }
+})
 
 const filtered = computed(() => {
   const q = search.value.toLowerCase()
@@ -144,18 +169,34 @@ function openEdit(k: Kitchen) {
   form.value = { ...k }
   showModal.value = true
 }
-function save() {
+async function save() {
   if (!form.value.id || !form.value.name) return
-  if (editTarget.value) {
-    const idx = kitchens.value.findIndex(k => k.id === editTarget.value!.id)
-    if (idx >= 0) kitchens.value[idx] = { ...form.value }
-  } else {
-    kitchens.value.push({ ...form.value })
+  saving.value = true
+  error.value = null
+  try {
+    if (editTarget.value) {
+      const updated = await updateKitchen(editTarget.value.id, { name: form.value.name })
+      const idx = kitchens.value.findIndex(k => k.id === editTarget.value!.id)
+      if (idx >= 0) kitchens.value[idx] = updated
+    } else {
+      const created = await createKitchen({ id: form.value.id, name: form.value.name })
+      kitchens.value.push(created)
+    }
+    showModal.value = false
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'บันทึกข้อมูลล้มเหลว'
+  } finally {
+    saving.value = false
   }
-  showModal.value = false
 }
-function deleteKitchen(k: Kitchen) {
-  kitchens.value = kitchens.value.filter(x => x.id !== k.id)
+async function handleDelete(k: Kitchen) {
+  error.value = null
+  try {
+    await deleteKitchen(k.id)
+    kitchens.value = kitchens.value.filter(x => x.id !== k.id)
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'ลบข้อมูลล้มเหลว'
+  }
 }
 </script>
 

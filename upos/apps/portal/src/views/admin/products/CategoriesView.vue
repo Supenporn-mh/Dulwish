@@ -9,6 +9,11 @@
       </button>
     </div>
 
+    <!-- Error banner -->
+    <div v-if="error" style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px 14px;font-size:13px;color:#B91C1C">
+      {{ error }}
+    </div>
+
     <!-- Search -->
     <div class="adm-table-wrap p-4" style="border-radius:10px">
       <div class="flex gap-3">
@@ -30,7 +35,10 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="paginated.length === 0">
+          <tr v-if="loading">
+            <td colspan="5" class="center" style="padding:40px;color:var(--color-text-tertiary)">กำลังโหลด...</td>
+          </tr>
+          <tr v-else-if="paginated.length === 0">
             <td colspan="5" class="center" style="padding:40px;color:var(--color-text-tertiary)">ไม่พบข้อมูล</td>
           </tr>
           <tr v-for="(c, i) in paginated" :key="c.id">
@@ -52,7 +60,7 @@
                 <button class="adm-action-btn" title="แก้ไข" @click="openEdit(c)">
                   <PhPencilSimple :size="14" />
                 </button>
-                <button class="adm-action-btn danger" title="ลบ" @click="deleteCategory(c)">
+                <button class="adm-action-btn danger" title="ลบ" @click="handleDelete(c)">
                   <PhTrash :size="14" />
                 </button>
               </div>
@@ -171,9 +179,13 @@
               <input ref="imgInput" type="file" accept="image/*" style="display:none" @change="onImgChange" />
             </div>
           </div>
+          <!-- Save error -->
+          <div v-if="saveError" style="margin-top:10px;font-size:12px;color:#B91C1C">{{ saveError }}</div>
           <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">
-            <button class="adm-hdr-btn adm-hdr-btn-ghost" @click="showModal=false">ยกเลิก</button>
-            <button class="adm-hdr-btn adm-hdr-btn-primary" :disabled="!form.id||!form.name" @click="save">ตกลง</button>
+            <button class="adm-hdr-btn adm-hdr-btn-ghost" :disabled="saving" @click="showModal=false">ยกเลิก</button>
+            <button class="adm-hdr-btn adm-hdr-btn-primary" :disabled="!form.id||!form.name||saving" @click="save">
+              {{ saving ? 'กำลังบันทึก...' : 'ตกลง' }}
+            </button>
           </div>
         </div>
       </Transition>
@@ -183,39 +195,44 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { PhPlus, PhTrash, PhImageSquare, PhUploadSimple, PhX, PhPencilSimple } from '@phosphor-icons/vue'
+import type { ProductCategory } from '@/api/types'
+import {
+  listCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+} from '@/api/products'
 
-interface Category { id: string; name: string; imageUrl?: string }
+const categories = ref<ProductCategory[]>([])
+const loading    = ref(false)
+const error      = ref<string | null>(null)
+const saving     = ref(false)
+const saveError  = ref<string | null>(null)
 
-const categories = ref<Category[]>([
-  { id:'002', name:'A: PLANT BASED' },
-  { id:'003', name:'B: BREAKFAST SETS' },
-  { id:'004', name:'C. A LA CARTE WESTERN BREAKFAST' },
-  { id:'005', name:'D. A LA CARTE ASIAN BREAKFAST' },
-  { id:'006', name:'E: HEART HEALTHY SOUP' },
-  { id:'007', name:'F: HEALTHY SALAD' },
-  { id:'008', name:'G : HALAL' },
-  { id:'009', name:'H: MAIN COURSE' },
-  { id:'010', name:'I: THAI SPICY SALAD' },
-  { id:'011', name:'J: THAI INDIVIDUAL DISHES' },
-  { id:'012', name:'K: GRILLED & STIR-FRIED' },
-  { id:'013', name:'L: NOODLES & RICE' },
-  { id:'014', name:'M: SOUP & STEW' },
-  { id:'015', name:'N: DESSERT' },
-  { id:'016', name:'O: BEVERAGES' },
-])
+onMounted(async () => {
+  loading.value = true
+  error.value   = null
+  try {
+    categories.value = await listCategories()
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ'
+  } finally {
+    loading.value = false
+  }
+})
 
 const search      = ref('')
 const pageSize    = ref(10)
 const currentPage = ref(1)
 const showModal   = ref(false)
-const editTarget  = ref<Category | null>(null)
+const editTarget  = ref<ProductCategory | null>(null)
 const form        = ref({ id:'', name:'', imageUrl:'' })
 const imgInput    = ref<HTMLInputElement | null>(null)
-const imageModal = ref({ show: false, category: null as Category | null })
+const imageModal  = ref({ show: false, category: null as ProductCategory | null })
 
-function openImageModal(c: Category) {
+function openImageModal(c: ProductCategory) {
   imageModal.value = { show: true, category: c }
 }
 
@@ -228,22 +245,44 @@ const paginated  = computed(() =>
   filtered.value.slice((currentPage.value-1)*pageSize.value, currentPage.value*pageSize.value)
 )
 
-function openCreate() { editTarget.value=null; form.value={id:'',name:'',imageUrl:''}; showModal.value=true }
-function openEdit(c: Category) { editTarget.value=c; form.value={...c,imageUrl:c.imageUrl||''}; showModal.value=true }
+function openCreate() { editTarget.value=null; form.value={id:'',name:'',imageUrl:''}; saveError.value=null; showModal.value=true }
+function openEdit(c: ProductCategory) { editTarget.value=c; form.value={...c,imageUrl:c.imageUrl||''}; saveError.value=null; showModal.value=true }
 
-function save() {
+async function save() {
   if (!form.value.id || !form.value.name) return
-  if (editTarget.value) {
-    const idx = categories.value.findIndex(c => c.id === editTarget.value!.id)
-    if (idx >= 0) categories.value[idx] = { id:form.value.id, name:form.value.name, imageUrl:form.value.imageUrl||undefined }
-  } else {
-    categories.value.push({ id:form.value.id, name:form.value.name, imageUrl:form.value.imageUrl||undefined })
+  saving.value   = true
+  saveError.value = null
+  try {
+    const payload = {
+      id:       form.value.id,
+      name:     form.value.name,
+      imageUrl: form.value.imageUrl || undefined,
+    }
+    if (editTarget.value) {
+      const updated = await updateCategory(editTarget.value.id, payload)
+      const idx = categories.value.findIndex(c => c.id === editTarget.value!.id)
+      if (idx >= 0) categories.value[idx] = updated
+    } else {
+      const created = await createCategory(payload)
+      categories.value.push(created)
+    }
+    showModal.value = false
+  } catch (e: unknown) {
+    saveError.value = e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ'
+  } finally {
+    saving.value = false
   }
-  showModal.value = false
 }
-function deleteCategory(c: Category) {
-  categories.value = categories.value.filter(x => x.id !== c.id)
+
+async function handleDelete(c: ProductCategory) {
+  try {
+    await deleteCategory(c.id)
+    categories.value = categories.value.filter(x => x.id !== c.id)
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'ลบไม่สำเร็จ'
+  }
 }
+
 function onImgChange(e: Event) {
   const f = (e.target as HTMLInputElement).files?.[0]
   if (f) { const r = new FileReader(); r.onload = ev => { form.value.imageUrl = ev.target?.result as string }; r.readAsDataURL(f) }

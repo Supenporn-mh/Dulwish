@@ -38,6 +38,11 @@
       </div>
     </div>
 
+    <!-- API error banner -->
+    <div v-if="apiError" style="background:#FFF0F0;border:1px solid #FFCDD2;border-radius:8px;padding:10px 14px;font-size:13px;color:#C62828">
+      {{ apiError }}
+    </div>
+
     <!-- Table -->
     <div class="adm-table-wrap" style="border-radius:12px">
 
@@ -54,9 +59,13 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="paginated.length === 0">
+          <tr v-if="loading">
+            <td colspan="7" class="center" style="padding:40px;color:var(--color-text-tertiary)">กำลังโหลด...</td>
+          </tr>
+          <tr v-else-if="!loading && paginated.length === 0">
             <td colspan="7" class="center" style="padding:40px;color:var(--color-text-tertiary)">ไม่พบข้อมูล</td>
           </tr>
+          <template v-else>
           <tr v-for="(m, i) in paginated" :key="m.id">
             <td class="num center">{{ (currentPage-1)*pageSize + i + 1 }}</td>
             <td style="font-size:13px;color:var(--color-text-primary);max-width:500px">{{ m.name }}</td>
@@ -81,6 +90,7 @@
               </div>
             </td>
           </tr>
+          </template>
         </tbody>
       </table>
 
@@ -165,9 +175,20 @@
             </ul>
           </div>
 
+          <!-- Import result -->
+          <div v-if="importResult" style="margin:0 24px 16px;padding:12px 14px;border-radius:8px;background:#F0FFF4;border:1px solid #C6F6D5;font-size:13px;color:#276749;display:flex;flex-direction:column;gap:4px">
+            <span>เพิ่มใหม่ {{ importResult.inserted }} รายการ · อัปเดต {{ importResult.updated }} รายการ</span>
+            <span v-if="importResult.errors.length > 0" style="color:#C62828">ข้อผิดพลาด {{ importResult.errors.length }} รายการ: {{ importResult.errors.slice(0,3).join(', ') }}{{ importResult.errors.length > 3 ? ' ...' : '' }}</span>
+          </div>
+          <div v-if="importError" style="margin:0 24px 16px;padding:10px 14px;border-radius:8px;background:#FFF0F0;border:1px solid #FFCDD2;font-size:13px;color:#C62828">
+            {{ importError }}
+          </div>
+
           <div class="imp-footer">
-            <button class="imp-btn-cancel" @click="closeImport">ยกเลิก</button>
-            <button :class="['imp-btn-confirm', importFile?'imp-btn-confirm-active':'']" :disabled="!importFile" @click="confirmImport">ยืนยัน</button>
+            <button class="imp-btn-cancel" @click="closeImport">{{ importResult ? 'ปิด' : 'ยกเลิก' }}</button>
+            <button :class="['imp-btn-confirm', (importFile && !importing && !importResult) ? 'imp-btn-confirm-active' : '']" :disabled="!importFile || importing || !!importResult" @click="confirmImport">
+              {{ importing ? 'กำลังนำเข้า...' : 'ยืนยัน' }}
+            </button>
           </div>
         </div>
       </Transition>
@@ -217,9 +238,12 @@
               <span style="font-size:13px;color:var(--color-text-primary)">เปิดใช้งาน</span>
             </div>
           </div>
+          <div v-if="saveError" style="margin-top:12px;padding:8px 12px;border-radius:8px;background:#FFF0F0;border:1px solid #FFCDD2;font-size:13px;color:#C62828">
+            {{ saveError }}
+          </div>
           <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">
-            <button class="adm-hdr-btn adm-hdr-btn-ghost" @click="showModal=false">ยกเลิก</button>
-            <button class="adm-hdr-btn adm-hdr-btn-primary" :disabled="!form.name" @click="save">บันทึก</button>
+            <button class="adm-hdr-btn adm-hdr-btn-ghost" :disabled="saving" @click="showModal=false">ยกเลิก</button>
+            <button class="adm-hdr-btn adm-hdr-btn-primary" :disabled="!form.name || saving" @click="save">{{ saving ? 'กำลังบันทึก...' : 'บันทึก' }}</button>
           </div>
         </div>
       </Transition>
@@ -229,19 +253,29 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { PhPlus, PhUploadSimple, PhMagnifyingGlass, PhPencilSimple, PhTrash, PhCheckCircle, PhCircle, PhX, PhCloudArrowUp, PhFileXls, PhDownloadSimple } from '@phosphor-icons/vue'
 import * as XLSX from 'xlsx'
+import type { BookingMenu, BookingMenuImportRow } from '@/api/types'
+import { listBookingMenus, createBookingMenu, updateBookingMenu, deleteBookingMenu, importBookingMenus } from '@/api/booking'
 
-interface BookingMenu { id:number; name:string; ingredient:string; timeSlot:string; enabled:boolean; startDate:string; endDate:string }
+const menus    = ref<BookingMenu[]>([])
+const loading  = ref(false)
+const apiError = ref('')
 
-let nextId = 5
-const menus = ref<BookingMenu[]>([
-  { id:1, name:'PWB แกงเขียวหวานไก่', ingredient:'', timeSlot:'Breakfast', enabled:true, startDate:'25/03/2026', endDate:'25/03/2026' },
-  { id:2, name:'ข้าวสวย / ข้าวกล้อง, เกี้ยวซ่, หมูตัว, พริกเกลือ, หน่อไม้ (ไผ่ตง) ผัดไข่, แกงเขียวหวานไก่+, ขนมจีน, ผัดซี้อั้วเส้นใหญ่หมู, ไขคั่นทรงเครื่องปูอัด, น้ำสมุนไพร / น้ำอ้อยฟิวส์, น้ำพริกตาอกุ้ง (Zero Waste), เฉาก๊วยน้ำเชื่อม, ผักต้ม-ผักสด แกล้มน้ำพริก /ผักสลัด ผลไม้/ ลูกชิ้ด', ingredient:'', timeSlot:'Dinner', enabled:true, startDate:'25/03/2026', endDate:'25/03/2026' },
-  { id:3, name:'ข้าวสวย / ข้าวกล้อง, เกี้ยวซ่, หมูตัว, พริกเกลือ, หน่อไม้ (ไผ่ตง) ผัดไข่, แกงเขียวหวานไก่+, ขนมจีน, ผัดซี้อั้วเส้นใหญ่หมู, ไขคั่นทรงเครื่องปูอัด, น้ำสมุนไพร / น้ำอ้อยฟิวส์, น้ำพริกตาอกุ้ง (Zero Waste), เฉาก๊วยน้ำเชื่อม, ผักต้ม-ผักสด แกล้มน้ำพริก /ผักสลัด ผลไม้/ ลูกชิ้ด', ingredient:'', timeSlot:'Dinner', enabled:true, startDate:'23/03/2026', endDate:'23/03/2026' },
-  { id:4, name:'ข้าวสวย /ข้าวกล้อง, กะเพราเป็ด, ทอดมันปลา, ต้มจืดผักกาดดอง, หมูสามชั้น, ยาเยา หมูสับไข่ตอก, ไข่ดาว, น้ำผลไม้ /น้ำสมุนไพร /น้ำอ้อยฟิวส์ส/ น้ำพริกเห็ดสามอย่าง, ขนมบึงขาว + โฮลวีด, เนย / แยม, ผักต้ม-ผักสด แกล้มน้ำพริก / ผักสลัด ผลไม้', ingredient:'', timeSlot:'Lunch', enabled:true, startDate:'24/03/2026', endDate:'24/03/2026' },
-])
+async function fetchMenus() {
+  loading.value = true
+  apiError.value = ''
+  try {
+    menus.value = await listBookingMenus()
+  } catch (e: any) {
+    apiError.value = e?.response?.data?.message ?? e?.message ?? 'โหลดข้อมูลไม่สำเร็จ'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(fetchMenus)
 
 const search      = ref('')
 const filterSlot  = ref('')
@@ -252,6 +286,8 @@ const showModal   = ref(false)
 const showImportModal = ref(false)
 const editTarget  = ref<BookingMenu | null>(null)
 const form        = ref({ name:'', ingredient:'', timeSlot:'Breakfast', enabled:true, startDate:'', endDate:'' })
+const saving      = ref(false)
+const saveError   = ref('')
 
 const filtered = computed(() => {
   const q = search.value.toLowerCase()
@@ -264,35 +300,63 @@ const filtered = computed(() => {
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize.value)))
 const paginated  = computed(() => filtered.value.slice((currentPage.value-1)*pageSize.value, currentPage.value*pageSize.value))
 
-function openCreate() { editTarget.value=null; form.value={name:'',ingredient:'',timeSlot:'Breakfast',enabled:true,startDate:'',endDate:''}; showModal.value=true }
-function openEdit(m: BookingMenu) { editTarget.value=m; form.value={...m}; showModal.value=true }
-function save() {
-  if (!form.value.name) return
-  if (editTarget.value) {
-    const idx = menus.value.findIndex(m => m.id===editTarget.value!.id)
-    if (idx>=0) menus.value[idx] = { ...form.value, id:editTarget.value.id }
-  } else {
-    menus.value.push({ ...form.value, id:nextId++ })
-  }
-  showModal.value = false
-}
-function deleteMenu(m: BookingMenu) { menus.value = menus.value.filter(x => x.id!==m.id) }
-// Import modal
-const importFile  = ref<File | null>(null)
-const isDragOver  = ref(false)
-const fileInput   = ref<HTMLInputElement | null>(null)
+function openCreate() { editTarget.value=null; form.value={name:'',ingredient:'',timeSlot:'Breakfast',enabled:true,startDate:'',endDate:''}; saveError.value=''; showModal.value=true }
+function openEdit(m: BookingMenu) { editTarget.value=m; form.value={name:m.name,ingredient:m.ingredient,timeSlot:m.timeSlot,enabled:m.enabled,startDate:m.startDate,endDate:m.endDate}; saveError.value=''; showModal.value=true }
 
-function closeImport() { showImportModal.value=false; importFile.value=null }
+async function save() {
+  if (!form.value.name || saving.value) return
+  saving.value = true
+  saveError.value = ''
+  try {
+    const payload = { name: form.value.name, ingredient: form.value.ingredient, timeSlot: form.value.timeSlot, enabled: form.value.enabled, startDate: form.value.startDate, endDate: form.value.endDate }
+    if (editTarget.value) {
+      const updated = await updateBookingMenu(String(editTarget.value.id), payload)
+      const idx = menus.value.findIndex(m => m.id === editTarget.value!.id)
+      if (idx >= 0) menus.value[idx] = updated
+    } else {
+      const created = await createBookingMenu(payload)
+      menus.value.push(created)
+    }
+    showModal.value = false
+  } catch (e: any) {
+    saveError.value = e?.response?.data?.message ?? e?.message ?? 'บันทึกไม่สำเร็จ'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function deleteMenu(m: BookingMenu) {
+  try {
+    await deleteBookingMenu(String(m.id))
+    menus.value = menus.value.filter(x => x.id !== m.id)
+  } catch (e: any) {
+    apiError.value = e?.response?.data?.message ?? e?.message ?? 'ลบไม่สำเร็จ'
+  }
+}
+// Import modal
+const importFile      = ref<File | null>(null)
+const isDragOver      = ref(false)
+const fileInput       = ref<HTMLInputElement | null>(null)
+const importing       = ref(false)
+const importResult    = ref<{ inserted:number; updated:number; errors:string[] } | null>(null)
+const importError     = ref('')
+
+function closeImport() {
+  showImportModal.value = false
+  importFile.value = null
+  importResult.value = null
+  importError.value = ''
+}
 function onDragOver(e: DragEvent) { e.preventDefault(); isDragOver.value=true }
 function onDragLeave() { isDragOver.value=false }
 function onDrop(e: DragEvent) {
   e.preventDefault(); isDragOver.value=false
   const f = e.dataTransfer?.files?.[0]
-  if (f && /\.xlsx$/i.test(f.name)) importFile.value = f
+  if (f && /\.xlsx$/i.test(f.name)) { importFile.value = f; importResult.value = null; importError.value = '' }
 }
 function onFileChange(e: Event) {
   const f = (e.target as HTMLInputElement).files?.[0]
-  if (f) importFile.value = f
+  if (f) { importFile.value = f; importResult.value = null; importError.value = '' }
   ;(e.target as HTMLInputElement).value = ''
 }
 function downloadTemplate() {
@@ -332,7 +396,44 @@ function downloadTemplate() {
 
   XLSX.writeFile(wb, 'BookingMenu_Template.xlsx')
 }
-function confirmImport() { closeImport() }
+async function confirmImport() {
+  if (!importFile.value || importing.value) return
+  importing.value = true
+  importResult.value = null
+  importError.value = ''
+  try {
+    // Client-side xlsx parse
+    const buffer = await importFile.value.arrayBuffer()
+    const wb = XLSX.read(buffer, { type: 'array' })
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    const raw = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 }) as string[][]
+
+    // Row 0 = headers, rows 1+ = data
+    const rows: BookingMenuImportRow[] = []
+    for (let i = 1; i < raw.length; i++) {
+      const r = raw[i]
+      if (!r || !r[0]) continue
+      rows.push({
+        name:      String(r[0] ?? '').trim(),
+        timeSlot:  String(r[1] ?? '').trim(),
+        status:    r[2] ? String(r[2]).trim() : undefined,
+        startDate: r[3] ? String(r[3]).trim() : undefined,
+        endDate:   r[4] ? String(r[4]).trim() : undefined,
+      })
+    }
+
+    // Send to API
+    const result = await importBookingMenus(rows)
+    importResult.value = result
+
+    // Refresh list so imported rows appear
+    await fetchMenus()
+  } catch (e: any) {
+    importError.value = e?.response?.data?.message ?? e?.message ?? 'นำเข้าไม่สำเร็จ'
+  } finally {
+    importing.value = false
+  }
+}
 </script>
 
 <style scoped>

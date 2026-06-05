@@ -3,6 +3,11 @@ import { ref } from 'vue'
 import {
   PhCurrencyCircleDollar, PhReceipt, PhCreditCard, PhBowlFood,
 } from '@phosphor-icons/vue'
+import {
+  listWalletPermissions,
+  upsertWalletPermission,
+} from '@/api/settings'
+import type { WalletPermission } from '@/api/types'
 
 export interface WalletItem {
   id:        string
@@ -15,14 +20,52 @@ export interface WalletItem {
   icon:      any
 }
 
-export const useWalletsStore = defineStore('wallets', () => {
-  const wallets = ref<WalletItem[]>([
-    { id:'W001', name:'กระเป๋าหลัก (เติมเงิน)',      desc:'เติมเงินเข้าระบบ',                    amount:500, enabled:true,  startDate:'2024-01-01', endDate:'', icon: PhCurrencyCircleDollar },
-    { id:'W002', name:'ชำระค่าอาหาร',                desc:'ชำระผ่าน POS/Kiosk',                  amount:200, enabled:false, startDate:'', endDate:'', icon: PhReceipt                 },
-    { id:'W003', name:'Pre-order',                   desc:'สั่งอาหารล่วงหน้า',                    amount:100, enabled:false, startDate:'', endDate:'', icon: PhCreditCard              },
-    { id:'W004', name:'Buffet (Primary ฿170)',        desc:'K1–P6 · ฿170/รอบ (ตาม spec 2026)',    amount:170, enabled:false, startDate:'', endDate:'', icon: PhBowlFood                },
-    { id:'W005', name:'Buffet (Secondary ฿150)',      desc:'S1–S6 · ฿150/รอบ (ตาม spec 2026)',    amount:150, enabled:false, startDate:'', endDate:'', icon: PhBowlFood                },
-  ])
+// Client-side only: maps wallet code → Phosphor icon component
+const iconMap: Record<string, any> = {
+  W001: PhCurrencyCircleDollar,
+  W002: PhReceipt,
+  W003: PhCreditCard,
+  W004: PhBowlFood,
+  W005: PhBowlFood,
+}
+const defaultIcon = PhCurrencyCircleDollar
 
-  return { wallets }
+function toWalletItem(p: WalletPermission): WalletItem {
+  return {
+    id:        p.id,
+    name:      p.name,
+    desc:      p.desc,
+    amount:    p.amount,
+    enabled:   p.enabled,
+    startDate: p.startDate,
+    endDate:   p.endDate,
+    icon:      iconMap[p.id] ?? defaultIcon,
+  }
+}
+
+export const useWalletsStore = defineStore('wallets', () => {
+  const wallets = ref<WalletItem[]>([])
+
+  async function load(): Promise<void> {
+    const permissions = await listWalletPermissions()
+    wallets.value = permissions.map(toWalletItem)
+  }
+
+  async function save(item: WalletItem): Promise<void> {
+    const payload: Partial<WalletPermission> = {
+      name:      item.name,
+      desc:      item.desc,
+      amount:    item.amount,
+      enabled:   item.enabled,
+      startDate: item.startDate,
+      endDate:   item.endDate,
+    }
+    const updated = await upsertWalletPermission(item.id, payload)
+    const idx = wallets.value.findIndex(w => w.id === item.id)
+    if (idx !== -1) {
+      wallets.value[idx] = toWalletItem(updated)
+    }
+  }
+
+  return { wallets, load, save }
 })

@@ -13,6 +13,9 @@
       <span style="font-size:13px;color:var(--color-text-secondary)">การตั้งค่าและควบคุม Wallet ระดับระบบ</span>
     </div>
 
+    <!-- Error banner -->
+    <div v-if="error" class="wallet-error">{{ error }}</div>
+
     <!-- Hero banner -->
     <div class="wallet-hero">
       <div class="wallet-hero-left">
@@ -35,8 +38,11 @@
       </div>
     </div>
 
+    <!-- Loading skeleton -->
+    <div v-if="loading" class="wallet-loading">กำลังโหลด...</div>
+
     <!-- Wallet cards grid -->
-    <div class="wallet-grid">
+    <div v-else class="wallet-grid">
       <div
         v-for="w in wallets"
         :key="w.id"
@@ -73,6 +79,7 @@
               type="date"
               class="wc-date-input"
               :disabled="!w.enabled"
+              @change="saveDates(w)"
             />
           </div>
           <div class="wc-date-field">
@@ -82,6 +89,7 @@
               type="date"
               class="wc-date-input"
               :disabled="!w.enabled"
+              @change="saveDates(w)"
             />
           </div>
         </div>
@@ -99,18 +107,53 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import {
   PhBuildings, PhShieldCheck, PhCheckCircle, PhPauseCircle,
 } from '@phosphor-icons/vue'
 import { useWalletsStore } from '@/stores/wallets'
+import type { WalletItem } from '@/stores/wallets'
 
 const store   = useWalletsStore()
 const wallets = store.wallets
 
+const loading = ref(false)
+const error   = ref<string | null>(null)
+
 const activeCount = computed(() => wallets.filter(w => w.enabled).length)
 
-function toggleWallet(w: any) { w.enabled = !w.enabled }
+onMounted(async () => {
+  loading.value = true
+  error.value   = null
+  try {
+    await store.load()
+  } catch (e: any) {
+    error.value = e?.message ?? 'โหลดข้อมูล Wallet ไม่สำเร็จ'
+  } finally {
+    loading.value = false
+  }
+})
+
+async function toggleWallet(w: WalletItem) {
+  w.enabled = !w.enabled
+  error.value = null
+  try {
+    await store.save(w)
+  } catch (e: any) {
+    // revert optimistic toggle on failure
+    w.enabled = !w.enabled
+    error.value = e?.message ?? 'บันทึกไม่สำเร็จ'
+  }
+}
+
+async function saveDates(w: WalletItem) {
+  error.value = null
+  try {
+    await store.save(w)
+  } catch (e: any) {
+    error.value = e?.message ?? 'บันทึกวันที่ไม่สำเร็จ'
+  }
+}
 </script>
 
 <style scoped>
@@ -134,7 +177,7 @@ function toggleWallet(w: any) { w.enabled = !w.enabled }
 .hero-badge {
   display: inline-flex; align-items: center; gap: 5px;
   background: rgba(255,255,255,0.15); color: #fff;
-  font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
+  font-size: 11px; font-weight: 500; letter-spacing: 0.05em;
   padding: 3px 10px; border-radius: 100px; margin-bottom: 12px;
 }
 .hero-title { font-size: 22px; font-weight: 500; color: #fff; margin-bottom: 6px; }
@@ -212,6 +255,18 @@ function toggleWallet(w: any) { w.enabled = !w.enabled }
 }
 .wc-date-input:focus    { border-color: var(--color-primary); }
 .wc-date-input:disabled { background: var(--color-bg-secondary); color: var(--color-text-tertiary); }
+
+/* Loading / error states */
+.wallet-loading {
+  padding: 24px; text-align: center;
+  font-size: 14px; color: var(--color-text-secondary);
+}
+.wallet-error {
+  padding: 12px 16px; border-radius: 10px;
+  background: #FEF2F2; color: #B91C1C;
+  font-size: 13px; font-weight: 400;
+  border: 1px solid #FECACA;
+}
 
 /* Status badge */
 .wc-status {

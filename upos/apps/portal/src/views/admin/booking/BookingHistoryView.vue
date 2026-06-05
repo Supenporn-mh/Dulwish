@@ -50,10 +50,16 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="paginated.length === 0">
+          <tr v-if="loading">
+            <td colspan="7" class="center" style="padding:40px;color:var(--color-text-tertiary)">กำลังโหลด...</td>
+          </tr>
+          <tr v-else-if="error">
+            <td colspan="7" class="center" style="padding:40px;color:var(--color-danger)">{{ error }}</td>
+          </tr>
+          <tr v-else-if="paginated.length === 0">
             <td colspan="7" class="center" style="padding:40px;color:var(--color-text-tertiary)">ไม่พบข้อมูล</td>
           </tr>
-          <tr v-for="(b, i) in paginated" :key="b.id">
+          <tr v-for="(b, i) in paginated" v-else :key="b.code">
             <td class="num center">{{ (currentPage-1)*pageSize + i + 1 }}</td>
             <td style="font-family:monospace;font-size:12px;color:var(--color-text-secondary)">{{ b.code }}</td>
             <td>
@@ -179,14 +185,17 @@
 
         <!-- Footer -->
         <div style="height:1px;background:var(--color-border-tertiary)" />
+        <div style="padding:12px 24px 0" v-if="saveError">
+          <p style="font-size:12px;color:var(--color-danger)">{{ saveError }}</p>
+        </div>
         <div style="display:flex;gap:10px;padding:16px 24px;justify-content:flex-end">
-          <button class="adm-hdr-btn adm-hdr-btn-ghost" @click="showModal=false">ยกเลิก</button>
+          <button class="adm-hdr-btn adm-hdr-btn-ghost" :disabled="saving" @click="showModal=false">ยกเลิก</button>
           <button
             :class="['adm-hdr-btn', editForm.status==='ยกเลิก' ? 'adm-hdr-btn-danger-btn' : 'adm-hdr-btn-primary']"
-            :disabled="!canSave"
+            :disabled="!canSave || saving"
             @click="saveEdit"
           >
-            {{ editForm.status === 'ยกเลิก' ? 'ยืนยันการยกเลิก' : 'บันทึก' }}
+            {{ saving ? 'กำลังบันทึก...' : editForm.status === 'ยกเลิก' ? 'ยืนยันการยกเลิก' : 'บันทึก' }}
           </button>
         </div>
 
@@ -197,23 +206,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { PhMagnifyingGlass, PhPencilSimple, PhTrash, PhX, PhWarning } from '@phosphor-icons/vue'
+import type { Booking } from '../../../api/types'
+import {
+  listBookings as apiFetchBookings,
+  updateBooking as apiUpdateBooking,
+  deleteBooking as apiDeleteBooking,
+} from '../../../api/booking'
 
-interface Booking {
-  id: number; code: string; name: string; type: string
-  bookingDate: string; slot: string; slotTime: string
-  status: 'จองแล้ว'|'เสร็จสิ้น'|'ยกเลิก'|'ไม่มา'
-  bookedAt: string; cancelledAt?: string
+interface BookingPatchPayload {
+  status: Booking['status']
+  cancelReason?: string
+  adminCode?: string
 }
 
-const bookings = ref<Booking[]>([
-  { id:1, code:'BK1774335319901243', name:'รณพร เจริญทิพย์',        type:'อื่นๆ', bookingDate:'24/03/2026', slot:'Lunch',  slotTime:'13:00-15:00', status:'เสร็จสิ้น', bookedAt:'24/03/2026' },
-  { id:2, code:'WI1774335204511314', name:'ฉัตร จักรพันธ์ประดิษฐ์', type:'อื่นๆ', bookingDate:'24/03/2026', slot:'Lunch',  slotTime:'13:00-15:00', status:'เสร็จสิ้น', bookedAt:'24/03/2026' },
-  { id:3, code:'BK1774328453268950', name:'เจตพัทธ์ สีสะอาด',       type:'อื่นๆ', bookingDate:'25/03/2026', slot:'Dinner', slotTime:'17:00-18:00', status:'ไม่มา',    bookedAt:'24/03/2026' },
-  { id:4, code:'BK1774328433309735', name:'เจตพัทธ์ สีสะอาด',       type:'อื่นๆ', bookingDate:'25/03/2026', slot:'Lunch',  slotTime:'13:00-15:00', status:'ยกเลิก',   bookedAt:'24/03/2026', cancelledAt:'' },
-  { id:5, code:'BK1774328172149765', name:'เจตพัทธ์ สีสะอาด',       type:'อื่นๆ', bookingDate:'24/03/2026', slot:'Lunch',  slotTime:'13:00-15:00', status:'จองแล้ว',  bookedAt:'24/03/2026' },
-])
+const bookings    = ref<Booking[]>([])
+const loading     = ref(false)
+const error       = ref<string | null>(null)
+
+async function fetchBookings() {
+  loading.value = true
+  error.value = null
+  try {
+    bookings.value = await apiFetchBookings()
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(fetchBookings)
 
 const search       = ref('')
 const filterStatus = ref('')
@@ -235,9 +259,11 @@ const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / 
 const paginated  = computed(() => filtered.value.slice((currentPage.value-1)*pageSize.value, currentPage.value*pageSize.value))
 
 // Edit modal
-const showModal  = ref(false)
-const editTarget = ref<Booking | null>(null)
-const editForm   = ref({ status: 'จองแล้ว' as Booking['status'], cancelReason: '', adminCode: '' })
+const showModal   = ref(false)
+const editTarget  = ref<Booking | null>(null)
+const editForm    = ref({ status: 'จองแล้ว' as Booking['status'], cancelReason: '', adminCode: '' })
+const saving      = ref(false)
+const saveError   = ref<string | null>(null)
 
 const canSave = computed(() => {
   if (editForm.value.status !== 'ยกเลิก') return true
@@ -247,25 +273,39 @@ const canSave = computed(() => {
 function openEdit(b: Booking) {
   editTarget.value = b
   editForm.value = { status: b.status, cancelReason: '', adminCode: '' }
+  saveError.value = null
   showModal.value = true
 }
 
-function saveEdit() {
+async function saveEdit() {
   if (!editTarget.value || !canSave.value) return
-  const idx = bookings.value.findIndex(x => x.id === editTarget.value!.id)
-  if (idx >= 0) {
-    bookings.value[idx] = {
-      ...bookings.value[idx],
-      status: editForm.value.status,
-      cancelledAt: editForm.value.status === 'ยกเลิก'
-        ? new Date().toLocaleDateString('th-TH', { day:'2-digit', month:'2-digit', year:'numeric' })
-        : bookings.value[idx].cancelledAt,
+  saving.value = true
+  saveError.value = null
+  try {
+    const payload: BookingPatchPayload = { status: editForm.value.status }
+    if (editForm.value.status === 'ยกเลิก') {
+      payload.cancelReason = editForm.value.cancelReason
+      payload.adminCode    = editForm.value.adminCode
     }
+    const updated = await apiUpdateBooking(editTarget.value.code, payload as Partial<Booking>)
+    const idx = bookings.value.findIndex(x => x.code === updated.code)
+    if (idx >= 0) bookings.value[idx] = updated
+    showModal.value = false
+  } catch (e: unknown) {
+    saveError.value = e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ'
+  } finally {
+    saving.value = false
   }
-  showModal.value = false
 }
 
-function deleteBooking(b: Booking) { bookings.value = bookings.value.filter(x => x.id !== b.id) }
+async function deleteBooking(b: Booking) {
+  try {
+    await apiDeleteBooking(b.code)
+    bookings.value = bookings.value.filter(x => x.code !== b.code)
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'ลบไม่สำเร็จ'
+  }
+}
 </script>
 
 <style scoped>

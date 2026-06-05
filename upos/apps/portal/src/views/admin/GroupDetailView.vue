@@ -36,7 +36,14 @@
             <label class="gd-label">{{ isStudent ? 'ชื่อกลุ่มนักเรียน' : 'ชื่อกลุ่มสมาชิก' }}</label>
             <input v-model="form.name" class="gd-input" placeholder="ชื่อกลุ่ม" />
           </div>
-          <button class="gd-save-btn" :disabled="!form.name" @click="save">บันทึก</button>
+          <button class="gd-save-btn" :disabled="!form.name || saving" @click="save">
+            {{ saving ? 'กำลังบันทึก...' : 'บันทึก' }}
+          </button>
+        </div>
+
+        <!-- Save error -->
+        <div v-if="saveError" style="padding:10px 14px;background:var(--color-danger-bg);color:var(--color-danger);border-radius:8px;font-size:13px">
+          {{ saveError }}
         </div>
 
         <!-- กำหนดสิทธิ์ -->
@@ -75,6 +82,18 @@
 
       <!-- ── Tab 2: จัดการสมาชิก ───────────────────────────────────── -->
       <div v-else class="gd-body">
+
+        <!-- Member error -->
+        <div v-if="memberError" style="padding:10px 14px;background:var(--color-danger-bg);color:var(--color-danger);border-radius:8px;font-size:13px">
+          {{ memberError }}
+        </div>
+
+        <!-- Loading members -->
+        <div v-if="loadingMembers" style="padding:32px;text-align:center;color:var(--color-text-tertiary);font-size:13px">
+          กำลังโหลดสมาชิก...
+        </div>
+
+        <template v-else>
 
         <!-- Search + button row -->
         <div class="mem-toolbar">
@@ -142,6 +161,8 @@
             </tbody>
           </table>
         </div>
+
+        </template>
       </div>
 
     </div>
@@ -172,8 +193,16 @@
               <input v-model="selectSearch" class="sel-search" placeholder="ค้นหาโดย รหัส / ชื่อ-นามสกุล / Card SN" />
             </div>
 
+            <!-- Picker loading/error -->
+            <div v-if="loadingPicker" style="padding:32px;text-align:center;color:var(--color-text-tertiary);font-size:13px">
+              กำลังโหลดรายชื่อ...
+            </div>
+            <div v-else-if="pickerError" style="padding:10px 14px;background:var(--color-danger-bg);color:var(--color-danger);border-radius:8px;font-size:13px;margin-bottom:8px">
+              {{ pickerError }}
+            </div>
+
             <!-- Table -->
-            <div class="adm-table-wrap" style="flex:1;overflow:auto">
+            <div v-else class="adm-table-wrap" style="flex:1;overflow:auto">
               <table class="adm-table">
                 <thead>
                   <tr>
@@ -251,13 +280,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   PhArrowLeft, PhCheck, PhPlus, PhUsersThree, PhTrash,
   PhMagnifyingGlass, PhX, PhUser,
 } from '@phosphor-icons/vue'
 import { useWalletsStore } from '@/stores/wallets'
+import {
+  listGroupMembers,
+  createGroup,
+  updateGroup,
+  addGroupMember,
+  removeGroupMember,
+} from '@/api/groups'
+import type { GroupMember } from '@/api/types'
+import api from '@/api/axios'
 
 const route  = useRoute()
 const router = useRouter()
@@ -266,8 +304,11 @@ const isStudent = computed(() => route.path.startsWith('/admin/student-groups'))
 
 const activeTab = ref<'settings' | 'members'>('settings')
 
+const groupCode = computed(() => route.params.id as string)
+const isNew     = computed(() => groupCode.value === 'new')
+
 const form = ref({
-  id:   (route.params.id as string) ?? '',
+  id:   isNew.value ? '' : groupCode.value,
   name: (route.query.name as string) ?? '',
 })
 
@@ -283,11 +324,39 @@ const selectedPerms = ref<string[]>(
   route.query.perms ? (route.query.perms as string).split(',').filter(Boolean) : []
 )
 
+// ── Members ───────────────────────────────────────────────────────────
 interface Member { id: string; name: string; cardSn?: string; joinedAt?: string }
+
+function fromGroupMember(gm: GroupMember): Member {
+  return { id: gm.userId, name: gm.name ?? gm.userId }
+}
 
 const members         = ref<Member[]>([])
 const memberSearch    = ref('')
 const selectedMembers = ref<string[]>([])
+const loadingMembers  = ref(false)
+const memberError     = ref<string | null>(null)
+const saving          = ref(false)
+const saveError       = ref<string | null>(null)
+
+async function loadMembers() {
+  if (isNew.value) return
+  loadingMembers.value = true
+  memberError.value    = null
+  try {
+    const list = await listGroupMembers(groupCode.value)
+    members.value = list.map(fromGroupMember)
+  } catch (e: any) {
+    memberError.value = e?.message ?? 'โหลดสมาชิกไม่สำเร็จ'
+  } finally {
+    loadingMembers.value = false
+  }
+}
+
+onMounted(async () => {
+  if (walletsStore.wallets.length === 0) await walletsStore.load()
+  await loadMembers()
+})
 
 const filteredMembers = computed(() => {
   const q = memberSearch.value.toLowerCase()
@@ -315,9 +384,19 @@ function toggleSelectAll(e: Event) {
   selectedMembers.value = checked ? filteredMembers.value.map(m => m.id) : []
 }
 
-function removeMember(m: Member) {
-  members.value = members.value.filter(x => x.id !== m.id)
-  selectedMembers.value = selectedMembers.value.filter(id => id !== m.id)
+async function removeMember(m: Member) {
+  if (isNew.value) {
+    members.value = members.value.filter(x => x.id !== m.id)
+    selectedMembers.value = selectedMembers.value.filter(id => id !== m.id)
+    return
+  }
+  try {
+    await removeGroupMember(groupCode.value, m.id)
+    members.value = members.value.filter(x => x.id !== m.id)
+    selectedMembers.value = selectedMembers.value.filter(id => id !== m.id)
+  } catch (e: any) {
+    alert(e?.message ?? 'ลบสมาชิกไม่สำเร็จ')
+  }
 }
 
 // ── Select modal ──────────────────────────────────────────────────────
@@ -325,22 +404,41 @@ const showSelectModal = ref(false)
 const selectSearch    = ref('')
 const pendingIds      = ref<string[]>([])
 
-const availableUsers = computed<Member[]>(() =>
-  isStudent.value
-    ? [
-        { id:'STD-K1-0001', name:'สมหญิง ใจดี',    cardSn:'04A3B5C6' },
-        { id:'STD-K1-0012', name:'ปรีชา มานะ',      cardSn:'04E7F8A9' },
-        { id:'STD-K2-0008', name:'มานี สุขดี',       cardSn:'04C3D4E5' },
-        { id:'STD-P1-0005', name:'กานดา ศรีสวัสดิ์', cardSn:'04F1A2B3' },
-        { id:'STD-P3-0015', name:'สมชาย ใจดี',       cardSn:'04B1C2D3' },
-        { id:'STD-S1-0003', name:'อรุณี ดีงาม',      cardSn:'' },
-      ]
-    : [
-        { id:'EMP-001', name:'สมชาย ใจดี',   cardSn:'1029384756' },
-        { id:'EMP-002', name:'วิภา รักเรียน', cardSn:'5647382910' },
-        { id:'EMP-003', name:'หนอง แคชเชียร์',cardSn:'8837465012' },
-      ]
-)
+// Picker candidate list — loaded from API when the modal opens
+const availableUsers  = ref<Member[]>([])
+const loadingPicker   = ref(false)
+const pickerError     = ref<string | null>(null)
+
+async function loadPickerList() {
+  loadingPicker.value = true
+  pickerError.value   = null
+  availableUsers.value = []
+  try {
+    if (isStudent.value) {
+      // GET /admin/students — same mapping as StudentsView
+      const res = await api.get('/admin/students')
+      const raw: any[] = res.data?.students ?? res.data ?? []
+      availableUsers.value = raw.map((s: any) => ({
+        id:     s.uid ?? s.id,
+        name:   `${s.firstName ?? s.first_name ?? ''} ${s.lastName ?? s.last_name ?? ''}`.trim(),
+        cardSn: s.cardUid ?? s.card_uid ?? '',
+      }))
+    } else {
+      // GET /users — same mapping as MembersView
+      const res = await api.get('/users')
+      const raw: any[] = res.data?.users ?? res.data ?? []
+      availableUsers.value = raw.map((u: any) => ({
+        id:     u.uid ?? u._id ?? u.id,
+        name:   `${u.firstName ?? u.first_name ?? ''} ${u.lastName ?? u.last_name ?? ''}`.trim(),
+        cardSn: u.cardUid ?? u.card_uid ?? '',
+      }))
+    }
+  } catch (e: any) {
+    pickerError.value = e?.message ?? 'โหลดรายชื่อไม่สำเร็จ'
+  } finally {
+    loadingPicker.value = false
+  }
+}
 
 const selectableFiltered = computed(() => {
   const q = selectSearch.value.toLowerCase()
@@ -352,9 +450,10 @@ const selectableFiltered = computed(() => {
 })
 
 function openSelectModal() {
-  pendingIds.value  = []
-  selectSearch.value = ''
+  pendingIds.value      = []
+  selectSearch.value    = ''
   showSelectModal.value = true
+  loadPickerList()
 }
 
 function togglePending(id: string) {
@@ -368,19 +467,50 @@ function toggleSelectAllPending(e: Event) {
   pendingIds.value = checked ? selectableFiltered.value.map(u => u.id) : []
 }
 
-function confirmSelect() {
-  const today = new Date().toLocaleDateString('th-TH', { day:'2-digit', month:'2-digit', year:'numeric' })
-  for (const id of pendingIds.value) {
-    const u = availableUsers.value.find(x => x.id === id)
-    if (u && !members.value.find(m => m.id === id)) {
-      members.value.push({ id: u.id, name: u.name, cardSn: u.cardSn, joinedAt: today })
+async function confirmSelect() {
+  showSelectModal.value = false
+  for (const userId of pendingIds.value) {
+    const u = availableUsers.value.find(x => x.id === userId)
+    if (!u || members.value.find(m => m.id === userId)) continue
+    if (isNew.value) {
+      members.value.push({ id: u.id, name: u.name, cardSn: u.cardSn })
+    } else {
+      try {
+        const gm = await addGroupMember(groupCode.value, userId)
+        if (!members.value.find(m => m.id === gm.userId)) {
+          members.value.push(fromGroupMember(gm))
+        }
+      } catch (e: any) {
+        alert(`เพิ่ม ${u.name} ไม่สำเร็จ: ${e?.message ?? ''}`)
+      }
     }
   }
-  showSelectModal.value = false
 }
 
-function save() {
-  router.back()
+async function save() {
+  saveError.value = null
+  saving.value    = true
+  try {
+    const kind = isStudent.value ? 'student' : 'member'
+    if (isNew.value) {
+      await createGroup({
+        id:          form.value.id,
+        name:        form.value.name,
+        permissions: selectedPerms.value,
+        kind,
+      } as any)
+    } else {
+      await updateGroup(groupCode.value, {
+        name:        form.value.name,
+        permissions: selectedPerms.value,
+      })
+    }
+    router.back()
+  } catch (e: any) {
+    saveError.value = e?.message ?? 'บันทึกไม่สำเร็จ'
+  } finally {
+    saving.value = false
+  }
 }
 </script>
 

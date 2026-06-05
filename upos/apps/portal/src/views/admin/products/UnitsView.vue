@@ -17,6 +17,9 @@
       </div>
     </div>
 
+    <!-- Error -->
+    <div v-if="error" style="color:var(--color-danger);font-size:14px;padding:8px 0">{{ error }}</div>
+
     <!-- Table -->
     <div class="adm-table-wrap">
       <table class="adm-table">
@@ -28,10 +31,13 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="paginated.length === 0">
+          <tr v-if="loading">
+            <td colspan="3" class="center" style="padding:40px;color:var(--color-text-tertiary)">กำลังโหลด...</td>
+          </tr>
+          <tr v-else-if="paginated.length === 0">
             <td colspan="3" class="center" style="padding:40px;color:var(--color-text-tertiary)">ไม่พบข้อมูล</td>
           </tr>
-          <tr v-for="(u, i) in paginated" :key="u.id">
+          <tr v-for="(u, i) in paginated" v-else :key="u._id">
             <td class="num center">{{ (currentPage-1)*pageSize + i + 1 }}</td>
             <td style="font-weight:500;color:var(--color-primary)">{{ u.name }}</td>
             <td class="center">
@@ -39,7 +45,7 @@
                 <button class="adm-action-btn" title="แก้ไข" @click="openEdit(u)">
                   <PhPencilSimple :size="14" />
                 </button>
-                <button class="adm-action-btn danger" title="ลบ" @click="deleteUnit(u)">
+                <button class="adm-action-btn danger" title="ลบ" @click="handleDelete(u)">
                   <PhTrash :size="14" />
                 </button>
               </div>
@@ -84,9 +90,12 @@
               <input v-model="form.name" class="k-input" placeholder="กรุณาระบุชื่อหน่วยนับ" @keydown.enter="save" />
             </div>
           </div>
+          <div v-if="saveError" style="color:var(--color-danger);font-size:13px;margin-top:8px">{{ saveError }}</div>
           <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">
-            <button class="adm-hdr-btn adm-hdr-btn-ghost" @click="showModal=false">ยกเลิก</button>
-            <button class="adm-hdr-btn adm-hdr-btn-primary" :disabled="!form.name.trim()" @click="save">ตกลง</button>
+            <button class="adm-hdr-btn adm-hdr-btn-ghost" :disabled="saving" @click="showModal=false">ยกเลิก</button>
+            <button class="adm-hdr-btn adm-hdr-btn-primary" :disabled="!form.name.trim() || saving" @click="save">
+              {{ saving ? 'กำลังบันทึก...' : 'ตกลง' }}
+            </button>
           </div>
         </div>
       </Transition>
@@ -96,31 +105,43 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { PhPlus, PhPencilSimple, PhTrash } from '@phosphor-icons/vue'
+import {
+  listUnits,
+  createUnit,
+  updateUnit,
+  deleteUnit as apiDeleteUnit,
+} from '@/api/products'
 
-interface Unit { id: number; name: string }
+interface UnitRow { _id: string; name: string }
 
-let nextId = 11
-const units = ref<Unit[]>([
-  { id:1,  name:'จาน' },
-  { id:2,  name:'ชาม' },
-  { id:3,  name:'แก้ว' },
-  { id:4,  name:'ถ้วย' },
-  { id:5,  name:'จาน 2' },
-  { id:6,  name:'ขวด' },
-  { id:7,  name:'กล่อง' },
-  { id:8,  name:'เซ็ต' },
-  { id:9,  name:'รายการ' },
-  { id:10, name:'ชุด' },
-])
+const units       = ref<UnitRow[]>([])
+const loading     = ref(false)
+const error       = ref('')
+const saving      = ref(false)
+const saveError   = ref('')
 
 const search      = ref('')
 const pageSize    = ref(10)
 const currentPage = ref(1)
 const showModal   = ref(false)
-const editTarget  = ref<Unit | null>(null)
+const editTarget  = ref<UnitRow | null>(null)
 const form        = ref({ name: '' })
+
+onMounted(async () => {
+  loading.value = true
+  error.value = ''
+  try {
+    const data = await listUnits()
+    // API returns Unit[] where each doc has _id from Mongo
+    units.value = (data as unknown as UnitRow[])
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'โหลดข้อมูลล้มเหลว'
+  } finally {
+    loading.value = false
+  }
+})
 
 const filtered   = computed(() => {
   const q = search.value.toLowerCase()
@@ -131,20 +152,38 @@ const paginated  = computed(() =>
   filtered.value.slice((currentPage.value-1)*pageSize.value, currentPage.value*pageSize.value)
 )
 
-function openCreate() { editTarget.value=null; form.value={ name:'' }; showModal.value=true }
-function openEdit(u: Unit) { editTarget.value=u; form.value={ name:u.name }; showModal.value=true }
-function save() {
+function openCreate() { editTarget.value=null; form.value={ name:'' }; saveError.value=''; showModal.value=true }
+function openEdit(u: UnitRow) { editTarget.value=u; form.value={ name:u.name }; saveError.value=''; showModal.value=true }
+
+async function save() {
   if (!form.value.name.trim()) return
-  if (editTarget.value) {
-    const idx = units.value.findIndex(u => u.id === editTarget.value!.id)
-    if (idx >= 0) units.value[idx] = { ...units.value[idx], name: form.value.name.trim() }
-  } else {
-    units.value.push({ id: nextId++, name: form.value.name.trim() })
+  saving.value = true
+  saveError.value = ''
+  try {
+    if (editTarget.value) {
+      const updated = await updateUnit(editTarget.value._id as unknown as number, { name: form.value.name.trim() })
+      const row = updated as unknown as UnitRow
+      const idx = units.value.findIndex(u => u._id === editTarget.value!._id)
+      if (idx >= 0) units.value[idx] = row
+    } else {
+      const created = await createUnit({ name: form.value.name.trim() } as { name: string })
+      units.value.push(created as unknown as UnitRow)
+    }
+    showModal.value = false
+  } catch (e: unknown) {
+    saveError.value = e instanceof Error ? e.message : 'บันทึกล้มเหลว'
+  } finally {
+    saving.value = false
   }
-  showModal.value = false
 }
-function deleteUnit(u: Unit) {
-  units.value = units.value.filter(x => x.id !== u.id)
+
+async function handleDelete(u: UnitRow) {
+  try {
+    await apiDeleteUnit(u._id as unknown as number)
+    units.value = units.value.filter(x => x._id !== u._id)
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'ลบล้มเหลว'
+  }
 }
 </script>
 

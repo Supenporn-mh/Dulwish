@@ -12,23 +12,38 @@
       </button>
     </div>
 
+    <!-- Error -->
+    <div v-if="error" style="padding:12px 16px;background:var(--color-danger-bg);color:var(--color-danger);border-radius:10px;font-size:13px">
+      {{ error }}
+    </div>
+
     <!-- Search -->
     <div class="group-search-wrap">
       <PhMagnifyingGlass :size="16" style="color:var(--color-text-tertiary);flex-shrink:0" />
       <input v-model="search" class="group-search" placeholder="ค้นหาชื่อกลุ่ม..." />
     </div>
 
+    <!-- Loading -->
+    <div v-if="loading" style="padding:48px;text-align:center;color:var(--color-text-tertiary);font-size:13px">
+      กำลังโหลด...
+    </div>
+
     <!-- Grid -->
-    <div class="group-grid">
+    <div v-else class="group-grid">
       <div v-for="g in filtered" :key="g.id" class="group-card">
         <!-- Top row -->
         <div style="display:flex;align-items:flex-start;justify-content:space-between">
           <div class="group-avatar">
             <PhUsersThree :size="22" weight="fill" style="color:var(--color-primary)" />
           </div>
-          <button class="group-edit-btn" @click="openEdit(g)" title="แก้ไข">
-            <PhPencilSimple :size="15" />
-          </button>
+          <div style="display:flex;gap:6px">
+            <button class="group-edit-btn" @click="openEdit(g)" title="แก้ไข">
+              <PhPencilSimple :size="15" />
+            </button>
+            <button class="group-edit-btn" @click="removeGroup(g)" title="ลบ" style="color:var(--color-danger)">
+              <PhTrash :size="15" />
+            </button>
+          </div>
         </div>
 
         <!-- Info -->
@@ -63,10 +78,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { PhPlus, PhUsersThree, PhMagnifyingGlass, PhPencilSimple } from '@phosphor-icons/vue'
+import { PhPlus, PhUsersThree, PhMagnifyingGlass, PhPencilSimple, PhTrash } from '@phosphor-icons/vue'
 import { useWalletsStore } from '@/stores/wallets'
+import { listGroups, deleteGroup } from '@/api/groups'
+import type { MemberGroup } from '@/api/types'
+
 const router       = useRouter()
 const walletsStore = useWalletsStore()
 
@@ -79,15 +97,26 @@ function enabledPerms(perms?: string[]) {
   return (perms ?? []).filter(id => enabledIds.has(id))
 }
 
-interface Group { id: string; name: string; memberCount: number; permissions?: string[] }
+const groups  = ref<MemberGroup[]>([])
+const loading = ref(false)
+const error   = ref<string | null>(null)
 
-const groups = ref<Group[]>([
-  { id: 'G_K1',   name: 'กลุ่ม K1',   memberCount: 2, permissions: ['W001','W004'] },
-  { id: 'G_K2',   name: 'กลุ่ม K2',   memberCount: 1, permissions: ['W001','W004'] },
-  { id: 'G_P1P3', name: 'กลุ่ม P1–P3',memberCount: 3, permissions: ['W001','W002','W004'] },
-  { id: 'G_P4P6', name: 'กลุ่ม P4–P6',memberCount: 3, permissions: ['W001','W002','W004'] },
-  { id: 'G_SEC',  name: 'กลุ่มมัธยม', memberCount: 6, permissions: ['W001','W002','W005'] },
-])
+async function loadGroups() {
+  loading.value = true
+  error.value   = null
+  try {
+    groups.value = await listGroups('student')
+  } catch (e: any) {
+    error.value = e?.message ?? 'โหลดข้อมูลไม่สำเร็จ'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(async () => {
+  if (walletsStore.wallets.length === 0) await walletsStore.load()
+  await loadGroups()
+})
 
 const search = ref('')
 
@@ -96,9 +125,18 @@ const filtered = computed(() => {
   return groups.value.filter(g => !q || g.name.toLowerCase().includes(q) || g.id.toLowerCase().includes(q))
 })
 
-function openCreate()        { router.push('/admin/student-groups/new?name=สร้างกลุ่มนักเรียนใหม่') }
-function openEdit(g: Group)  { router.push(`/admin/student-groups/${g.id}?name=${encodeURIComponent(g.name)}&perms=${(g.permissions??[]).join(',')}`) }
-function openManage(g: Group){ router.push(`/admin/student-groups/${g.id}?name=${encodeURIComponent(g.name)}&perms=${(g.permissions??[]).join(',')}`) }
+function openCreate()               { router.push('/admin/student-groups/new?name=สร้างกลุ่มนักเรียนใหม่') }
+function openEdit(g: MemberGroup)   { router.push(`/admin/student-groups/${g.id}?name=${encodeURIComponent(g.name)}&perms=${(g.permissions??[]).join(',')}`) }
+
+async function removeGroup(g: MemberGroup) {
+  if (!confirm(`ลบกลุ่ม "${g.name}" ใช่หรือไม่?`)) return
+  try {
+    await deleteGroup(g.id)
+    groups.value = groups.value.filter(x => x.id !== g.id)
+  } catch (e: any) {
+    alert(e?.message ?? 'ลบไม่สำเร็จ')
+  }
+}
 </script>
 
 <style scoped>

@@ -69,6 +69,11 @@
       </div>
     </div>
 
+    <!-- Error banner -->
+    <div v-if="loadError" style="padding:10px 14px;border-radius:8px;background:var(--color-danger-bg,#FEE2E2);color:var(--color-danger,#CC3333);font-size:13px">
+      {{ loadError }}
+    </div>
+
     <!-- Table -->
     <div class="adm-table-wrap">
       <table class="adm-table">
@@ -338,7 +343,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   PhPlus, PhDownloadSimple, PhUploadSimple, PhPencilSimple,
   PhKey, PhProhibit, PhCheckCircle, PhX, PhCopy, PhArrowClockwise,
@@ -361,20 +366,46 @@ interface Member {
   status:      'active' | 'inactive'
 }
 
+
 const walletsStore   = useWalletsStore()
 const enabledWallets = computed(() => walletsStore.wallets.filter(w => w.enabled))
 
 const loading     = ref(false)
-const members     = ref<Member[]>([
-  { uid:'EMP-001', firstName:'สมชาย',  lastName:'ใจดี',      email:'admin@dulwich.ac.th',   cardUid:'04A1B2C3', cardStatus:'active',   balance:850, role:'admin',      status:'active'   },
-  { uid:'EMP-002', firstName:'วิภา',   lastName:'รักเรียน',  email:'patcha@school.local',   cardUid:'04D4E5F6', cardStatus:'active',   balance:320, role:'supervisor', status:'active'   },
-  { uid:'EMP-003', firstName:'หนอง',   lastName:'แคชเชียร์', email:'nong@school.local',     cardUid:'04G7H8I9', cardStatus:'active',   balance:150, role:'cashier',    status:'active'   },
-])
+const loadError   = ref('')
+const members     = ref<Member[]>([])
 const search      = ref('')
 const filterRole  = ref('')
 const filterStatus = ref('')
 const currentPage = ref(1)
 const pageSize    = ref(10)
+
+async function fetchMembers() {
+  loading.value   = true
+  loadError.value = ''
+  try {
+    const res = await api.get('/users', { params: { role: undefined } })
+    const raw: any[] = res.data?.users ?? res.data ?? []
+    const staff = raw.filter((u: any) => ['admin','supervisor','cashier'].includes(u.role ?? u.Role))
+    members.value = staff.map((u: any) => ({
+      uid:        u.uid ?? u._id ?? u.id,
+      firstName:  u.firstName ?? u.first_name ?? '',
+      lastName:   u.lastName  ?? u.last_name  ?? '',
+      email:      u.email     ?? undefined,
+      cardUid:    u.cardUid   ?? u.card_uid   ?? undefined,
+      cardStatus: u.cardStatus ?? u.card_status ?? undefined,
+      balance:    typeof u.balance === 'number' ? u.balance : 0,
+      role:       u.role      ?? '',
+      status:     u.status    ?? 'active',
+    }))
+  } catch {
+    loadError.value = 'โหลดข้อมูลไม่สำเร็จ'
+    members.value   = []
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(fetchMembers)
 
 const filtered = computed(() => {
   const q = search.value.toLowerCase()
