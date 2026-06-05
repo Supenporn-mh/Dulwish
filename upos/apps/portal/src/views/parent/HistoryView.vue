@@ -333,16 +333,38 @@ const reviewFor    = ref<Transaction | null>(null)
 const reviewRating = ref(0)
 const reviewNote   = ref('')
 const reviewBusy   = ref(false)
+const reviewError  = ref<string | null>(null)
 
-function openReview(t: Transaction) { reviewFor.value=t; reviewRating.value=ratings[t.id]??0; reviewNote.value=notes[t.id]??'' }
+function openReview(t: Transaction) {
+  reviewFor.value    = t
+  reviewRating.value = ratings[t.id] ?? 0
+  reviewNote.value   = notes[t.id] ?? ''
+  reviewError.value  = null
+}
 async function submitReview() {
-  if (!reviewFor.value || reviewRating.value===0) return
-  reviewBusy.value = true
-  try { await api.post('/feedback', { transactionId:reviewFor.value.id, rating:reviewRating.value, comment:reviewNote.value }) } catch {}
-  ratings[reviewFor.value.id] = reviewRating.value
-  notes[reviewFor.value.id]   = reviewNote.value
-  rated.add(reviewFor.value.id)
-  reviewFor.value = null; reviewBusy.value = false
+  if (!reviewFor.value || reviewRating.value === 0) return
+  reviewBusy.value  = true
+  reviewError.value = null
+  const t = reviewFor.value
+  const body: Record<string, unknown> = {
+    channel: 'mobile',
+    rating:  reviewRating.value,
+    comment: reviewNote.value,
+  }
+  if (t.type === 'booking') {
+    body.order_id = t.id
+  }
+  try {
+    await api.post('/feedback', body)
+    ratings[t.id] = reviewRating.value
+    notes[t.id]   = reviewNote.value
+    rated.add(t.id)
+    reviewFor.value = null
+  } catch (err: any) {
+    reviewError.value = locale.t('ส่งรีวิวไม่สำเร็จ กรุณาลองใหม่', 'Failed to submit review, please try again')
+  } finally {
+    reviewBusy.value = false
+  }
 }
 
 // ── Mount ─────────────────────────────────────────────────────────────────────
@@ -755,6 +777,10 @@ onMounted(async () => {
             <textarea v-model="reviewNote" class="rs-textarea" rows="3"
               :placeholder="locale.t('ความคิดเห็นเพิ่มเติม...','Add a comment...')"/>
           </div>
+
+          <p v-if="reviewError" class="text-[12px] font-medium text-center" style="color:var(--color-danger)">
+            {{ reviewError }}
+          </p>
 
           <button @click="submitReview" :disabled="reviewBusy||reviewRating===0"
             class="btn btn-primary w-full"

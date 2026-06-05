@@ -1,7 +1,14 @@
 import { Elysia, t } from 'elysia'
 import bcrypt from 'bcryptjs'
 import { User, Wallet, AuditLog, EnrollmentCode, ParentStudent } from '../../models'
-import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../middleware/auth'
+import { signAccessToken, signRefreshToken, verifyRefreshToken, authPlugin } from '../../middleware/auth'
+
+// ── In-memory OTP store (acceptable for demo; keyed by contact) ───────────────
+const OTP_STORE: Map<string, { otp: string; expiresAt: Date; studentId?: string }> = new Map()
+
+function generateOtp(): string {
+  return String(Math.floor(100000 + Math.random() * 900000))
+}
 
 export const authController = new Elysia({ prefix: '/auth' })
   .post('/login', async ({ body, set, request }) => {
@@ -247,4 +254,219 @@ export const authController = new Elysia({ prefix: '/auth' })
       contact:  t.String({ minLength: 1 }),
       password: t.String({ minLength: 1 }),
     }),
+  })
+
+  // ── Parent OTP registration flow ──────────────────────────────────────────
+
+  .post('/parent/lookup-student', async ({ body, set }) => {
+    const sid = (body.studentId ?? '').toUpperCase().trim()
+    if (!sid) {
+      set.status = 400
+      return { error: { code: 'INVALID', message: 'กรุณากรอกรหัสนักเรียน' } }
+    }
+    const student = await User.findOne({ uid: sid, role: 'student', status: 'active' }).lean()
+    if (!student) {
+      set.status = 404
+      return { error: { code: 'STD_404', message: 'ไม่พบรหัสนักเรียนในระบบ' } }
+    }
+    return {
+      found: true,
+      student: {
+        uid:       student.uid,
+        firstName: student.firstName,
+        lastName:  student.lastName,
+        grade:     student.studentProfile?.gradeLevel ?? null,
+        className: student.studentProfile?.className  ?? null,
+      },
+    }
+  }, {
+    body: t.Object({ studentId: t.String({ minLength: 1 }) }),
+  })
+
+  .post('/parent/send-otp', async ({ body, set }) => {
+    const contact   = (body.contact   ?? '').trim().toLowerCase()
+    const studentId = (body.studentId ?? '').toUpperCase().trim()
+    if (!contact || !studentId) {
+      set.status = 400
+      return { error: { code: 'INVALID', message: 'กรุณากรอกข้อมูลให้ครบ' } }
+    }
+    // Check contact not already registered
+    const existing = await User.findOne({
+      $or: [{ email: contact }, { phone: contact }],
+      role: 'parent',
+      status: 'active',
+    }).lean()
+    if (existing) {
+      set.status = 409
+      return { error: { code: 'ALREADY_REGISTERED', message: 'อีเมล/เบอร์นี้ลงทะเบียนแล้ว' } }
+    }
+    const otp       = generateOtp()
+    const expiresAt = new Date(Date.now() + 14 * 24 * 3600 * 1000) // 14 days (same as mock)
+    OTP_STORE.set(contact, { otp, expiresAt, studentId })
+    console.log(`[OTP] ${contact} → ${otp}`)
+    return { sent: true, otp, expiresAt: expiresAt.toISOString(), _demo: `OTP: ${otp}` }
+  }, {
+    body: t.Object({
+      studentId: t.String({ minLength: 1 }),
+      contact:   t.String({ minLength: 1 }),
+    }),
+  })
+
+  .post('/parent/register', async ({ body, set }) => {
+    const contact   = (body.contact   ?? '').trim().toLowerCase()
+    const otp       = (body.otp       ?? '').trim()
+    const studentId = (body.studentId ?? '').toUpperCase().trim()
+    const record    = OTP_STORE.get(contact)
+    if (!record || record.otp !== otp) {
+      set.status = 400
+      return { error: { code: 'OTP_INVALID', message: 'รหัส OTP ไม่ถูกต้องหรือหมดอายุ' } }
+    }
+    if (new Date() > record.expiresAt) {
+      set.status = 400
+      return { error: { code: 'OTP_EXPIRED', message: 'รหัส OTP หมดอายุแล้ว' } }
+    }
+    OTP_STORE.delete(contact)
+
+    const student = await User.findOne({ uid: studentId, role: 'student', status: 'active' }).lean()
+    if (!student) {
+      set.status = 404
+      return { error: { code: 'STD_404', message: 'ไม่พบรหัสนักเรียนในระบบ' } }
+    }
+
+    const existingLink = await ParentStudent.findOne({ studentUserId: student._id }).lean()
+    if (existingLink) {
+      set.status = 400
+      return { error: { code: 'ENR_004', message: 'นักเรียนคนนี้มีผู้ปกครองในระบบแล้ว' } }
+    }
+
+    const passwordHash = await bcrypt.hash(body.password, 10)
+    const count = await User.countDocuments({ role: 'parent' })
+    const uid   = `PRT-${String(count + 1).padStart(4, '0')}`
+
+    // Store contact in email or phone field based on format
+    const isPhone = /^0[0-9]{9}$/.test(contact) || contact.startsWith('+66')
+    const contactField = isPhone ? { phone: contact } : { email: contact }
+
+    const parent = await User.create({
+      uid, role: 'parent',
+      firstName: body.firstName ?? 'ผู้ปกครอง',
+      lastName:  body.lastName  ?? '',
+      passwordHash,
+      status: 'active',
+      pdpaAcceptedAt: new Date(),
+      ...contactField,
+    })
+
+    await Wallet.create({ userId: parent._id, balance: 0 })
+
+    await ParentStudent.create({
+      parentUserId:  parent._id,
+      studentUserId: student._id,
+      isPrimary:     true,
+      relationship:  'parent',
+    })
+
+    const payload = { userId: String(parent._id), role: parent.role, uid: parent.uid }
+    const accessToken  = signAccessToken(payload as any)
+    const refreshToken = signRefreshToken(payload as any)
+
+    const { passwordHash: _ph, ...safeUser } = parent.toObject()
+    return { accessToken, refreshToken, user: safeUser }
+  }, {
+    body: t.Object({
+      studentId: t.String({ minLength: 1 }),
+      contact:   t.String({ minLength: 1 }),
+      otp:       t.String({ minLength: 6 }),
+      firstName: t.Optional(t.String()),
+      lastName:  t.Optional(t.String()),
+      password:  t.String({ minLength: 8 }),
+    }),
+  })
+
+  // ── Forgot password flow ──────────────────────────────────────────────────
+
+  .post('/forgot-password/send', async ({ body, set }) => {
+    const contact = (body.contact ?? '').trim().toLowerCase()
+    if (!contact) {
+      set.status = 400
+      return { error: { code: 'INVALID', message: 'กรุณากรอกอีเมลหรือเบอร์มือถือ' } }
+    }
+    const user = await User.findOne({
+      $or: [{ email: contact }, { phone: contact }],
+      status: 'active',
+    }).lean()
+    if (!user) {
+      set.status = 404
+      return { error: { code: 'NOT_FOUND', message: 'ไม่พบบัญชีนี้ในระบบ' } }
+    }
+    const otp       = generateOtp()
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 min
+    OTP_STORE.set(`reset_${contact}`, { otp, expiresAt })
+    console.log(`[OTP reset] ${contact} → ${otp}`)
+    return { sent: true, otp, _demo: `OTP: ${otp}` }
+  }, {
+    body: t.Object({ contact: t.String({ minLength: 1 }) }),
+  })
+
+  .post('/forgot-password/reset', async ({ body, set }) => {
+    const contact = (body.contact ?? '').trim().toLowerCase()
+    const otp     = (body.otp     ?? '').trim()
+    const record  = OTP_STORE.get(`reset_${contact}`)
+    if (!record || record.otp !== otp) {
+      set.status = 400
+      return { error: { code: 'OTP_INVALID', message: 'รหัส OTP ไม่ถูกต้อง' } }
+    }
+    if (new Date() > record.expiresAt) {
+      set.status = 400
+      return { error: { code: 'OTP_EXPIRED', message: 'รหัส OTP หมดอายุ' } }
+    }
+    OTP_STORE.delete(`reset_${contact}`)
+
+    const user = await User.findOne({
+      $or: [{ email: contact }, { phone: contact }],
+      status: 'active',
+    }).lean()
+    if (!user) {
+      set.status = 404
+      return { error: { code: 'NOT_FOUND', message: 'ไม่พบบัญชีนี้ในระบบ' } }
+    }
+    const passwordHash = await bcrypt.hash(body.newPassword, 10)
+    await User.updateOne({ _id: user._id }, { passwordHash })
+    return { success: true }
+  }, {
+    body: t.Object({
+      contact:     t.String({ minLength: 1 }),
+      otp:         t.String({ minLength: 6 }),
+      newPassword: t.String({ minLength: 8 }),
+    }),
+  })
+
+  // ── Change password (authenticated) ──────────────────────────────────────
+
+  .use(authPlugin())
+
+  .post('/change-password', async ({ body, currentUser, set }) => {
+    const oldPassword = (body as any).oldPassword ?? (body as any).currentPassword ?? ''
+    const newPassword = (body as any).newPassword ?? ''
+
+    if (!oldPassword || !newPassword) {
+      set.status = 400
+      return { error: { code: 'INVALID', message: 'กรุณากรอกรหัสผ่านให้ครบ' } }
+    }
+
+    const user = await User.findById(currentUser._id).lean()
+    if (!user || !user.passwordHash) {
+      set.status = 404
+      return { error: { code: 'NOT_FOUND', message: 'ไม่พบบัญชีผู้ใช้' } }
+    }
+
+    const valid = await bcrypt.compare(oldPassword, user.passwordHash)
+    if (!valid) {
+      set.status = 400
+      return { error: { code: 'WRONG_PASSWORD', message: 'รหัสผ่านเดิมไม่ถูกต้อง' } }
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10)
+    await User.updateOne({ _id: user._id }, { passwordHash })
+    return { success: true }
   })

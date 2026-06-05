@@ -95,3 +95,80 @@ export const usersController = new Elysia({ prefix: '/users' })
     const cards = await Card.find({ userId: params.id }).lean()
     return { cards }
   })
+
+  .post('/me/add-student', async ({ body, currentUser, set }) => {
+    if (currentUser.role !== 'parent') {
+      set.status = 403
+      return { error: { code: 'AUTH_008', message: 'Parents only' } }
+    }
+
+    const code = (body.enrollmentCode ?? '').toUpperCase().trim()
+    if (!code) {
+      set.status = 400
+      return { error: { code: 'ENR_001', message: 'กรุณากรอกรหัสลงทะเบียน' } }
+    }
+
+    const enrollment = await EnrollmentCode.findOne({ code })
+      .populate<{ studentUserId: any }>('studentUserId')
+      .lean()
+
+    if (!enrollment) {
+      set.status = 404
+      return { error: { code: 'ENR_001', message: 'ไม่พบรหัสลงทะเบียน' } }
+    }
+    if (enrollment.used) {
+      set.status = 400
+      return { error: { code: 'ENR_002', message: 'รหัสนี้ถูกใช้งานแล้ว' } }
+    }
+    if (new Date() > enrollment.expiresAt) {
+      set.status = 400
+      return { error: { code: 'ENR_003', message: 'รหัสหมดอายุแล้ว' } }
+    }
+
+    const student = enrollment.studentUserId
+    if (!student) {
+      set.status = 404
+      return { error: { code: 'ENR_001', message: 'ไม่พบข้อมูลนักเรียน' } }
+    }
+
+    // Avoid duplicate parent-student links
+    const existingLink = await ParentStudent.findOne({
+      parentUserId:  currentUser._id,
+      studentUserId: student._id,
+    }).lean()
+    if (existingLink) {
+      set.status = 400
+      return { error: { code: 'ENR_005', message: 'นักเรียนคนนี้เชื่อมกับบัญชีของคุณแล้ว' } }
+    }
+
+    await ParentStudent.create({
+      parentUserId:  currentUser._id,
+      studentUserId: student._id,
+      isPrimary:     false,
+      relationship:  'parent',
+    })
+
+    // Ensure student wallet exists
+    const existingWallet = await Wallet.findOne({ userId: student._id }).lean()
+    if (!existingWallet) {
+      await Wallet.create({ userId: student._id, balance: 0 })
+    }
+
+    await EnrollmentCode.updateOne(
+      { _id: enrollment._id },
+      { used: true, usedAt: new Date(), usedByParentId: currentUser._id },
+    )
+
+    return {
+      success: true,
+      student: {
+        uid:        student.uid,
+        firstName:  student.firstName,
+        lastName:   student.lastName,
+        gradeLevel: student.studentProfile?.gradeLevel ?? null,
+        className:  student.studentProfile?.className  ?? null,
+      },
+    }
+  }, {
+    body: t.Object({ enrollmentCode: t.String({ minLength: 1 }) }),
+  })
