@@ -105,7 +105,8 @@ import {
   PhSquaresFour, PhUsers, PhStudent, PhForkKnife,
   PhReceipt, PhChartLine, PhClipboardText, PhGear, PhCalendarDots,
   PhBuildings, PhSignOut, PhCaretDown, PhPackage, PhGraduationCap, PhStorefront,
-  PhShieldCheck, PhWallet, PhUsersThree, PhIdentificationCard,
+  PhShieldCheck, PhWallet, PhUsersThree, PhIdentificationCard, PhCalendarCheck,
+  PhClock, PhCalendarPlus, PhClockCounterClockwise,
   PhCookingPot, PhTag, PhRuler, PhShoppingBag,
 } from '@phosphor-icons/vue'
 
@@ -162,6 +163,17 @@ const navItems: any[] = [
       { to: '/admin/products',            icon: PhShoppingBag, label: 'สินค้า'        },
     ],
   },
+  {
+    type: 'group',
+    label: 'จัดการการจอง',
+    sub:   '',
+    icon:  PhCalendarCheck,
+    children: [
+      { to: '/admin/booking/time-settings', icon: PhClock,                   label: 'ตั้งค่าช่วงเวลา'  },
+      { to: '/admin/booking/menu',          icon: PhCalendarPlus,             label: 'เมนูการจอง'       },
+      { to: '/admin/booking/history',       icon: PhClockCounterClockwise,    label: 'ประวัติการจอง'    },
+    ],
+  },
   { type: 'link', to: '/admin/transactions', icon: PhReceipt,       label: 'รายการ'          },
   { type: 'link', to: '/admin/reports',      icon: PhChartLine,     label: 'รายงาน'          },
   { type: 'link', to: '/admin/audit',        icon: PhClipboardText, label: 'Audit'           },
@@ -182,6 +194,9 @@ const pageTitles: Record<string, string> = {
   '/admin/products':              'สินค้า',
   '/admin/products/new':         'เพิ่มสินค้า',
   '/admin/menu':                  'เมนู',
+  '/admin/booking/time-settings': 'ตั้งค่าช่วงเวลา',
+  '/admin/booking/menu':          'เมนูการจอง',
+  '/admin/booking/history':       'ประวัติการจอง',
   '/admin/transactions':          'รายการ',
   '/admin/reports':               'รายงาน',
   '/admin/audit':                 'Audit Log',

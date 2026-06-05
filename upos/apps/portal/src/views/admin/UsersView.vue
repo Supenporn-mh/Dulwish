@@ -54,7 +54,7 @@
               <td colspan="8" class="center" style="padding:32px;color:var(--color-text-tertiary)">ไม่พบข้อมูล</td>
             </tr>
             <tr v-for="(u, i) in paged" :key="u.id">
-              <td class="num center">{{ (currentPage-1)*pageSize.value + i + 1 }}</td>
+              <td class="num center">{{ (currentPage-1)*pageSize + i + 1 }}</td>
               <td><span class="adm-code">{{ u.employeeCode }}</span></td>
               <td>
                 <div style="font-weight:500;color:var(--color-primary)">{{ u.firstName }} {{ u.lastName }}</div>
