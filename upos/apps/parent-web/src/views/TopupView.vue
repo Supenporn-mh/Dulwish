@@ -275,11 +275,13 @@ async function handleTopup() {
   }
 }
 
-function completePayment(userId: string) {
+async function completePayment(userId: string) {
   newBalance.value = currentBalance.value + finalAmount.value
   paymentDone.value = true
-  // Refresh wallet in background
-  walletStore.fetchWallet(userId)
+  await Promise.all([
+    walletStore.fetchWallet(userId),
+    walletStore.fetchTransactions(userId, true),
+  ])
 }
 
 function closeQr() {
