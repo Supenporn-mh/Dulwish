@@ -9,7 +9,7 @@ import type {
 // ── Normalizers ───────────────────────────────────────────────────────────────
 
 function normWalletPermission(w: any): WalletPermission {
-  return { ...w, id: String(w._id ?? w.id) }
+  return { ...w, code: w.code, id: w.code }
 }
 
 function normAcademicYear(a: any): AcademicYear {

@@ -54,7 +54,7 @@
             <div class="pd-field">
               <select v-model="form.unit" class="pd-input pd-select">
                 <option value="" disabled>หน่วยนับ*</option>
-                <option v-for="u in UNITS" :key="u" :value="u">{{ u }}</option>
+                <option v-for="u in units" :key="u.id" :value="u.name">{{ u.name }}</option>
               </select>
             </div>
             <div class="pd-field">
@@ -67,8 +67,8 @@
           <div class="pd-row">
             <div class="pd-field">
               <select v-model="form.categoryCode" class="pd-input pd-select">
-                <option value="" disabled>ครัว</option>
-                <option v-for="c in CATEGORIES" :key="c.id" :value="c.id">{{ c.name }}</option>
+                <option value="" disabled>หมวดหมู่</option>
+                <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
               </select>
             </div>
             <div class="pd-field">
@@ -183,24 +183,18 @@ import {
   listProducts as apiListProducts,
   createProduct as apiCreateProduct,
   updateProduct as apiUpdateProduct,
+  listCategories as apiListCategories,
+  listUnits as apiListUnits,
 } from '@/api/products'
-import type { Product } from '@/api/types'
+import type { Product, ProductCategory, Unit } from '@/api/types'
 
 const route  = useRoute()
 const router = useRouter()
 const isNew  = computed(() => route.path.endsWith('/new'))
 const productCode = computed(() => route.params.id as string)
 
-const CATEGORIES = [
-  { id:'002', name:'A: PLANT BASED' }, { id:'003', name:'B: BREAKFAST SETS' },
-  { id:'004', name:'C. A LA CARTE WESTERN BREAKFAST' }, { id:'005', name:'D. A LA CARTE ASIAN BREAKFAST' },
-  { id:'006', name:'E: HEART HEALTHY SOUP' }, { id:'007', name:'F: HEALTHY SALAD' },
-  { id:'008', name:'G : HALAL' }, { id:'009', name:'H: MAIN COURSE' },
-  { id:'010', name:'I: THAI SPICY SALAD' }, { id:'011', name:'J: THAI INDIVIDUAL DISHES' },
-  { id:'012', name:'K: GRILLED & STIR-FRIED' }, { id:'013', name:'L: NOODLES & RICE' },
-  { id:'015', name:'M: BEVERAGE' }, { id:'021', name:'S: INDIAN' },
-]
-const UNITS = ['จาน 2','แก้ว','รายการ','ชุด','กล่อง','เซ็ต','ชาม']
+const categories = ref<ProductCategory[]>([])
+const units      = ref<Unit[]>([])
 const ICONS = ['🍜','🍱','🥗','☕','🌿']
 
 const tab      = ref<'basic'|'extra'>('basic')
@@ -221,6 +215,13 @@ const canSave       = computed(() => !!form.value.id && !!form.value.name)
 const attrSubmitted = ref(false)
 
 onMounted(async () => {
+  const [cats, unitList] = await Promise.all([
+    apiListCategories().catch(() => [] as ProductCategory[]),
+    apiListUnits().catch(() => [] as Unit[]),
+  ])
+  categories.value = cats
+  units.value = unitList
+
   if (isNew.value) return
   loading.value = true
   errorMsg.value = ''

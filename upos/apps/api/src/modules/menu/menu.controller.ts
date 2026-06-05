@@ -99,9 +99,9 @@ export const menuController = new Elysia({ prefix: '/menu' })
 
   // Admin routes
   .post('/items', async ({ body, currentUser, set }) => {
-    if (!['admin'].includes(currentUser.role)) {
+    if (!['admin','supervisor'].includes(currentUser.role)) {
       set.status = 403
-      return { error: { code: 'AUTH_008', message: 'Admin only' } }
+      return { error: { code: 'AUTH_008', message: 'Admin or supervisor only' } }
     }
     const item = await MenuItem.create(body)
     return { item }
@@ -121,9 +121,9 @@ export const menuController = new Elysia({ prefix: '/menu' })
   })
 
   .patch('/items/:id', async ({ params, body, currentUser, set }) => {
-    if (!['admin'].includes(currentUser.role)) {
+    if (!['admin','supervisor'].includes(currentUser.role)) {
       set.status = 403
-      return { error: { code: 'AUTH_008', message: 'Admin only' } }
+      return { error: { code: 'AUTH_008', message: 'Admin or supervisor only' } }
     }
     const item = await MenuItem.findByIdAndUpdate(params.id, body, { new: true })
     return { item }
@@ -138,9 +138,9 @@ export const menuController = new Elysia({ prefix: '/menu' })
   })
 
   .delete('/items/:id', async ({ params, currentUser, set }) => {
-    if (!['admin'].includes(currentUser.role)) {
+    if (!['admin','supervisor'].includes(currentUser.role)) {
       set.status = 403
-      return { error: { code: 'AUTH_008', message: 'Admin only' } }
+      return { error: { code: 'AUTH_008', message: 'Admin or supervisor only' } }
     }
     await MenuItem.findByIdAndUpdate(params.id, { active: false })
     return { success: true }

@@ -24,6 +24,10 @@
         </button>
       </div>
 
+      <div v-if="fetchError" class="error-banner">
+        โหลดข้อมูลไม่สำเร็จ — {{ fetchError }}
+      </div>
+
       <div class="adm-table-wrap">
         <table class="adm-table">
           <thead>
@@ -42,25 +46,27 @@
             <tr v-if="loading">
               <td colspan="8" class="center" style="padding:32px;color:#AEAEB2">กำลังโหลด...</td>
             </tr>
-            <tr v-else-if="menuItems.length === 0">
+            <tr v-else-if="menuItems.length === 0 && !fetchError">
               <td colspan="8" class="center" style="padding:32px;color:#AEAEB2">ไม่มีเมนูอาหาร</td>
             </tr>
-            <tr v-for="(item, i) in menuItems" :key="item.id ?? i">
+            <tr v-for="(item, i) in menuItems" :key="item._id">
               <td class="num center">{{ i + 1 }}</td>
               <td><span class="adm-code">{{ item.sku }}</span></td>
               <td style="font-weight:500;color:var(--color-primary)">{{ item.name }}</td>
-              <td style="color:#3C3C43">{{ item.shop }}</td>
+              <td style="color:#3C3C43">{{ shopNameById(item.shopId) }}</td>
               <td class="right" style="font-weight:500;color:var(--color-primary)">฿{{ item.price }}</td>
               <td class="center">
                 <button
-                  :class="['adm-toggle', item.preorderable ? 'on' : '']"
-                  @click="item.preorderable = !item.preorderable"
+                  :class="['adm-toggle', item.isPreorderable ? 'on' : '']"
+                  :disabled="togglingId === item._id"
+                  @click="togglePreorderable(item)"
                 />
               </td>
               <td class="center">
                 <button
                   :class="['adm-toggle', item.active ? 'on' : '']"
-                  @click="item.active = !item.active"
+                  :disabled="togglingId === item._id"
+                  @click="toggleActive(item)"
                 />
               </td>
               <td>
@@ -82,15 +88,17 @@
     <!-- Shops tab -->
     <div v-if="activeTab === 'shops'">
       <div class="ios-section-header">ร้านค้าทั้งหมด</div>
-      <div class="shops-grid">
+      <div v-if="loading" style="padding:32px;color:#AEAEB2;text-align:center">กำลังโหลด...</div>
+      <div v-else-if="shops.length === 0" style="padding:32px;color:#AEAEB2;text-align:center">ไม่มีข้อมูลร้านค้า</div>
+      <div v-else class="shops-grid">
         <div
           v-for="shop in shops"
-          :key="shop.id"
+          :key="shop._id"
           class="ios-card shop-card"
         >
           <div class="shop-icon">🍳</div>
           <div class="shop-name">{{ shop.name }}</div>
-          <div class="shop-meta">{{ shop.itemCount }} รายการ</div>
+          <div class="shop-meta">{{ shop.code }}</div>
         </div>
       </div>
     </div>
@@ -120,14 +128,14 @@
         <el-form-item label="ราคา (฿)" prop="price">
           <el-input-number v-model="form.price" :min="0" :precision="0" style="width: 100%" />
         </el-form-item>
-        <el-form-item label="ร้านค้า" prop="shop">
-          <el-select v-model="form.shop" placeholder="เลือกร้าน" style="width: 100%">
-            <el-option v-for="s in shops" :key="s.id" :label="s.name" :value="s.name" />
+        <el-form-item label="ร้านค้า" prop="shopId">
+          <el-select v-model="form.shopId" placeholder="เลือกร้าน" style="width: 100%">
+            <el-option v-for="s in shops" :key="s._id" :label="s.name" :value="s._id" />
           </el-select>
         </el-form-item>
         <el-form-item label="สั่งล่วงหน้า">
           <el-switch
-            v-model="form.preorderable"
+            v-model="form.isPreorderable"
             active-text="ได้"
             inactive-text="ไม่ได้"
             style="--el-switch-on-color: #1264E3"
@@ -161,68 +169,61 @@ import { ref, reactive, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { PhPencilSimple, PhTrash } from '@phosphor-icons/vue'
-
-const API_BASE = 'http://localhost:4000'
+import api from '@/api/axios'
 
 interface MenuItem {
-  id: string
+  _id: string
   sku: string
   name: string
-  shop: string
+  shopId: string
   price: number
-  preorderable: boolean
+  isPreorderable: boolean
   active: boolean
+  description?: string
+  categoryId?: string
 }
 
 interface Shop {
-  id: string
+  _id: string
+  code: string
   name: string
-  itemCount: number
+  type?: string
 }
-
-const DEMO_ITEMS: MenuItem[] = [
-  { id: '1', sku: 'FOOD-001', name: 'ข้าวมันไก่', shop: 'ร้านครัวไทย', price: 45, preorderable: true, active: true },
-  { id: '2', sku: 'FOOD-002', name: 'ก๋วยเตี๋ยวหมู', shop: 'ร้านก๋วยเตี๋ยว', price: 40, preorderable: false, active: true },
-  { id: '3', sku: 'FOOD-003', name: 'ข้าวผัดหมู', shop: 'ร้านครัวไทย', price: 50, preorderable: true, active: true },
-  { id: '4', sku: 'FOOD-004', name: 'ส้มตำ', shop: 'ร้านอาหารอีสาน', price: 35, preorderable: false, active: true },
-  { id: '5', sku: 'BUFF-001', name: 'Buffet นักเรียน', shop: 'โรงอาหาร', price: 120, preorderable: false, active: true },
-]
-
-const DEMO_SHOPS: Shop[] = [
-  { id: 's1', name: 'ร้านครัวไทย', itemCount: 8 },
-  { id: 's2', name: 'ร้านก๋วยเตี๋ยว', itemCount: 5 },
-  { id: 's3', name: 'ร้านอาหารอีสาน', itemCount: 4 },
-  { id: 's4', name: 'โรงอาหาร', itemCount: 2 },
-]
 
 const activeTab = ref('items')
 const loading = ref(false)
 const saving = ref(false)
+const togglingId = ref<string | null>(null)
+const fetchError = ref<string | null>(null)
 const dialogVisible = ref(false)
 const editingItem = ref<MenuItem | null>(null)
 const formRef = ref<FormInstance>()
 const menuItems = ref<MenuItem[]>([])
-const shops = ref<Shop[]>(DEMO_SHOPS)
+const shops = ref<Shop[]>([])
 
 const form = reactive({
   name: '',
   sku: '',
   price: 0,
-  shop: '',
-  preorderable: false,
+  shopId: '',
+  isPreorderable: false,
   active: true,
 })
 
 const rules: FormRules = {
-  name:  [{ required: true, message: 'กรุณากรอกชื่อเมนู', trigger: 'blur' }],
-  sku:   [{ required: true, message: 'กรุณากรอก SKU', trigger: 'blur' }],
-  price: [{ required: true, message: 'กรุณากรอกราคา', trigger: 'blur' }],
-  shop:  [{ required: true, message: 'กรุณาเลือกร้าน', trigger: 'change' }],
+  name:   [{ required: true, message: 'กรุณากรอกชื่อเมนู', trigger: 'blur' }],
+  sku:    [{ required: true, message: 'กรุณากรอก SKU', trigger: 'blur' }],
+  price:  [{ required: true, message: 'กรุณากรอกราคา', trigger: 'blur' }],
+  shopId: [{ required: true, message: 'กรุณาเลือกร้าน', trigger: 'change' }],
+}
+
+function shopNameById(id: string): string {
+  return shops.value.find(s => s._id === id)?.name ?? id
 }
 
 function openAddDialog() {
   editingItem.value = null
-  Object.assign(form, { name: '', sku: '', price: 0, shop: '', preorderable: false, active: true })
+  Object.assign(form, { name: '', sku: '', price: 0, shopId: '', isPreorderable: false, active: true })
   dialogVisible.value = true
 }
 
@@ -232,8 +233,8 @@ function openEditDialog(item: MenuItem) {
     name: item.name,
     sku: item.sku,
     price: item.price,
-    shop: item.shop,
-    preorderable: item.preorderable,
+    shopId: item.shopId,
+    isPreorderable: item.isPreorderable,
     active: item.active,
   })
   dialogVisible.value = true
@@ -246,33 +247,31 @@ async function saveItem() {
 
   saving.value = true
   try {
-    const payload = { ...form }
     if (editingItem.value) {
-      const res = await fetch(`${API_BASE}/menu/items/${editingItem.value.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+      const { data } = await api.patch(`/menu/items/${editingItem.value._id}`, {
+        name: form.name,
+        price: form.price,
+        active: form.active,
+        isPreorderable: form.isPreorderable,
       })
-      if (res.ok || true) {
-        Object.assign(editingItem.value, payload)
-        ElMessage.success('อัปเดตเมนูสำเร็จ')
-      }
+      const updated: MenuItem = data.item
+      const idx = menuItems.value.findIndex(m => m._id === updated._id)
+      if (idx !== -1) menuItems.value[idx] = updated
+      ElMessage.success('อัปเดตเมนูสำเร็จ')
     } else {
-      const res = await fetch(`${API_BASE}/menu/items`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+      const { data } = await api.post('/menu/items', {
+        shopId: form.shopId,
+        sku: form.sku,
+        name: form.name,
+        price: form.price,
+        isPreorderable: form.isPreorderable,
       })
-      const newItem = res.ok
-        ? await res.json()
-        : { id: Date.now().toString(), ...payload }
-      menuItems.value.push(newItem)
+      menuItems.value.push(data.item)
       ElMessage.success('เพิ่มเมนูสำเร็จ')
     }
     dialogVisible.value = false
-  } catch {
-    ElMessage.warning('API ไม่พร้อม — บันทึกเฉพาะ UI')
-    dialogVisible.value = false
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.message ?? 'บันทึกไม่สำเร็จ')
   } finally {
     saving.value = false
   }
@@ -285,28 +284,57 @@ async function deleteItem(item: MenuItem) {
     type: 'warning',
   })
   try {
-    await fetch(`${API_BASE}/menu/items/${item.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ active: false }),
+    await api.delete(`/menu/items/${item._id}`)
+    item.active = false
+    ElMessage.success('ปิดการใช้งานเมนูแล้ว')
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.message ?? 'ลบไม่สำเร็จ')
+  }
+}
+
+async function togglePreorderable(item: MenuItem) {
+  if (togglingId.value) return
+  togglingId.value = item._id
+  try {
+    const { data } = await api.patch(`/menu/items/${item._id}`, {
+      isPreorderable: !item.isPreorderable,
     })
-  } catch { /* ignore */ }
-  item.active = false
-  ElMessage.success('ปิดการใช้งานเมนูแล้ว')
+    const idx = menuItems.value.findIndex(m => m._id === data.item._id)
+    if (idx !== -1) menuItems.value[idx] = data.item
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.message ?? 'อัปเดตไม่สำเร็จ')
+  } finally {
+    togglingId.value = null
+  }
+}
+
+async function toggleActive(item: MenuItem) {
+  if (togglingId.value) return
+  togglingId.value = item._id
+  try {
+    const { data } = await api.patch(`/menu/items/${item._id}`, {
+      active: !item.active,
+    })
+    const idx = menuItems.value.findIndex(m => m._id === data.item._id)
+    if (idx !== -1) menuItems.value[idx] = data.item
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.message ?? 'อัปเดตไม่สำเร็จ')
+  } finally {
+    togglingId.value = null
+  }
 }
 
 async function fetchMenu() {
   loading.value = true
+  fetchError.value = null
   try {
-    const res = await fetch(`${API_BASE}/menu/items`)
-    if (res.ok) {
-      const data = await res.json()
-      menuItems.value = Array.isArray(data) ? data : data.data ?? DEMO_ITEMS
-    } else {
-      menuItems.value = DEMO_ITEMS
-    }
-  } catch {
-    menuItems.value = DEMO_ITEMS
+    const { data } = await api.get('/menu')
+    menuItems.value = Array.isArray(data.items) ? data.items : []
+    shops.value = Array.isArray(data.shops) ? data.shops : []
+  } catch (err: any) {
+    fetchError.value = err?.response?.data?.message ?? err?.message ?? 'ไม่สามารถเชื่อมต่อ API'
+    menuItems.value = []
+    shops.value = []
   } finally {
     loading.value = false
   }
@@ -348,7 +376,7 @@ onMounted(fetchMenu)
 .tab-btn--active {
   background: #1264E3;
   color: #FFFFFF;
-  font-weight: 600;
+  font-weight: 500;
   box-shadow: 0 2px 8px rgba(18,100,227,0.3);
 }
 
@@ -367,7 +395,7 @@ onMounted(fetchMenu)
   border: none;
   border-radius: 10px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition: background 0.15s;
   box-shadow: 0 2px 8px rgba(18,100,227,0.25);
@@ -375,6 +403,16 @@ onMounted(fetchMenu)
 
 .add-btn:hover {
   background: #0F52C1;
+}
+
+/* Error banner */
+.error-banner {
+  padding: 10px 14px;
+  background: rgba(255, 59, 48, 0.08);
+  border: 1px solid rgba(255, 59, 48, 0.2);
+  border-radius: 10px;
+  color: #FF3B30;
+  font-size: 14px;
 }
 
 /* Table card */
@@ -410,7 +448,7 @@ onMounted(fetchMenu)
   border: none;
   border-radius: 7px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition: background 0.15s;
   margin: 0 2px;
@@ -456,7 +494,7 @@ onMounted(fetchMenu)
 
 .shop-name {
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 500;
   color: #000000;
 }
 
@@ -479,7 +517,7 @@ onMounted(fetchMenu)
 
 .ios-dialog :deep(.el-dialog__title) {
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 500;
   color: #000000;
 }
 
@@ -529,7 +567,7 @@ onMounted(fetchMenu)
   border: none;
   border-radius: 9px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition: background 0.15s;
 }

@@ -21,7 +21,7 @@
           <label style="font-size:12px;color:var(--color-text-secondary)">เลือกประเภทสินค้า</label>
           <select v-model="filterCategory" class="adm-filter-select">
             <option value="">ประเภทสินค้าทั้งหมด</option>
-            <option v-for="c in CATEGORIES" :key="c.id" :value="c.id">{{ c.name }}</option>
+            <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:200px">
@@ -169,7 +169,7 @@
                 <label class="k-label">ประเภทสินค้า</label>
                 <select v-model="form.categoryCode" class="k-input k-select">
                   <option value="">เลือกประเภท</option>
-                  <option v-for="c in CATEGORIES" :key="c.id" :value="c.id">{{ c.name }}</option>
+                  <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
               </div>
               <div class="k-field" style="flex:1">
@@ -180,7 +180,7 @@
                 <label class="k-label">หน่วยนับ</label>
                 <select v-model="form.unit" class="k-input k-select">
                   <option value="">เลือกหน่วย</option>
-                  <option v-for="u in UNITS" :key="u" :value="u">{{ u }}</option>
+                  <option v-for="u in units" :key="u.id" :value="u.name">{{ u.name }}</option>
                 </select>
               </div>
             </div>
@@ -304,25 +304,18 @@ import {
   updateProduct as apiUpdateProduct,
   deleteProduct as apiDeleteProduct,
   importProducts as apiImportProducts,
+  listCategories as apiListCategories,
+  listUnits as apiListUnits,
 } from '@/api/products'
-import type { Product, ProductImportRow } from '@/api/types'
+import type { Product, ProductCategory, Unit, ProductImportRow } from '@/api/types'
 
 const router = useRouter()
 
-const CATEGORIES = [
-  { id:'002', name:'A: PLANT BASED' }, { id:'003', name:'B: BREAKFAST SETS' },
-  { id:'004', name:'C. A LA CARTE WESTERN BREAKFAST' }, { id:'005', name:'D. A LA CARTE ASIAN BREAKFAST' },
-  { id:'006', name:'E: HEART HEALTHY SOUP' }, { id:'007', name:'F: HEALTHY SALAD' },
-  { id:'008', name:'G : HALAL' }, { id:'009', name:'H: MAIN COURSE' },
-  { id:'010', name:'I: THAI SPICY SALAD' }, { id:'011', name:'J: THAI INDIVIDUAL DISHES' },
-  { id:'012', name:'K: GRILLED & STIR-FRIED' }, { id:'013', name:'L: NOODLES & RICE' },
-  { id:'014', name:'M: SOUP & STEW' }, { id:'015', name:'M: BEVERAGE' },
-  { id:'021', name:'S: INDIAN' }, { id:'030', name:'OPEN FOOD' },
-]
-const UNITS = ['จาน 2','แก้ว','รายการ','ชุด','กล่อง','เซ็ต','ชาม']
+const categories = ref<ProductCategory[]>([])
+const units      = ref<Unit[]>([])
 
 function categoryName(code: string) {
-  return CATEGORIES.find(c => c.id === code)?.name ?? code
+  return categories.value.find(c => c.id === code)?.name ?? code
 }
 
 const products  = ref<Product[]>([])
@@ -341,7 +334,13 @@ async function loadProducts() {
   }
 }
 
-onMounted(loadProducts)
+onMounted(async () => {
+  await Promise.all([
+    loadProducts(),
+    apiListCategories().then(list => { categories.value = list }),
+    apiListUnits().then(list => { units.value = list }),
+  ])
+})
 
 const search         = ref('')
 const filterCategory = ref('')

@@ -101,6 +101,7 @@ export interface GroupMember {
 
 export interface WalletPermission {
   id: string
+  code: string
   name: string
   desc: string
   amount: number

@@ -23,6 +23,11 @@
       </template>
     </div>
 
+    <!-- Error banner -->
+    <div v-if="fetchError && !loading" style="padding:10px 14px;background:rgba(255,59,48,0.08);border-radius:10px;color:#CC3333;font-size:13px;font-weight:500">
+      ไม่สามารถโหลดข้อมูล Dashboard ได้ — กำลังแสดงค่าศูนย์
+    </div>
+
     <!-- Recent transactions -->
     <div>
       <p style="font-size:13px;font-weight:500;color:#AEAEB2;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:12px">
@@ -75,14 +80,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { PhMoney, PhArrowUp, PhForkKnife, PhWarningCircle } from '@phosphor-icons/vue'
-
-const API_BASE = 'http://localhost:4000'
+import api from '@/api/axios'
 
 interface DashboardData {
   todayRevenue: number
-  topUps: number
+  todayTopups: number
+  topupCount: number
   buffetEntries: number
-  lowBalance: number
+  lowBalanceCount: number
 }
 
 interface Transaction {
@@ -96,33 +101,15 @@ interface Transaction {
 }
 
 const loading = ref(true)
+const fetchError = ref(false)
 const dashboardData = ref<DashboardData>({
-  todayRevenue: 12450,
-  topUps: 8200,
-  buffetEntries: 87,
-  lowBalance: 12,
+  todayRevenue: 0,
+  todayTopups: 0,
+  topupCount: 0,
+  buffetEntries: 0,
+  lowBalanceCount: 0,
 })
 const recentTransactions = ref<Transaction[]>([])
-
-const DEMO_DATA: DashboardData = {
-  todayRevenue: 12450,
-  topUps: 8200,
-  buffetEntries: 87,
-  lowBalance: 12,
-}
-
-const DEMO_TRANSACTIONS: Transaction[] = [
-  { id: '1', refNo: 'TXN-20240101-001', type: 'topup', amount: 500, channel: 'QR Code', status: 'success', createdAt: '2024-01-01T08:00:00Z' },
-  { id: '2', refNo: 'TXN-20240101-002', type: 'purchase', amount: 45, channel: 'NFC', status: 'success', createdAt: '2024-01-01T08:15:00Z' },
-  { id: '3', refNo: 'TXN-20240101-003', type: 'buffet', amount: 120, channel: 'QR Code', status: 'success', createdAt: '2024-01-01T09:00:00Z' },
-  { id: '4', refNo: 'TXN-20240101-004', type: 'topup', amount: 1000, channel: 'Cash', status: 'success', createdAt: '2024-01-01T09:30:00Z' },
-  { id: '5', refNo: 'TXN-20240101-005', type: 'void', amount: 45, channel: 'NFC', status: 'voided', createdAt: '2024-01-01T10:00:00Z' },
-  { id: '6', refNo: 'TXN-20240101-006', type: 'purchase', amount: 80, channel: 'NFC', status: 'success', createdAt: '2024-01-01T10:30:00Z' },
-  { id: '7', refNo: 'TXN-20240101-007', type: 'topup', amount: 200, channel: 'QR Code', status: 'success', createdAt: '2024-01-01T11:00:00Z' },
-  { id: '8', refNo: 'TXN-20240101-008', type: 'buffet', amount: 120, channel: 'QR Code', status: 'success', createdAt: '2024-01-01T11:30:00Z' },
-  { id: '9', refNo: 'TXN-20240101-009', type: 'purchase', amount: 35, channel: 'NFC', status: 'success', createdAt: '2024-01-01T12:00:00Z' },
-  { id: '10', refNo: 'TXN-20240101-010', type: 'topup', amount: 300, channel: 'Cash', status: 'pending', createdAt: '2024-01-01T12:30:00Z' },
-]
 
 const metricCards = computed(() => [
   {
@@ -138,8 +125,8 @@ const metricCards = computed(() => [
     key: 'topups',
     icon: PhArrowUp,
     label: 'เติมเงิน',
-    formatted: `฿${dashboardData.value.topUps.toLocaleString()}`,
-    sub: 'Top-up amount today',
+    formatted: `฿${dashboardData.value.todayTopups.toLocaleString()}`,
+    sub: `${dashboardData.value.topupCount} รายการวันนี้`,
     color: '#34C759',
     iconBg: 'rgba(52,199,89,0.1)',
   },
@@ -156,7 +143,7 @@ const metricCards = computed(() => [
     key: 'low',
     icon: PhWarningCircle,
     label: 'ยอดต่ำ',
-    formatted: dashboardData.value.lowBalance.toString(),
+    formatted: dashboardData.value.lowBalanceCount.toString(),
     sub: 'Students with low balance',
     color: '#FF3B30',
     iconBg: 'rgba(255,59,48,0.1)',
@@ -219,25 +206,19 @@ function amountSign(type: string): string {
 
 async function fetchDashboard() {
   loading.value = true
+  fetchError.value = false
   try {
     const [dashRes, txRes] = await Promise.all([
-      fetch(`${API_BASE}/admin/dashboard`),
-      fetch(`${API_BASE}/admin/transactions?limit=10`),
+      api.get<DashboardData>('/admin/dashboard'),
+      api.get<Transaction[] | { data: Transaction[] }>('/admin/transactions?limit=10'),
     ])
-    if (dashRes.ok) {
-      dashboardData.value = await dashRes.json()
-    } else {
-      dashboardData.value = DEMO_DATA
-    }
-    if (txRes.ok) {
-      const data = await txRes.json()
-      recentTransactions.value = Array.isArray(data) ? data.slice(0, 10) : data.data?.slice(0, 10) ?? DEMO_TRANSACTIONS
-    } else {
-      recentTransactions.value = DEMO_TRANSACTIONS
-    }
+    dashboardData.value = dashRes.data
+    const txData = txRes.data
+    recentTransactions.value = Array.isArray(txData) ? txData.slice(0, 10) : (txData as { data: Transaction[] }).data?.slice(0, 10) ?? []
   } catch {
-    dashboardData.value = DEMO_DATA
-    recentTransactions.value = DEMO_TRANSACTIONS
+    fetchError.value = true
+    dashboardData.value = { todayRevenue: 0, todayTopups: 0, topupCount: 0, buffetEntries: 0, lowBalanceCount: 0 }
+    recentTransactions.value = []
   } finally {
     loading.value = false
   }
@@ -303,14 +284,14 @@ onMounted(fetchDashboard)
 
 .metric-value {
   font-size: 32px;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.05;
   letter-spacing: -0.5px;
 }
 
 .metric-label {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   color: #000000;
 }
 
@@ -332,7 +313,7 @@ onMounted(fetchDashboard)
 .table-card :deep(.el-table th.el-table__cell) {
   background: #F2F2F7 !important;
   color: #6E6E73;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 13px;
 }
 

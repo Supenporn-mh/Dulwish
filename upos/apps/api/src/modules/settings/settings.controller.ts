@@ -12,9 +12,9 @@ export const settingsController = new Elysia({ prefix: '/settings' })
     return { walletPermissions }
   })
 
-  .patch('/wallet-permissions/:id', async ({ params, body, set }) => {
-    const walletPermission = await WalletPermission.findByIdAndUpdate(
-      params.id,
+  .patch('/wallet-permissions/:code', async ({ params, body, set }) => {
+    const walletPermission = await WalletPermission.findOneAndUpdate(
+      { code: params.code },
       { $set: body },
       { new: true, upsert: true },
     ).lean()
