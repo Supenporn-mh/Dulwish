@@ -1,5 +1,4 @@
 import { Elysia, t } from 'elysia'
-import mongoose from 'mongoose'
 import { authPlugin } from '../../middleware/auth'
 import { Order, MenuItem, MealPeriod, Wallet, Transaction, ParentStudent, Shop } from '../../models'
 
@@ -67,47 +66,43 @@ export const ordersController = new Elysia({ prefix: '/orders' })
 
     // Wallet deduction
     const studentId = body.student_user_id ?? String(currentUser._id)
-    const session = await mongoose.startSession()
-    let result: any
-    await session.withTransaction(async () => {
-      const wallet = await Wallet.findOne({ userId: studentId }).session(session)
-      if (!wallet) throw new Error('Wallet not found')
-      if (wallet.balance - total < -wallet.negativeLimit)
-        throw Object.assign(new Error('Insufficient balance'), { code: 'WALLET_001' })
+    const wallet = await Wallet.findOne({ userId: studentId })
+    if (!wallet) { set.status = 400; return { error: { code: 'WALLET_001', message: 'Wallet not found' } } }
+    if (wallet.balance - total < -wallet.negativeLimit) {
+      set.status = 400
+      return { error: { code: 'WALLET_001', message: 'Insufficient balance' } }
+    }
 
-      wallet.balance -= total
-      wallet.version += 1
-      await wallet.save({ session })
+    wallet.balance -= total
+    wallet.version += 1
+    await wallet.save()
 
-      const refNo = genRefNo()
-      const txn = await Transaction.create([{
-        refNo,
-        walletId: wallet._id,
-        type: 'purchase',
-        amount: -total,
-        balanceAfter: wallet.balance,
-        channel: 'mobile_web',
-        paymentMethod: 'card_wallet',
-        status: 'success',
-      }], { session })
-
-      const order = await Order.create([{
-        orderNo: genOrderNo(),
-        studentUserId: studentId,
-        parentUserId: currentUser.role === 'parent' ? currentUser._id : undefined,
-        shopId: body.shop_id,
-        mealPeriodId: period._id,
-        serveDate: body.serve_date,
-        totalAmount: total,
-        status: 'confirmed',
-        items: lineItems,
-        transactionId: txn[0]._id,
-      }], { session })
-
-      result = { order: order[0], transaction: txn[0] }
+    const refNo = genRefNo()
+    const txn = await Transaction.create({
+      refNo,
+      walletId: wallet._id,
+      type: 'purchase',
+      amount: -total,
+      balanceAfter: wallet.balance,
+      channel: 'mobile_web',
+      paymentMethod: 'card_wallet',
+      status: 'success',
     })
-    session.endSession()
-    return result
+
+    const order = await Order.create({
+      orderNo: genOrderNo(),
+      studentUserId: studentId,
+      parentUserId: currentUser.role === 'parent' ? currentUser._id : undefined,
+      shopId: body.shop_id,
+      mealPeriodId: period._id,
+      serveDate: body.serve_date,
+      totalAmount: total,
+      status: 'confirmed',
+      items: lineItems,
+      transactionId: txn._id,
+    })
+
+    return { order, transaction: txn }
   }, {
     body: t.Object({
       student_user_id: t.Optional(t.String()),
@@ -161,22 +156,18 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       return { error: { code: 'ORDER_004', message: `Cannot cancel order with status: ${order.status}` } }
     }
 
-    const session = await mongoose.startSession()
-    await session.withTransaction(async () => {
-      // Refund wallet
-      const wallet = await Wallet.findOne({ userId: order.studentUserId }).session(session)
-      if (wallet && order.transactionId) {
-        wallet.balance += order.totalAmount
-        wallet.version += 1
-        await wallet.save({ session })
-      }
+    // Refund wallet
+    const wallet = await Wallet.findOne({ userId: order.studentUserId })
+    if (wallet && order.transactionId) {
+      wallet.balance += order.totalAmount
+      wallet.version += 1
+      await wallet.save()
+    }
 
-      order.status = 'cancelled'
-      order.cancelledAt = new Date()
-      order.cancelReason = body.reason
-      await order.save({ session })
-    })
-    session.endSession()
+    order.status = 'cancelled'
+    order.cancelledAt = new Date()
+    order.cancelReason = body.reason
+    await order.save()
     return { success: true, order }
   }, {
     body: t.Object({ reason: t.String() }),

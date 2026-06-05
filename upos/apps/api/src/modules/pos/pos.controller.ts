@@ -75,64 +75,66 @@ export const posController = new Elysia({ prefix: '/pos' })
       return { error: { code: 'PAY_002', message: `Tender sum ฿${tenderSum} ≠ total ฿${total}` } }
     }
 
-    const session = await mongoose.startSession()
-    let result: any
-    await session.withTransaction(async () => {
-      const splits: any[] = []
+    const splits: any[] = []
 
-      for (const tender of tenders) {
-        if (tender.method === 'card_wallet') {
-          const card = await Card.findOne({ cardUid: tender.card_uid, status: 'active' }).session(session).lean()
-          if (!card) throw Object.assign(new Error('Card not found'), { code: 'CARD_001' })
-
-          const wallet = await Wallet.findOne({ userId: card.userId }).session(session)
-          if (!wallet) throw Object.assign(new Error('Wallet not found'), { code: 'WALLET_001' })
-          if (wallet.balance - tender.amount < -wallet.negativeLimit)
-            throw Object.assign(new Error('Insufficient balance'), { code: 'WALLET_001' })
-
-          wallet.balance -= tender.amount
-          wallet.version += 1
-          await wallet.save({ session })
-          splits.push({ tenderMethod: 'card_wallet', sourceWalletId: wallet._id, amount: tender.amount })
-        } else {
-          splits.push({ tenderMethod: tender.method, amount: tender.amount })
+    for (const tender of tenders) {
+      if (tender.method === 'card_wallet') {
+        const card = await Card.findOne({ cardUid: tender.card_uid, status: 'active' }).lean()
+        if (!card) {
+          set.status = 400
+          return { error: { code: 'CARD_001', message: 'Card not found' } }
         }
-      }
 
-      const refNo = genRefNo('TXN')
-      const walletTender = tenders.find((t: any) => t.method === 'card_wallet')
-      let walletId: any = null
-      if (walletTender) {
-        const card = await Card.findOne({ cardUid: walletTender.card_uid }).lean()
-        if (card) {
-          const w = await Wallet.findOne({ userId: card.userId }).lean()
-          walletId = w?._id
+        const wallet = await Wallet.findOne({ userId: card.userId })
+        if (!wallet) {
+          set.status = 400
+          return { error: { code: 'WALLET_001', message: 'Wallet not found' } }
         }
-      }
+        if (wallet.balance - tender.amount < -wallet.negativeLimit) {
+          set.status = 400
+          return { error: { code: 'WALLET_001', message: 'Insufficient balance' } }
+        }
 
-      const txn = await Transaction.create([{
-        refNo,
-        walletId: walletId ?? new mongoose.Types.ObjectId(),
-        type: 'purchase',
-        amount: -total,
-        balanceAfter: 0,
-        channel: 'pos',
-        paymentMethod: tenders[0].method,
-        cashierId: currentUser._id,
-        status: 'success',
-        splits,
-        metadata: { items: lineItems, shopId: shop_id },
-      }], { session })
-
-      result = {
-        transaction: txn[0],
-        receipt_no: genRefNo('RCP'),
-        total,
-        items: lineItems,
+        wallet.balance -= tender.amount
+        wallet.version += 1
+        await wallet.save()
+        splits.push({ tenderMethod: 'card_wallet', sourceWalletId: wallet._id, amount: tender.amount })
+      } else {
+        splits.push({ tenderMethod: tender.method, amount: tender.amount })
       }
+    }
+
+    const refNo = genRefNo('TXN')
+    const walletTender = tenders.find((t: any) => t.method === 'card_wallet')
+    let walletId: any = null
+    if (walletTender) {
+      const card = await Card.findOne({ cardUid: walletTender.card_uid }).lean()
+      if (card) {
+        const w = await Wallet.findOne({ userId: card.userId }).lean()
+        walletId = w?._id
+      }
+    }
+
+    const txn = await Transaction.create({
+      refNo,
+      walletId: walletId ?? new mongoose.Types.ObjectId(),
+      type: 'purchase',
+      amount: -total,
+      balanceAfter: 0,
+      channel: 'pos',
+      paymentMethod: tenders[0].method,
+      cashierId: currentUser._id,
+      status: 'success',
+      splits,
+      metadata: { items: lineItems, shopId: shop_id },
     })
-    session.endSession()
-    return result
+
+    return {
+      transaction: txn,
+      receipt_no: genRefNo('RCP'),
+      total,
+      items: lineItems,
+    }
   }, {
     body: t.Object({
       shop_id: t.String(),
@@ -204,54 +206,52 @@ export const posController = new Elysia({ prefix: '/pos' })
 
     const price = pricing.price
 
-    const session = await mongoose.startSession()
-    let result: any
-    await session.withTransaction(async () => {
-      const wallet = await Wallet.findOne({ userId: user._id }).session(session)
-      if (!wallet) throw new Error('Wallet not found')
+    const wallet = await Wallet.findOne({ userId: user._id })
+    if (!wallet) {
+      set.status = 400
+      return { error: { code: 'WALLET_001', message: 'Wallet not found' } }
+    }
 
-      if (wallet.balance - price < -wallet.negativeLimit) {
-        throw Object.assign(new Error('Insufficient balance'), { code: 'WALLET_001' })
-      }
+    if (wallet.balance - price < -wallet.negativeLimit) {
+      set.status = 400
+      return { error: { code: 'WALLET_001', message: 'Insufficient balance' } }
+    }
 
-      wallet.balance -= price
-      wallet.version += 1
-      await wallet.save({ session })
+    wallet.balance -= price
+    wallet.version += 1
+    await wallet.save()
 
-      const refNo = genRefNo('TXN')
-      const txn = await Transaction.create([{
-        refNo,
-        walletId: wallet._id,
-        type: 'buffet',
-        amount: -price,
-        balanceAfter: wallet.balance,
-        channel: 'pos',
-        paymentMethod: pay_method ?? 'card_wallet',
-        status: 'success',
-      }], { session })
-
-      const buffetSession = await BuffetSession.create([{
-        userId: user._id,
-        mealPeriodId: period._id,
-        entryDate: today,
-        priceCharged: price,
-        payMethod: pay_method ?? 'card_wallet',
-        transactionId: txn[0]._id,
-      }], { session })
-
-      const { passwordHash: _, ...safeUser } = user as any
-      result = {
-        allow_entry: true,
-        already_checked_in: false,
-        price,
-        balance_after: wallet.balance,
-        user: safeUser,
-        period: period.name,
-        session: buffetSession[0],
-      }
+    const refNo = genRefNo('TXN')
+    const txn = await Transaction.create({
+      refNo,
+      walletId: wallet._id,
+      type: 'buffet',
+      amount: -price,
+      balanceAfter: wallet.balance,
+      channel: 'pos',
+      paymentMethod: pay_method ?? 'card_wallet',
+      status: 'success',
     })
-    session.endSession()
-    return result
+
+    const buffetSessionDoc = await BuffetSession.create({
+      userId: user._id,
+      mealPeriodId: period._id,
+      entryDate: today,
+      priceCharged: price,
+      payMethod: pay_method ?? 'card_wallet',
+      transactionId: txn._id,
+    })
+
+    const { passwordHash: _, ...safeUser } = user as any
+    return {
+      allow_entry: true,
+      already_checked_in: false,
+      price,
+      balance_after: wallet.balance,
+      user: safeUser,
+      period: period.name,
+      session: buffetSessionDoc,
+    }
   }, {
     body: t.Object({
       card_uid:      t.String(),
@@ -315,50 +315,47 @@ export const posController = new Elysia({ prefix: '/pos' })
       return { error: { code: 'POS_003', message: 'Already voided' } }
     }
 
-    const session = await mongoose.startSession()
-    await session.withTransaction(async () => {
-      // Refund wallet if card_wallet was used
-      const walletSplit = txn.splits?.find((s: any) => s.tenderMethod === 'card_wallet')
-      if (walletSplit?.sourceWalletId) {
-        const wallet = await Wallet.findById(walletSplit.sourceWalletId).session(session)
-        if (wallet) {
-          wallet.balance += walletSplit.amount
-          wallet.version += 1
-          await wallet.save({ session })
-        }
+    // Refund wallet if card_wallet was used
+    const walletSplit = txn.splits?.find((s: any) => s.tenderMethod === 'card_wallet')
+    if (walletSplit?.sourceWalletId) {
+      const wallet = await Wallet.findById(walletSplit.sourceWalletId)
+      if (wallet) {
+        wallet.balance += walletSplit.amount
+        wallet.version += 1
+        await wallet.save()
       }
+    }
 
-      // Create void transaction
-      const refNo = genRefNo('VOID')
-      await Transaction.create([{
-        refNo,
-        walletId: txn.walletId,
-        type: 'void',
-        amount: -txn.amount,
-        balanceAfter: 0,
-        channel: 'pos',
-        paymentMethod: txn.paymentMethod,
-        cashierId: currentUser._id,
-        voidedByTxnId: txn._id,
-        status: 'success',
-        note: body.reason,
-      }], { session })
-
-      txn.status = 'voided'
-      await txn.save({ session })
-
-      await AuditLog.create([{
-        actorUserId: currentUser._id,
-        actorRole: currentUser.role,
-        action: 'void_txn',
-        entityType: 'Transaction',
-        entityId: String(txn._id),
-        reason: body.reason,
-        beforeData: { status: 'success' },
-        afterData:  { status: 'voided' },
-      }], { session })
+    // Create void transaction
+    const refNo = genRefNo('VOID')
+    await Transaction.create({
+      refNo,
+      walletId: txn.walletId,
+      type: 'void',
+      amount: -txn.amount,
+      balanceAfter: 0,
+      channel: 'pos',
+      paymentMethod: txn.paymentMethod,
+      cashierId: currentUser._id,
+      voidedByTxnId: txn._id,
+      status: 'success',
+      note: body.reason,
     })
-    session.endSession()
+
+    txn.status = 'voided'
+    await txn.save()
+
+    await AuditLog.create({
+      actorUserId: currentUser._id,
+      actorRole: currentUser.role,
+      action: 'void_txn',
+      entityType: 'Transaction',
+      entityId: String(txn._id),
+      reason: body.reason,
+      beforeData: { status: 'success' },
+      afterData:  { status: 'voided' },
+    })
+
     return { success: true, txnId: txn._id }
   }, {
     body: t.Object({ reason: t.String() }),

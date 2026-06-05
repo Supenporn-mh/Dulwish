@@ -1,5 +1,4 @@
 import { Elysia, t } from 'elysia'
-import mongoose from 'mongoose'
 import { authPlugin } from '../../middleware/auth'
 import { Wallet, Transaction, User, ParentStudent } from '../../models'
 
@@ -78,7 +77,11 @@ export const walletController = new Elysia({ prefix: '/wallets' })
     const refNo = genRefNo('TXN')
 
     if (paymentMethod === 'scb_qr' || paymentMethod === 'credit_card') {
-      // Mock payment — create pending transaction, auto-confirm after 3s
+      // Confirm immediately (standalone MongoDB — no replica set, sessions not supported)
+      wallet.balance += amount
+      wallet.version += 1
+      await wallet.save()
+
       const txn = await Transaction.create({
         refNo,
         walletId: wallet._id,
@@ -88,64 +91,31 @@ export const walletController = new Elysia({ prefix: '/wallets' })
         channel,
         paymentMethod,
         paymentRef: `MOCK-${Date.now()}`,
-        status: 'pending',
+        status: 'success',
       })
 
-      // Auto-confirm after 3s (mock gateway callback)
-      setTimeout(async () => {
-        const session = await mongoose.startSession()
-        await session.withTransaction(async () => {
-          const w = await Wallet.findById(wallet._id).session(session)
-          if (!w) return
-          w.balance += amount
-          w.version += 1
-          await w.save({ session })
-          await Transaction.findByIdAndUpdate(txn._id, {
-            status: 'success',
-            balanceAfter: w.balance,
-          }, { session })
-        })
-        session.endSession()
-        console.log(`[Wallet] Mock topup confirmed: ${refNo} +฿${amount}`)
-      }, 3000)
-
-      return {
-        transaction: {
-          _id: txn._id,
-          refNo,
-          status: 'pending',
-          qr_payload: `MOCK_QR_${refNo}`,
-          expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-        }
-      }
+      console.log(`[Wallet] Topup confirmed: ${refNo} +฿${amount}`)
+      return { transaction: txn, newBalance: wallet.balance }
     }
 
     // Immediate (cash topup at POS)
-    const session = await mongoose.startSession()
-    let result: any
-    await session.withTransaction(async () => {
-      const w = await Wallet.findById(wallet._id).session(session)
-      if (!w) throw new Error('Wallet not found')
-      w.balance += amount
-      w.version += 1
-      await w.save({ session })
+    wallet.balance += amount
+    wallet.version += 1
+    await wallet.save()
 
-      const txn = await Transaction.create([{
-        refNo,
-        walletId: w._id,
-        type: 'topup',
-        amount,
-        balanceAfter: w.balance,
-        channel,
-        paymentMethod: paymentMethod ?? 'cash',
-        cashierId: currentUser._id,
-        status: 'success',
-      }], { session })
-
-      result = { transaction: txn[0], newBalance: w.balance }
+    const txn = await Transaction.create({
+      refNo,
+      walletId: wallet._id,
+      type: 'topup',
+      amount,
+      balanceAfter: wallet.balance,
+      channel,
+      paymentMethod: paymentMethod ?? 'cash',
+      cashierId: currentUser._id,
+      status: 'success',
     })
-    session.endSession()
-    return result
+
+    return { transaction: txn, newBalance: wallet.balance }
   }, {
     body: t.Object({
       amount:        t.Number(),
