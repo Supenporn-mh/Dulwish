@@ -37,13 +37,22 @@ const transactions = ref<Transaction[]>([])
 const loading      = ref(true)
 const apiBookings  = ref<Booking[]>([])  // จาก API
 
-// computed: merge store bookings (real-time) + API bookings
+// computed: merge store bookings (real-time) + API bookings, dedup per session
 const bookings = computed(() => {
   const d = new Date()
   const todayLocal = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
   const storeItems = parentStore.todayBookings.filter(b => b.serveDate === todayLocal)
   const storeIds   = new Set(storeItems.map(b => b.id))
-  return [...storeItems, ...apiBookings.value.filter(b => !storeIds.has(b.id))]
+  // dedup API bookings by mealPeriodCode — keep first per session
+  const seenCodes  = new Set<string>()
+  const uniqueApi  = apiBookings.value.filter(b => {
+    if (storeIds.has(b.id)) return false
+    const code = (b as any).mealPeriodCode
+    if (code && seenCodes.has(code)) return false
+    if (code) seenCodes.add(code)
+    return true
+  })
+  return [...storeItems, ...uniqueApi]
 })
 
 // ── Carousel ────────────────────────────────────────────────────────────────
