@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { useLocaleStore } from '@/stores/locale'
+import { useParentStore } from '@/stores/parent'
 import api from '@/api/axios'
 import {
   PhArrowUp, PhShoppingBag, PhForkKnife, PhArrowCounterClockwise,
@@ -9,7 +10,8 @@ import {
   PhStorefront, PhCheckCircle, PhHourglass,
 } from '@phosphor-icons/vue'
 
-const locale = useLocaleStore()
+const locale      = useLocaleStore()
+const parentStore = useParentStore()
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TxType    = 'topup' | 'purchase' | 'buffet' | 'booking' | 'refund'
@@ -187,7 +189,6 @@ const expandedId   = ref<string | null>(null)
 // ── Data ──────────────────────────────────────────────────────────────────────
 const transactions = ref<Transaction[]>([])
 const loading      = ref(true)
-const studentId    = ref('demo-child')
 
 // ── Filtering pipeline ────────────────────────────────────────────────────────
 const monthFiltered = computed(() => {
@@ -371,17 +372,14 @@ const CODE_TO_MEAL: Record<string, 'breakfast' | 'lunch' | 'dinner'> = {
   BREAKFAST: 'breakfast', LUNCH: 'lunch', DINNER: 'dinner',
 }
 
-// ── Mount ─────────────────────────────────────────────────────────────────────
-onMounted(async () => {
-  try {
-    const cr = await api.get('/users/me/children')
-    const c  = (cr.data?.children ?? cr.data ?? [])[0]
-    if (c) studentId.value = c.id ?? c._id
-  } catch {}
+// ── Fetch history for a specific child ────────────────────────────────────────
+async function fetchHistory(childId: string) {
+  if (!childId) return
+  loading.value = true
 
   const [txRes, ordRes] = await Promise.allSettled([
-    api.get(`/wallets/${studentId.value}/transactions?page=1&limit=50`),
-    api.get('/orders'),
+    api.get(`/wallets/${childId}/transactions?page=1&limit=50`),
+    api.get('/orders', { params: { student: childId } }),
   ])
 
   const walletTxns: Transaction[] = txRes.status === 'fulfilled'
@@ -405,11 +403,23 @@ onMounted(async () => {
       }))
     : []
 
-  // Merge wallet txns + booking records, sorted newest first
   transactions.value = [...walletTxns, ...bookingTxns]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
   loading.value = false
+}
+
+// ── Mount ─────────────────────────────────────────────────────────────────────
+onMounted(() => {
+  const childId = parentStore.selectedChildId
+  if (childId) fetchHistory(childId)
+})
+
+watch(() => parentStore.selectedChildId, (newId) => {
+  if (newId) {
+    transactions.value = []
+    fetchHistory(newId)
+  }
 })
 </script>
 

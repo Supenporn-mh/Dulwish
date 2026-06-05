@@ -22,8 +22,7 @@ const showNotifs  = computed({
   set: (v) => { notifStore.showSheet = v },
 })
 
-// Seed demo notifications on first load
-onMounted(() => notifStore.seedDemo())
+onMounted(() => { /* notifications come from real wallet fetch */ })
 
 // ── Toast notification ────────────────────────────────────────────────────────
 const toast        = ref<Notification | null>(null)
