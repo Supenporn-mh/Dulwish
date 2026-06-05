@@ -106,7 +106,7 @@ async function simulatePayment() {
 
   try {
     // topup route resolves the wallet by student userId (not wallet _id)
-    const userId = activeChildId.value
+    const userId = activeChild.value?.id
     await api.post(`/wallets/${userId}/topup`, {
       amount: numericAmount.value,
       channel: 'mobile_web',
