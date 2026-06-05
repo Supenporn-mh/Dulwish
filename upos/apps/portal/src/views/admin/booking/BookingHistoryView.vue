@@ -19,6 +19,7 @@
         <select v-model="filterStatus" class="adm-filter-select">
           <option value="">สถานะทั้งหมด</option>
           <option value="จองแล้ว">จองแล้ว</option>
+          <option value="รอชำระ">รอชำระ</option>
           <option value="เสร็จสิ้น">เสร็จสิ้น</option>
           <option value="ยกเลิก">ยกเลิก</option>
           <option value="ไม่มา">ไม่มา</option>
@@ -149,10 +150,14 @@
             <label class="bh-label">สถานะ <span style="color:var(--color-danger)">*</span></label>
             <select v-model="editForm.status" class="bh-input bh-select">
               <option value="จองแล้ว">จองแล้ว</option>
+              <option value="รอชำระ">รอชำระ</option>
               <option value="เสร็จสิ้น">เสร็จสิ้น</option>
               <option value="ไม่มา">ไม่มา</option>
               <option value="ยกเลิก">ยกเลิก</option>
             </select>
+            <p v-if="editForm.status !== 'ยกเลิก'" style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">
+              ระบบรองรับเฉพาะการยกเลิกออร์เดอร์ผ่านหน้านี้ สถานะอื่นอัปเดตโดยอัตโนมัติจากระบบ
+            </p>
           </div>
 
           <!-- ส่วนยกเลิก — แสดงเฉพาะเมื่อเลือก "ยกเลิก" -->
@@ -208,28 +213,68 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { PhMagnifyingGlass, PhPencilSimple, PhTrash, PhX, PhWarning } from '@phosphor-icons/vue'
-import type { Booking } from '../../../api/types'
-import {
-  listBookings as apiFetchBookings,
-  updateBooking as apiUpdateBooking,
-  deleteBooking as apiDeleteBooking,
-} from '../../../api/booking'
+import api from '../../../api/axios'
 
-interface BookingPatchPayload {
-  status: Booking['status']
-  cancelReason?: string
-  adminCode?: string
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type ThaiStatus = 'จองแล้ว' | 'รอชำระ' | 'เสร็จสิ้น' | 'ยกเลิก' | 'ไม่มา'
+
+interface OrderRow {
+  id: string
+  code: string
+  name: string
+  type: string
+  slot: string
+  slotTime: string
+  bookingDate: string
+  status: ThaiStatus
+  totalAmount: number
+  bookedAt: string
+  cancelledAt?: string
 }
 
-const bookings    = ref<Booking[]>([])
-const loading     = ref(false)
-const error       = ref<string | null>(null)
+// ── Status mapping ────────────────────────────────────────────────────────────
+
+const STATUS_TO_THAI: Record<string, ThaiStatus> = {
+  confirmed:       'จองแล้ว',
+  pending_payment: 'รอชำระ',
+  redeemed:        'เสร็จสิ้น',
+  cancelled:       'ยกเลิก',
+  expired:         'ไม่มา',
+}
+
+function mapOrder(o: any): OrderRow {
+  const thaiStatus: ThaiStatus = STATUS_TO_THAI[o.status] ?? 'จองแล้ว'
+  const studentLabel = o.studentName
+    ? o.studentCode ? `${o.studentName} (${o.studentCode})` : o.studentName
+    : o.studentUserId ?? '-'
+  return {
+    id:          String(o._id ?? o.id),
+    code:        o.orderNo ?? String(o._id ?? o.id),
+    name:        studentLabel,
+    type:        o.mealPeriodName ?? '-',
+    slot:        o.mealPeriodCode ?? o.mealPeriodName ?? '-',
+    slotTime:    o.mealPeriodTime ?? '-',
+    bookingDate: o.serveDate ? o.serveDate.slice(0, 10) : '-',
+    status:      thaiStatus,
+    totalAmount: o.totalAmount ?? 0,
+    bookedAt:    o.createdAt ? o.createdAt.slice(0, 10) : '-',
+    cancelledAt: o.cancelledAt ? String(o.cancelledAt).slice(0, 10) : undefined,
+  }
+}
+
+// ── Data ──────────────────────────────────────────────────────────────────────
+
+const bookings = ref<OrderRow[]>([])
+const loading  = ref(false)
+const error    = ref<string | null>(null)
 
 async function fetchBookings() {
   loading.value = true
   error.value = null
   try {
-    bookings.value = await apiFetchBookings()
+    const { data } = await api.get('/orders')
+    bookings.value = (data.orders ?? []).map(mapOrder)
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ'
   } finally {
@@ -238,6 +283,8 @@ async function fetchBookings() {
 }
 
 onMounted(fetchBookings)
+
+// ── Filters / pagination ──────────────────────────────────────────────────────
 
 const search       = ref('')
 const filterStatus = ref('')
@@ -258,19 +305,20 @@ const filtered = computed(() => {
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize.value)))
 const paginated  = computed(() => filtered.value.slice((currentPage.value-1)*pageSize.value, currentPage.value*pageSize.value))
 
-// Edit modal
-const showModal   = ref(false)
-const editTarget  = ref<Booking | null>(null)
-const editForm    = ref({ status: 'จองแล้ว' as Booking['status'], cancelReason: '', adminCode: '' })
-const saving      = ref(false)
-const saveError   = ref<string | null>(null)
+// ── Edit / cancel modal ───────────────────────────────────────────────────────
+
+const showModal  = ref(false)
+const editTarget = ref<OrderRow | null>(null)
+const editForm   = ref({ status: 'จองแล้ว' as ThaiStatus, cancelReason: '', adminCode: '' })
+const saving     = ref(false)
+const saveError  = ref<string | null>(null)
 
 const canSave = computed(() => {
   if (editForm.value.status !== 'ยกเลิก') return true
   return !!editForm.value.cancelReason.trim() && !!editForm.value.adminCode.trim()
 })
 
-function openEdit(b: Booking) {
+function openEdit(b: OrderRow) {
   editTarget.value = b
   editForm.value = { status: b.status, cancelReason: '', adminCode: '' }
   saveError.value = null
@@ -279,17 +327,26 @@ function openEdit(b: Booking) {
 
 async function saveEdit() {
   if (!editTarget.value || !canSave.value) return
+
+  if (editForm.value.status !== 'ยกเลิก') {
+    saveError.value = 'ระบบรองรับเฉพาะการยกเลิกเท่านั้น กรุณาเลือกสถานะ "ยกเลิก"'
+    return
+  }
+
   saving.value = true
   saveError.value = null
   try {
-    const payload: BookingPatchPayload = { status: editForm.value.status }
-    if (editForm.value.status === 'ยกเลิก') {
-      payload.cancelReason = editForm.value.cancelReason
-      payload.adminCode    = editForm.value.adminCode
+    await api.patch(`/orders/${editTarget.value.id}/cancel`, {
+      reason: editForm.value.cancelReason,
+    })
+    const idx = bookings.value.findIndex(x => x.id === editTarget.value!.id)
+    if (idx >= 0) {
+      bookings.value[idx] = {
+        ...bookings.value[idx],
+        status: 'ยกเลิก',
+        cancelledAt: new Date().toISOString().slice(0, 10),
+      }
     }
-    const updated = await apiUpdateBooking(editTarget.value.code, payload as Partial<Booking>)
-    const idx = bookings.value.findIndex(x => x.code === updated.code)
-    if (idx >= 0) bookings.value[idx] = updated
     showModal.value = false
   } catch (e: unknown) {
     saveError.value = e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ'
@@ -298,12 +355,20 @@ async function saveEdit() {
   }
 }
 
-async function deleteBooking(b: Booking) {
+async function deleteBooking(b: OrderRow) {
+  if (!confirm(`ยืนยันการยกเลิกออร์เดอร์ ${b.code}?`)) return
   try {
-    await apiDeleteBooking(b.code)
-    bookings.value = bookings.value.filter(x => x.code !== b.code)
+    await api.patch(`/orders/${b.id}/cancel`, { reason: 'ยกเลิกโดย Admin' })
+    const idx = bookings.value.findIndex(x => x.id === b.id)
+    if (idx >= 0) {
+      bookings.value[idx] = {
+        ...bookings.value[idx],
+        status: 'ยกเลิก',
+        cancelledAt: new Date().toISOString().slice(0, 10),
+      }
+    }
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : 'ลบไม่สำเร็จ'
+    error.value = e instanceof Error ? e.message : 'ยกเลิกไม่สำเร็จ'
   }
 }
 </script>
@@ -365,6 +430,7 @@ async function deleteBooking(b: Booking) {
   padding:4px 12px; border-radius:100px; white-space:nowrap;
 }
 .bh-status-จองแล้ว  { background:#FEF3C7; color:#92400E; }
+.bh-status-รอชำระ   { background:#EDE9FE; color:#5B21B6; }
 .bh-status-เสร็จสิ้น { background:#D1FAE5; color:#065F46; }
 .bh-status-ยกเลิก   { background:#F3F4F6; color:#6B7280; }
 .bh-status-ไม่มา    { background:#FEE2E2; color:#991B1B; }

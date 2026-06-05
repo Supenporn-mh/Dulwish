@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia'
 import { authPlugin } from '../../middleware/auth'
-import { Order, MenuItem, MealPeriod, Wallet, Transaction, ParentStudent, Shop } from '../../models'
+import { Order, MenuItem, MealPeriod, Wallet, Transaction, ParentStudent, Shop, User } from '../../models'
 
 function genOrderNo() {
   const d = new Date()
@@ -133,7 +133,26 @@ export const ordersController = new Elysia({ prefix: '/orders' })
     if (query.status)  filter.status = query.status
 
     const orders = await Order.find(filter).sort({ createdAt: -1 }).limit(50).lean()
-    return { orders }
+    // Enrich with student + meal period names so admin/parent UIs can display
+    const studentIds = [...new Set(orders.map(o => String(o.studentUserId)))]
+    const periodIds  = [...new Set(orders.map(o => String(o.mealPeriodId)))]
+    const [students, periods] = await Promise.all([
+      User.find({ _id: { $in: studentIds } }).select('uid firstName lastName displayName').lean(),
+      MealPeriod.find({ _id: { $in: periodIds } }).select('code name startTime endTime').lean(),
+    ])
+    const enriched = orders.map(o => {
+      const s = students.find(x => String(x._id) === String(o.studentUserId))
+      const p = periods.find(x => String(x._id) === String(o.mealPeriodId))
+      return {
+        ...o,
+        studentName: s ? (s.displayName || `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim()) : '',
+        studentCode: s?.uid ?? '',
+        mealPeriodName: p?.name ?? '',
+        mealPeriodCode: p?.code ?? '',
+        mealPeriodTime: p ? `${p.startTime}-${p.endTime}` : '',
+      }
+    })
+    return { orders: enriched }
   }, {
     query: t.Object({
       student: t.Optional(t.String()),

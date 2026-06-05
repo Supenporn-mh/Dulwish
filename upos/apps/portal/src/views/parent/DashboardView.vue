@@ -134,7 +134,7 @@ async function fetchChildData(childId: string) {
       api.get(`/wallets/${childId}`),
       api.get(`/wallets/${childId}/transactions?limit=5`),
     ])
-    balance.value = walletRes.data?.balance ?? 850
+    balance.value = walletRes.data?.wallet?.balance ?? walletRes.data?.balance ?? 0
     parentStore.updateBalance(childId, balance.value)
 
     // Push low-balance notification
@@ -157,7 +157,7 @@ async function fetchChildData(childId: string) {
       description: t.description ?? t.note ?? t.type,
     }))
   } catch {
-    balance.value = selectedChild.value?.balance ?? 850
+    balance.value = selectedChild.value?.balance ?? 0
     transactions.value = demoTransactions
   } finally {
     loading.value = false
@@ -213,17 +213,14 @@ onMounted(async () => {
       studentCode: c.studentCode ?? c.uid ?? '',
       grade:       c.grade ?? c.gradeLevel,
       className:   c.className,
-      walletId:    c.walletId,
-      balance:     c.balance ?? 0,
+      walletId:    c.wallet?._id ?? c.walletId,
+      balance:     c.wallet?.balance ?? c.balance ?? 0,
     }))
     if (list.length > 0) parentStore.setChildren(list)
     else throw new Error('empty')
   } catch {
     if (children.value.length === 0) {
-      parentStore.setChildren([
-        { id: 'std001', name: 'สมหญิง ใจดี', studentCode: 'STD-K1-0001', grade: 'K1', className: 'K1-A', balance: 850 },
-        { id: 'std002', name: 'สมชาย ใจดี',  studentCode: 'STD-P3-0015', grade: 'P3', className: 'P3-B', balance: 320 },
-      ])
+      parentStore.setChildren([])
     }
   }
 

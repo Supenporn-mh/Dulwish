@@ -131,7 +131,7 @@ function retryPayment()  { errorType.value = null; submitting.value = false }
 
 // ── On mount: read balance from store (already loaded by dashboard) ───────
 onMounted(() => {
-  childBalance.value = activeChild.value?.balance ?? 850
+  childBalance.value = activeChild.value?.balance ?? 0
 })
 
 onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useLocaleStore }       from '@/stores/locale'
 import { useParentStore }       from '@/stores/parent'
+import api                      from '@/api/axios'
 import {
   PhInfo, PhClock, PhUsers, PhForkKnife, PhCalendarBlank,
   PhCheckCircle, PhX,
@@ -104,25 +105,77 @@ function openDatePicker() {
   dateInputRef.value?.click()
 }
 
-// ── Menu sheet ───────────────────────────────────────────────────────────────
-const menuSession  = ref<MealSession | null>(null)
+// ── Backend data ─────────────────────────────────────────────────────────────
+interface MealPeriod { _id: string; code: string; name: string; startTime: string; endTime: string }
+interface Shop       { _id: string; code: string; name: string; type: string }
+interface MenuItem   { _id: string; name: string; price: number; isPreorderable: boolean; shopId: string }
 
-const DEMO_MENU = [
-  { id: 'm1', name: 'Ham Sandwich',    price: 85 },
-  { id: 'm2', name: 'Chicken Wrap',    price: 95 },
-  { id: 'm3', name: 'Veggie Salad',    price: 70 },
-  { id: 'm4', name: 'Orange Juice',    price: 45 },
-  { id: 'm5', name: 'Blueberry Muffin', price: 45 },
-]
+const mealPeriods  = ref<MealPeriod[]>([])
+const cafeShopId   = ref<string>('')
+const menuItems    = ref<MenuItem[]>([])  // only isPreorderable:true items
+
+// period _id keyed by session key (breakfast/lunch/dinner)
+const periodIdByKey = ref<Record<string, string>>({})
+
+// map backend mealPeriodCode → session key
+const CODE_TO_KEY: Record<string, string> = {
+  BREAKFAST: 'breakfast',
+  LUNCH:     'lunch',
+  DINNER:    'dinner',
+}
+
+const loadError   = ref<string>('')
+const loadingInit = ref(false)
+
+async function loadInitialData() {
+  loadingInit.value = true
+  loadError.value   = ''
+  try {
+    const [periodsRes, shopsRes, menuRes] = await Promise.all([
+      api.get('/menu/meal-periods'),
+      api.get('/menu/shops'),
+      api.get('/menu'),
+    ])
+
+    mealPeriods.value = periodsRes.data.mealPeriods ?? []
+
+    const shops: Shop[] = shopsRes.data.shops ?? []
+    const cafe = shops.find(s => s.code === 'CAFE')
+    cafeShopId.value = cafe?._id ?? ''
+
+    const allItems: MenuItem[] = menuRes.data.items ?? []
+    menuItems.value = allItems.filter(i => i.isPreorderable)
+
+    // map session key → period _id
+    const map: Record<string, string> = {}
+    for (const p of mealPeriods.value) {
+      const key = CODE_TO_KEY[p.code]
+      if (key) map[key] = p._id
+    }
+    periodIdByKey.value = map
+  } catch (e: any) {
+    loadError.value = e?.response?.data?.message ?? e?.message ?? 'โหลดข้อมูลไม่สำเร็จ'
+  } finally {
+    loadingInit.value = false
+  }
+}
+
+// ── Menu sheet ───────────────────────────────────────────────────────────────
+const menuSession = ref<MealSession | null>(null)
 
 // ── Confirm booking ───────────────────────────────────────────────────────────
-const confirmSession = ref<MealSession | null>(null)
-const bookingSuccess = ref(false)
+const confirmSession    = ref<MealSession | null>(null)
+const bookingSuccess    = ref(false)
 const lastBookedSession = ref<MealSession | null>(null)
-const studentName    = computed(() => parentStore.selectedChild?.name ?? '')
+const bookingLoading    = ref(false)
+const bookingError      = ref<string>('')
+const studentName       = computed(() => parentStore.selectedChild?.name ?? '')
 
 // Track booked sessions: key = "YYYY-MM-DD-sessionKey"
 const bookedSessions = ref<Set<string>>(new Set())
+
+// map session-key (e.g. "2025-06-05-breakfast") → backend order _id for cancel
+const orderIdMap = ref<Map<string, string>>(new Map())
 
 function bookingKey(s: MealSession): string {
   return `${selectedISO.value}-${s.key}`
@@ -136,56 +189,173 @@ function isBooked(s: MealSession): boolean {
   )
 }
 
+// ── Load existing orders to restore booked state ──────────────────────────────
+async function loadExistingOrders() {
+  try {
+    const res = await api.get('/orders', {
+      params: { from: todayISO, to: maxISO },
+    })
+    const orders: any[] = res.data.orders ?? []
+    const newSet = new Set(bookedSessions.value)
+    const newMap = new Map(orderIdMap.value)
+
+    for (const order of orders) {
+      if (order.status === 'cancelled') continue
+      const sessionKey = CODE_TO_KEY[order.mealPeriodCode ?? '']
+      if (!sessionKey || !order.serveDate) continue
+      const key = `${order.serveDate}-${sessionKey}`
+      newSet.add(key)
+      newMap.set(key, order._id)
+
+      // populate store for dashboard
+      parentStore.addTodayBooking({
+        id:          order._id,
+        orderNo:     order.orderNo ?? '',
+        status:      order.status ?? 'confirmed',
+        sessionKey,
+        sessionTh:   SESSION_DEFS.find(d => d.key === sessionKey)?.th ?? '',
+        sessionEn:   SESSION_DEFS.find(d => d.key === sessionKey)?.en ?? '',
+        serveDate:   order.serveDate,
+        totalAmount: order.totalAmount ?? 0,
+        items:       (order.items ?? []).map((i: any) => ({
+          name:      i.name ?? i.menuItemName ?? '',
+          qty:       i.qty ?? i.quantity ?? 1,
+          lineTotal: i.lineTotal ?? i.price ?? 0,
+        })),
+      })
+    }
+
+    bookedSessions.value = newSet
+    orderIdMap.value     = newMap
+  } catch {
+    // non-fatal — booked state just won't be pre-filled
+  }
+}
+
+onMounted(async () => {
+  await loadInitialData()
+  await loadExistingOrders()
+})
+
 // ── Cancel booking ────────────────────────────────────────────────────────────
-const cancelSession      = ref<MealSession | null>(null)
-const cancelledKey       = ref<string | null>(null)  // key ของ session ที่เพิ่งยกเลิก
-const cancelSuccess      = ref(false)
+const cancelSession  = ref<MealSession | null>(null)
+const cancelledKey   = ref<string | null>(null)
+const cancelSuccess  = ref(false)
+const cancelLoading  = ref(false)
+const cancelError    = ref<string>('')
 
 function canCancel(s: MealSession): boolean {
   return isBooked(s) && s.status === 'open'  // only before cutoff
 }
 
-function openCancel(s: MealSession) { cancelSession.value = s }
+function openCancel(s: MealSession) {
+  cancelError.value  = ''
+  cancelSession.value = s
+}
 
-function confirmCancel() {
+async function confirmCancel() {
   if (!cancelSession.value) return
-  const s = cancelSession.value
-  // Remove from store (persistent)
-  parentStore.removeTodayBooking(s.key, selectedISO.value)
-  // Remove from local set
-  bookedSessions.value.delete(bookingKey(s))
-  cancelledKey.value  = s.key
-  cancelSession.value = null
-  cancelSuccess.value = true
-  setTimeout(() => { cancelSuccess.value = false; cancelledKey.value = null }, 3000)
+  const s   = cancelSession.value
+  const key = bookingKey(s)
+  const orderId = orderIdMap.value.get(key)
+
+  cancelLoading.value = true
+  cancelError.value   = ''
+  try {
+    if (orderId) {
+      await api.patch(`/orders/${orderId}/cancel`, { reason: 'Parent cancelled via portal' })
+    }
+    // Remove from store (persistent)
+    parentStore.removeTodayBooking(s.key, selectedISO.value)
+    // Remove from local set and map
+    const newSet = new Set(bookedSessions.value)
+    newSet.delete(key)
+    bookedSessions.value = newSet
+    const newMap = new Map(orderIdMap.value)
+    newMap.delete(key)
+    orderIdMap.value    = newMap
+
+    cancelledKey.value  = s.key
+    cancelSession.value = null
+    cancelSuccess.value = true
+    setTimeout(() => { cancelSuccess.value = false; cancelledKey.value = null }, 3000)
+  } catch (e: any) {
+    cancelError.value = e?.response?.data?.message ?? e?.message ?? 'ยกเลิกไม่สำเร็จ'
+  } finally {
+    cancelLoading.value = false
+  }
 }
 
 function openMenu(s: MealSession)    { menuSession.value = s }
 function openConfirm(s: MealSession) {
   if (isBooked(s)) return  // already booked — don't reopen
+  bookingError.value   = ''
   confirmSession.value = s
 }
 
-function submitBooking() {
+async function submitBooking() {
   if (!confirmSession.value) return
-  const s = confirmSession.value
-  bookedSessions.value.add(bookingKey(s))
-  lastBookedSession.value = s
-  bookingSuccess.value    = true
-  confirmSession.value    = null
+  const s           = confirmSession.value
+  const child       = parentStore.selectedChild
+  const periodId    = periodIdByKey.value[s.key]
+  const shopId      = cafeShopId.value
+  const firstItem   = menuItems.value[0]
 
-  // Share booking to parentStore → DashboardView แสดง "การจองวันนี้" ทันที
-  parentStore.addTodayBooking({
-    id:          `local-${s.key}-${selectedISO.value}`,
-    orderNo:     `BKG-${Date.now()}`,
-    status:      'confirmed',
-    sessionKey:  s.key,
-    sessionTh:   s.th,
-    sessionEn:   s.en,
-    serveDate:   selectedISO.value,
-    totalAmount: 0,
-    items:       DEMO_MENU.slice(0, 2).map(m => ({ name: m.name, qty: 1, lineTotal: m.price })),
-  })
+  if (!child || !periodId || !shopId || !firstItem) {
+    bookingError.value = 'ข้อมูลไม่ครบ — กรุณาลองใหม่'
+    return
+  }
+
+  bookingLoading.value = true
+  bookingError.value   = ''
+  try {
+    const res = await api.post('/orders', {
+      student_user_id: child.id,
+      shop_id:         shopId,
+      meal_period_id:  periodId,
+      serve_date:      selectedISO.value,
+      items: [{ menu_item_id: firstItem._id, qty: 1 }],
+    })
+    const order = res.data.order
+
+    // Mark as booked
+    const key = bookingKey(s)
+    const newSet = new Set(bookedSessions.value)
+    newSet.add(key)
+    bookedSessions.value = newSet
+
+    if (order?._id) {
+      const newMap = new Map(orderIdMap.value)
+      newMap.set(key, order._id)
+      orderIdMap.value = newMap
+    }
+
+    lastBookedSession.value = s
+    bookingSuccess.value    = true
+    confirmSession.value    = null
+
+    // Share to parentStore → DashboardView แสดง "การจองวันนี้" ทันที
+    parentStore.addTodayBooking({
+      id:          order?._id ?? `order-${Date.now()}`,
+      orderNo:     order?.orderNo ?? '',
+      status:      order?.status ?? 'confirmed',
+      sessionKey:  s.key,
+      sessionTh:   s.th,
+      sessionEn:   s.en,
+      serveDate:   selectedISO.value,
+      totalAmount: order?.totalAmount ?? 0,
+      items:       (order?.items ?? [{ name: firstItem.name, qty: 1, lineTotal: firstItem.price }])
+        .map((i: any) => ({
+          name:      i.name ?? i.menuItemName ?? '',
+          qty:       i.qty ?? i.quantity ?? 1,
+          lineTotal: i.lineTotal ?? i.price ?? 0,
+        })),
+    })
+  } catch (e: any) {
+    bookingError.value = e?.response?.data?.message ?? e?.message ?? 'จองไม่สำเร็จ กรุณาลองใหม่'
+  } finally {
+    bookingLoading.value = false
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -202,6 +372,12 @@ function statusLabel(s: MealSession) {
 
 <template>
   <div class="page-content">
+
+    <!-- Load error banner -->
+    <div v-if="loadError" class="info-banner mx-4 mt-4" style="background: var(--color-danger-bg)">
+      <PhInfo :size="18" weight="fill" class="flex-shrink-0 mt-0.5" style="color: var(--color-danger)" />
+      <p class="text-[13px] leading-[1.5]" style="color: var(--color-danger)">{{ loadError }}</p>
+    </div>
 
     <!-- Info banner -->
     <div class="info-banner mx-4 mt-4">
@@ -361,9 +537,12 @@ function statusLabel(s: MealSession) {
           {{ menuSession.en }} — {{ locale.t('เมนู', 'Menu') }}
         </p>
         <div class="px-5 pb-8 flex flex-col gap-0 overflow-hidden rounded-[12px]" style="background: var(--color-bg-surface)">
+          <p v-if="menuItems.length === 0" class="text-[14px] py-3" style="color: var(--color-text-secondary)">
+            {{ locale.t('ไม่มีเมนู', 'No menu items') }}
+          </p>
           <div
-            v-for="(item, i) in DEMO_MENU"
-            :key="item.id"
+            v-for="(item, i) in menuItems"
+            :key="item._id"
             class="flex items-center justify-between py-3"
             :style="i > 0 ? 'border-top: 0.5px solid var(--color-border-tertiary)' : ''"
           >
@@ -436,13 +615,18 @@ function statusLabel(s: MealSession) {
             </p>
           </div>
 
+          <!-- Cancel error -->
+          <p v-if="cancelError" class="text-[13px] text-center" style="color: var(--color-danger)">
+            {{ cancelError }}
+          </p>
+
           <!-- Buttons -->
           <div class="flex gap-3">
-            <button class="sheet-action-ghost flex-1" @click="cancelSession = null">
+            <button class="sheet-action-ghost flex-1" :disabled="cancelLoading" @click="cancelSession = null">
               {{ locale.t('ไม่ยกเลิก', 'Keep') }}
             </button>
-            <button class="sheet-action-danger flex-1" @click="confirmCancel">
-              {{ locale.t('ยืนยันยกเลิก', 'Confirm Cancel') }}
+            <button class="sheet-action-danger flex-1" :disabled="cancelLoading" @click="confirmCancel">
+              {{ cancelLoading ? locale.t('กำลังยกเลิก…', 'Cancelling…') : locale.t('ยืนยันยกเลิก', 'Confirm Cancel') }}
             </button>
           </div>
         </div>
@@ -494,12 +678,17 @@ function statusLabel(s: MealSession) {
             </div>
           </div>
 
+          <!-- Booking error -->
+          <p v-if="bookingError" class="text-[13px] text-center" style="color: var(--color-danger)">
+            {{ bookingError }}
+          </p>
+
           <div class="flex gap-3">
-            <button class="btn btn-ghost flex-1" @click="confirmSession = null">
+            <button class="btn btn-ghost flex-1" :disabled="bookingLoading" @click="confirmSession = null">
               {{ locale.t('ยกเลิก', 'Cancel') }}
             </button>
-            <button class="btn btn-primary flex-1" @click="submitBooking">
-              {{ locale.t('ยืนยัน', 'Confirm') }}
+            <button class="btn btn-primary flex-1" :disabled="bookingLoading" @click="submitBooking">
+              {{ bookingLoading ? locale.t('กำลังจอง…', 'Booking…') : locale.t('ยืนยัน', 'Confirm') }}
             </button>
           </div>
         </div>
