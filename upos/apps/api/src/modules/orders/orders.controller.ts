@@ -163,13 +163,22 @@ export const ordersController = new Elysia({ prefix: '/orders' })
   })
 
   .get('/stats', async ({ query }) => {
-    const date = query.date
-    if (!date) return { stats: [] }
-    const result = await Order.aggregate([
-      { $match: { serveDate: date, status: { $ne: 'cancelled' } } },
-      { $group: { _id: '$mealPeriodId', count: { $sum: 1 } } },
-    ])
-    return { stats: result.map((r: any) => ({ mealPeriodId: String(r._id), count: r.count })) }
+    try {
+      const date = query.date
+      if (!date) return { stats: [] }
+      const orders = await Order.find({ serveDate: date, status: { $ne: 'cancelled' } })
+        .select('mealPeriodId')
+        .lean()
+      const countMap: Record<string, number> = {}
+      for (const o of orders) {
+        const key = String(o.mealPeriodId)
+        countMap[key] = (countMap[key] ?? 0) + 1
+      }
+      const stats = Object.entries(countMap).map(([mealPeriodId, count]) => ({ mealPeriodId, count }))
+      return { stats }
+    } catch (err: any) {
+      return { stats: [], error: err?.message }
+    }
   }, {
     query: t.Object({ date: t.Optional(t.String()) }),
   })
