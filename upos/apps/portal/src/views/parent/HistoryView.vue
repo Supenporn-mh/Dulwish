@@ -367,6 +367,10 @@ async function submitReview() {
   }
 }
 
+const CODE_TO_MEAL: Record<string, 'breakfast' | 'lunch' | 'dinner'> = {
+  BREAKFAST: 'breakfast', LUNCH: 'lunch', DINNER: 'dinner',
+}
+
 // ── Mount ─────────────────────────────────────────────────────────────────────
 onMounted(async () => {
   try {
@@ -374,17 +378,38 @@ onMounted(async () => {
     const c  = (cr.data?.children ?? cr.data ?? [])[0]
     if (c) studentId.value = c.id ?? c._id
   } catch {}
-  try {
-    const res     = await api.get(`/wallets/${studentId.value}/transactions?page=1&limit=50`)
-    const apiList = (res.data?.transactions ?? res.data ?? []).map((t: any) => ({
-      ...t,
-      id:          t.id ?? t._id,
-      description: t.description ?? t.note ?? '',
-    }))
-    transactions.value = apiList
-  } catch {
-    transactions.value = []
-  } finally { loading.value = false }
+
+  const [txRes, ordRes] = await Promise.allSettled([
+    api.get(`/wallets/${studentId.value}/transactions?page=1&limit=50`),
+    api.get('/orders'),
+  ])
+
+  const walletTxns: Transaction[] = txRes.status === 'fulfilled'
+    ? (txRes.value.data?.transactions ?? txRes.value.data ?? []).map((t: any) => ({
+        ...t,
+        id:          t.id ?? t._id,
+        description: t.description ?? t.note ?? '',
+      }))
+    : []
+
+  const bookingTxns: Transaction[] = ordRes.status === 'fulfilled'
+    ? (ordRes.value.data?.orders ?? []).map((o: any) => ({
+        id:            o.id ?? o._id,
+        type:          'booking' as TxType,
+        description:   `จองอาหาร ${o.mealPeriodName ?? ''}`.trim(),
+        amount:        0,
+        createdAt:     o.createdAt,
+        refNo:         o.orderNo,
+        bookingMeal:   CODE_TO_MEAL[o.mealPeriodCode ?? ''] ?? 'lunch',
+        bookingStatus: o.status === 'redeemed' ? 'consumed' : (o.status === 'cancelled' ? 'cancelled' : 'confirmed'),
+      }))
+    : []
+
+  // Merge wallet txns + booking records, sorted newest first
+  transactions.value = [...walletTxns, ...bookingTxns]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+  loading.value = false
 })
 </script>
 
