@@ -44,7 +44,22 @@ export const usersController = new Elysia({ prefix: '/users' })
       ]
     }
     const users = await User.find(filter).select('-passwordHash').lean()
-    return { users, total: users.length }
+    const ids = users.map(u => u._id)
+    const [wallets, cards] = await Promise.all([
+      Wallet.find({ userId: { $in: ids } }).lean(),
+      Card.find({ userId: { $in: ids } }).lean(),
+    ])
+    const enriched = users.map(u => {
+      const w = wallets.find(x => String(x.userId) === String(u._id))
+      const c = cards.find(x => String(x.userId) === String(u._id))
+      return {
+        ...u,
+        balance:    w?.balance ?? 0,
+        cardUid:    c?.cardUid ?? null,
+        cardStatus: c?.status  ?? null,
+      }
+    })
+    return { users: enriched, total: enriched.length }
   }, {
     query: t.Object({
       role:   t.Optional(t.String()),
