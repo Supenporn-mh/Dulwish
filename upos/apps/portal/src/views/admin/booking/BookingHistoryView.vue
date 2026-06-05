@@ -110,11 +110,95 @@
     </div>
 
   </div>
+
+  <!-- Edit Status Modal -->
+  <Teleport to="body">
+    <Transition name="modal-bg">
+      <div v-if="showModal" class="bh-backdrop" @click="showModal=false" />
+    </Transition>
+    <Transition name="modal-up">
+      <div v-if="showModal && editTarget" class="bh-modal">
+
+        <!-- Header -->
+        <div class="bh-modal-header">
+          <div>
+            <h3 class="bh-modal-title">แก้ไขสถานะการจอง</h3>
+            <p style="font-size:12px;color:var(--color-text-tertiary);margin-top:2px">{{ editTarget.code }}</p>
+          </div>
+          <button class="bh-close" @click="showModal=false"><PhX :size="18" weight="bold" /></button>
+        </div>
+        <div style="height:1px;background:var(--color-border-tertiary)" />
+
+        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:16px">
+          <!-- ข้อมูลการจอง -->
+          <div class="bh-info-box">
+            <div style="font-weight:500;color:var(--color-primary)">{{ editTarget.name }}</div>
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">
+              {{ editTarget.slot }} · {{ editTarget.slotTime }} · {{ editTarget.bookingDate }}
+            </div>
+          </div>
+
+          <!-- เลือกสถานะ -->
+          <div class="bh-field">
+            <label class="bh-label">สถานะ <span style="color:var(--color-danger)">*</span></label>
+            <select v-model="editForm.status" class="bh-input bh-select">
+              <option value="จองแล้ว">จองแล้ว</option>
+              <option value="เสร็จสิ้น">เสร็จสิ้น</option>
+              <option value="ไม่มา">ไม่มา</option>
+              <option value="ยกเลิก">ยกเลิก</option>
+            </select>
+          </div>
+
+          <!-- ส่วนยกเลิก — แสดงเฉพาะเมื่อเลือก "ยกเลิก" -->
+          <Transition name="cancel-section">
+            <div v-if="editForm.status === 'ยกเลิก'" class="bh-cancel-section">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px">
+                <PhWarning :size="16" weight="fill" style="color:var(--color-warning);flex-shrink:0" />
+                <span style="font-size:13px;color:var(--color-warning);font-weight:500">กรุณากรอกข้อมูลเพื่อยืนยันการยกเลิก</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:14px">
+                <div class="bh-field">
+                  <label class="bh-label">เหตุผลการยกเลิก <span style="color:var(--color-danger)">*</span></label>
+                  <textarea v-model="editForm.cancelReason" class="bh-input bh-textarea"
+                    placeholder="ระบุเหตุผลการยกเลิกการจอง..." />
+                </div>
+                <div class="bh-field">
+                  <label class="bh-label">รหัสพนักงาน Admin <span style="color:var(--color-danger)">*</span></label>
+                  <input v-model="editForm.adminCode" class="bh-input"
+                    placeholder="กรอกรหัสพนักงาน Admin เพื่อยืนยัน"
+                    style="font-family:monospace"
+                    autocomplete="off" />
+                  <p style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">
+                    รหัสพนักงานจะถูกบันทึกเป็นหลักฐานการยกเลิก
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Transition>
+        </div>
+
+        <!-- Footer -->
+        <div style="height:1px;background:var(--color-border-tertiary)" />
+        <div style="display:flex;gap:10px;padding:16px 24px;justify-content:flex-end">
+          <button class="adm-hdr-btn adm-hdr-btn-ghost" @click="showModal=false">ยกเลิก</button>
+          <button
+            :class="['adm-hdr-btn', editForm.status==='ยกเลิก' ? 'adm-hdr-btn-danger-btn' : 'adm-hdr-btn-primary']"
+            :disabled="!canSave"
+            @click="saveEdit"
+          >
+            {{ editForm.status === 'ยกเลิก' ? 'ยืนยันการยกเลิก' : 'บันทึก' }}
+          </button>
+        </div>
+
+      </div>
+    </Transition>
+  </Teleport>
+
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { PhMagnifyingGlass, PhPencilSimple, PhTrash } from '@phosphor-icons/vue'
+import { PhMagnifyingGlass, PhPencilSimple, PhTrash, PhX, PhWarning } from '@phosphor-icons/vue'
 
 interface Booking {
   id: number; code: string; name: string; type: string
@@ -150,11 +234,87 @@ const filtered = computed(() => {
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize.value)))
 const paginated  = computed(() => filtered.value.slice((currentPage.value-1)*pageSize.value, currentPage.value*pageSize.value))
 
-function openEdit(_b: Booking) {}
+// Edit modal
+const showModal  = ref(false)
+const editTarget = ref<Booking | null>(null)
+const editForm   = ref({ status: 'จองแล้ว' as Booking['status'], cancelReason: '', adminCode: '' })
+
+const canSave = computed(() => {
+  if (editForm.value.status !== 'ยกเลิก') return true
+  return !!editForm.value.cancelReason.trim() && !!editForm.value.adminCode.trim()
+})
+
+function openEdit(b: Booking) {
+  editTarget.value = b
+  editForm.value = { status: b.status, cancelReason: '', adminCode: '' }
+  showModal.value = true
+}
+
+function saveEdit() {
+  if (!editTarget.value || !canSave.value) return
+  const idx = bookings.value.findIndex(x => x.id === editTarget.value!.id)
+  if (idx >= 0) {
+    bookings.value[idx] = {
+      ...bookings.value[idx],
+      status: editForm.value.status,
+      cancelledAt: editForm.value.status === 'ยกเลิก'
+        ? new Date().toLocaleDateString('th-TH', { day:'2-digit', month:'2-digit', year:'numeric' })
+        : bookings.value[idx].cancelledAt,
+    }
+  }
+  showModal.value = false
+}
+
 function deleteBooking(b: Booking) { bookings.value = bookings.value.filter(x => x.id !== b.id) }
 </script>
 
 <style scoped>
+/* Edit modal */
+.bh-backdrop { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,0.4); }
+.bh-modal {
+  position:fixed; top:50%; left:50%; z-index:51; transform:translate(-50%,-50%);
+  background:#fff; border-radius:14px; width:calc(100vw - 48px); max-width:460px;
+  box-shadow:0 16px 48px rgba(0,0,0,0.16); overflow:hidden;
+}
+.bh-modal-header {
+  display:flex; justify-content:space-between; align-items:flex-start;
+  padding:20px 24px 16px;
+}
+.bh-modal-title { font-size:17px; font-weight:500; color:var(--color-text-primary); }
+.bh-close { background:none; border:none; cursor:pointer; color:var(--color-text-tertiary); padding:4px; border-radius:6px; display:flex; align-items:center; }
+.bh-close:hover { background:#F2F2F7; }
+.bh-info-box { background:var(--color-bg-secondary); border-radius:8px; padding:12px 14px; }
+.bh-field { display:flex; flex-direction:column; gap:5px; }
+.bh-label { font-size:12px; color:var(--color-text-secondary); }
+.bh-input {
+  height:42px; padding:0 12px; border-radius:8px;
+  border:1.5px solid #D0D0D0; font-size:14px; color:var(--color-text-primary);
+  outline:none; font-family:inherit; background:#fff; width:100%; box-sizing:border-box;
+  transition:border-color 0.15s;
+}
+.bh-input:focus { border-color:var(--color-primary); }
+.bh-select   { cursor:pointer; }
+.bh-textarea { height:80px; padding:10px 12px; resize:vertical; line-height:1.5; }
+
+.bh-cancel-section {
+  background:#FFFBEB; border:1px solid #FDE68A;
+  border-radius:10px; padding:16px;
+}
+
+.adm-hdr-btn-danger-btn {
+  background:var(--color-danger); color:#fff;
+}
+.adm-hdr-btn-danger-btn:hover:not(:disabled) { opacity:0.9; }
+.adm-hdr-btn-danger-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+.cancel-section-enter-active, .cancel-section-leave-active { transition:opacity 0.2s, transform 0.2s; }
+.cancel-section-enter-from, .cancel-section-leave-to { opacity:0; transform:translateY(-6px); }
+
+.modal-bg-enter-active, .modal-bg-leave-active { transition:opacity 0.2s; }
+.modal-bg-enter-from,   .modal-bg-leave-to     { opacity:0; }
+.modal-up-enter-active, .modal-up-leave-active { transition:opacity 0.25s,transform 0.25s; }
+.modal-up-enter-from,   .modal-up-leave-to     { opacity:0; transform:translate(-50%,-48%); }
+
 .bh-type-badge {
   display:inline-block; margin-top:4px;
   font-size:11px; padding:2px 8px; border-radius:100px;

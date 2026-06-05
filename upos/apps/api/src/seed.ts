@@ -142,7 +142,7 @@ console.log('[Seed] Cards created')
 
 // ── Wallets ───────────────────────────────────────────────────────────────────
 const walletData = [
-  { userId: student._id,    balance: 850,  negativeLimit: 100, lowThreshold: 200 },
+  { userId: student._id,    balance: 1615, negativeLimit: 100, lowThreshold: 200 },
   { userId: student2._id,   balance: 320,  negativeLimit: 100, lowThreshold: 200 },
   { userId: parent._id,     balance: 0 },
   { userId: teacher._id,    balance: 320,  negativeLimit: 100, lowThreshold: 200 },
@@ -204,6 +204,7 @@ console.log('[Seed] Buffet pricing created')
 
 // ── Sample Transactions ────────────────────────────────────────────────────────
 const studentWallet = wallets.find(w => String(w.userId) === String(student._id))!
+const txDay = (n: number) => new Date(Date.now() - n * 86_400_000) // n days ago (relative so reports stay recent)
 await Transaction.insertMany([
   {
     refNo: 'TXN20260801-000001',
@@ -215,7 +216,7 @@ await Transaction.insertMany([
     paymentMethod: 'scb_qr',
     paymentRef: 'SCB-MOCK-001',
     status: 'success',
-    createdAt: new Date('2026-08-01T09:00:00Z'),
+    createdAt: txDay(2),
   },
   {
     refNo: 'TXN20260801-000002',
@@ -226,18 +227,18 @@ await Transaction.insertMany([
     channel: 'pos',
     paymentMethod: 'card_wallet',
     status: 'success',
-    createdAt: new Date('2026-08-01T11:35:00Z'),
+    createdAt: txDay(1),
   },
   {
     refNo: 'TXN20260801-000003',
     walletId: studentWallet._id,
     type: 'purchase',
     amount: -65,
-    balanceAfter: 850,
+    balanceAfter: 1615,
     channel: 'pos',
     paymentMethod: 'card_wallet',
     status: 'success',
-    createdAt: new Date('2026-08-02T10:15:00Z'),
+    createdAt: txDay(0),
   },
 ])
 console.log('[Seed] Transactions created')
