@@ -149,6 +149,7 @@
                 <button
                   :class="['adm-action-btn', m.status === 'active' ? 'danger' : 'success']"
                   :title="m.status === 'active' ? 'ปิดใช้งาน' : 'เปิดใช้งาน'"
+                  :disabled="!!togglingStatus[m.uid]"
                   @click="toggleStatus(m)"
                 >
                   <PhProhibit v-if="m.status === 'active'" :size="14" />
@@ -223,9 +224,10 @@
               </div>
             </div>
           </div>
+          <div v-if="saveEditError" style="padding:0 24px 12px;font-size:12px;color:var(--color-danger,#CC3333)">{{ saveEditError }}</div>
           <div class="imp-footer">
-            <button class="imp-btn-cancel" @click="showEditModal=false">ยกเลิก</button>
-            <button class="imp-btn-confirm imp-btn-confirm-active" @click="saveEdit">บันทึก</button>
+            <button class="imp-btn-cancel" :disabled="savingEdit" @click="showEditModal=false">ยกเลิก</button>
+            <button class="imp-btn-confirm imp-btn-confirm-active" :disabled="savingEdit" @click="saveEdit">{{ savingEdit ? 'กำลังบันทึก...' : 'บันทึก' }}</button>
           </div>
         </div>
       </Transition>
@@ -423,24 +425,61 @@ const inactiveCount = computed(() => members.value.filter(m => m.status !== 'act
 const withCardCount = computed(() => members.value.filter(m => !!m.cardUid).length)
 
 // Edit
-const showEditModal = ref(false)
-const editTarget    = ref<any>(null)
+const showEditModal  = ref(false)
+const editTarget     = ref<any>(null)
+const savingEdit     = ref(false)
+const saveEditError  = ref('')
 function openAddModal() { editTarget.value = { uid:'', firstName:'', lastName:'', email:'', cardUid:'', cardStatus:'active', balance:0, role:'cashier', status:'active' }; showEditModal.value = true }
 function openEdit(m: Member) { editTarget.value = { ...m }; showEditModal.value = true }
-function saveEdit() {
-  if (!editTarget.value) return
+async function saveEdit() {
+  if (!editTarget.value || savingEdit.value) return
+  savingEdit.value  = true
+  saveEditError.value = ''
   if (!editTarget.value.uid) {
+    // New member — no backend endpoint for user creation here (staff CRUD deferred to UsersView)
+    // TODO: no backend endpoint yet — local-only add
     editTarget.value.uid = `EMP-${String(members.value.length + 1).padStart(3,'0')}`
     members.value.unshift({ ...editTarget.value })
-  } else {
-    const idx = members.value.findIndex(m => m.uid === editTarget.value.uid)
-    if (idx >= 0) members.value[idx] = { ...editTarget.value }
+    savingEdit.value  = false
+    showEditModal.value = false
+    return
   }
+  // Existing member
+  const original = members.value.find(m => m.uid === editTarget.value.uid)
+  // Persist status change via backend
+  if (original && editTarget.value.status !== original.status) {
+    try {
+      await api.patch(`/users/${editTarget.value.uid}/status`, { status: editTarget.value.status })
+    } catch {
+      saveEditError.value = 'บันทึกสถานะไม่สำเร็จ กรุณาลองใหม่'
+      savingEdit.value = false
+      return
+    }
+  }
+  // TODO: no backend endpoint yet for firstName/lastName/email/cardUid/cardStatus — local update only
+  const idx = members.value.findIndex(m => m.uid === editTarget.value.uid)
+  if (idx >= 0) members.value[idx] = { ...editTarget.value }
+  savingEdit.value  = false
   showEditModal.value = false
 }
-function toggleStatus(m: Member) {
+
+const togglingStatus = ref<Record<string, boolean>>({})
+async function toggleStatus(m: Member) {
+  if (togglingStatus.value[m.uid]) return
+  const newStatus: 'active' | 'inactive' = m.status === 'active' ? 'inactive' : 'active'
+  togglingStatus.value[m.uid] = true
+  // Optimistic local update
   const idx = members.value.findIndex(x => x.uid === m.uid)
-  if (idx >= 0) members.value[idx] = { ...members.value[idx], status: members.value[idx].status === 'active' ? 'inactive' : 'active' }
+  if (idx >= 0) members.value[idx] = { ...members.value[idx], status: newStatus }
+  try {
+    await api.patch(`/users/${m.uid}/status`, { status: newStatus })
+  } catch {
+    // Revert on error
+    if (idx >= 0) members.value[idx] = { ...members.value[idx], status: m.status }
+    loadError.value = 'เปลี่ยนสถานะไม่สำเร็จ กรุณาลองใหม่'
+  } finally {
+    togglingStatus.value[m.uid] = false
+  }
 }
 
 // Enrollment Code

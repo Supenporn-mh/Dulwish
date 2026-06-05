@@ -68,6 +68,9 @@
           <tr v-if="loading">
             <td colspan="7" class="center" style="padding:32px;color:#AEAEB2">กำลังโหลด...</td>
           </tr>
+          <tr v-else-if="error">
+            <td colspan="7" class="center" style="padding:32px;color:#CC3333;font-size:13px">{{ error }}</td>
+          </tr>
           <tr v-else-if="filtered.length === 0">
             <td colspan="7" class="center" style="padding:64px;color:#AEAEB2;font-size:15px">ไม่พบข้อมูล</td>
           </tr>
@@ -134,6 +137,7 @@ interface Alumni {
 }
 
 const loading     = ref(false)
+const error       = ref('')
 const alumni      = ref<Alumni[]>([])
 const search      = ref('')
 const filterStatus = ref('')
@@ -174,6 +178,7 @@ function statusBadge(r?: string) {
 
 async function fetchAlumni() {
   loading.value = true
+  error.value = ''
   try {
     const res = await api.get('/admin/students')
     const all = res.data?.students ?? res.data ?? []
@@ -184,14 +189,15 @@ async function fetchAlumni() {
         firstName:      s.firstName,
         lastName:       s.lastName,
         gradeLevel:     s.gradeLevel === 'GRADUATED' ? 'S6 (จบแล้ว)' : s.gradeLevel,
-        graduationYear: filterYear.value,
-        graduationDate: '',
-        exitReason:     'graduated' as const,
-        exitRemark:     '',
-        updatedAt:      '',
+        graduationYear: s.graduationYear ?? '',
+        graduationDate: s.graduationDate ?? '',
+        exitReason:     (s.exitReason as Alumni['exitReason']) ?? 'graduated',
+        exitRemark:     s.exitRemark ?? '',
+        updatedAt:      s.updatedAt ?? '',
       }))
-  } catch {
+  } catch (e: any) {
     alumni.value = []
+    error.value = e?.response?.data?.message ?? 'โหลดข้อมูลไม่สำเร็จ'
   } finally {
     loading.value = false
   }

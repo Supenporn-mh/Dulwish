@@ -12,7 +12,7 @@
         </button>
         <input ref="csvInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" @change="handleImport" />
         <!-- Add individual -->
-        <button class="adm-hdr-btn adm-hdr-btn-primary" @click="showAddModal = true">
+        <button class="adm-hdr-btn adm-hdr-btn-primary" @click="openAddModal">
           <PhPlus :size="14" />
           เพิ่มนักเรียน
         </button>
@@ -115,6 +115,9 @@
         <tbody>
           <tr v-if="loading">
             <td colspan="10" class="center" style="padding:32px;color:#AEAEB2">กำลังโหลด...</td>
+          </tr>
+          <tr v-else-if="fetchError">
+            <td colspan="10" class="center" style="padding:32px;color:var(--color-danger)">{{ fetchError }}</td>
           </tr>
           <tr v-else-if="paginated.length === 0">
             <td colspan="10" class="center" style="padding:32px;color:#AEAEB2">ไม่พบนักเรียน</td>
@@ -372,6 +375,63 @@
       </Transition>
     </Teleport>
 
+    <!-- ── Add Student Modal ──────────────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="modal-bg">
+        <div v-if="showAddModal" class="modal-backdrop" @click="showAddModal = false" />
+      </Transition>
+      <Transition name="modal-up">
+        <div v-if="showAddModal" class="imp-modal" style="max-width:460px">
+          <div class="imp-header">
+            <h3 class="imp-title">เพิ่มนักเรียนใหม่</h3>
+            <button class="imp-close" @click="showAddModal = false"><PhX :size="18" weight="bold" /></button>
+          </div>
+          <div class="imp-divider" />
+          <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+            <div class="edit-field-row">
+              <div class="edit-field">
+                <label class="promo-label">ชื่อ <span style="color:var(--color-danger)">*</span></label>
+                <input v-model="addForm.firstName" class="edit-input" placeholder="ชื่อจริง" />
+              </div>
+              <div class="edit-field">
+                <label class="promo-label">นามสกุล <span style="color:var(--color-danger)">*</span></label>
+                <input v-model="addForm.lastName" class="edit-input" placeholder="นามสกุล" />
+              </div>
+            </div>
+            <div class="edit-field-row">
+              <div class="edit-field">
+                <label class="promo-label">ชั้นปี <span style="color:var(--color-danger)">*</span></label>
+                <select v-model="addForm.gradeLevel" class="promo-select">
+                  <option v-for="g in GRADES" :key="g" :value="g">{{ g }}</option>
+                </select>
+              </div>
+              <div class="edit-field">
+                <label class="promo-label">ห้องเรียน <span style="color:var(--color-danger)">*</span></label>
+                <input v-model="addForm.className" class="edit-input" placeholder="เช่น P1-A" />
+              </div>
+            </div>
+            <div class="edit-field">
+              <label class="promo-label">อีเมล / เบอร์ผู้ปกครอง</label>
+              <input v-model="addForm.guardianEmail" class="edit-input" placeholder="parent@example.com หรือ 08xxxxxxxx" />
+            </div>
+            <div class="edit-field">
+              <label class="promo-label">รหัสนักเรียน <span style="color:#AEAEB2;font-weight:400">(ระบบจะสร้างให้อัตโนมัติถ้าไม่กรอก)</span></label>
+              <input v-model="addForm.uid" class="edit-input" placeholder="เช่น STD-P1-0001" style="font-family:monospace" />
+            </div>
+            <div v-if="addError" style="font-size:13px;color:var(--color-danger);padding:8px 12px;background:var(--color-danger-bg);border-radius:8px">
+              {{ addError }}
+            </div>
+          </div>
+          <div class="imp-footer">
+            <button class="imp-btn-cancel" @click="showAddModal = false">ยกเลิก</button>
+            <button class="imp-btn-confirm imp-btn-confirm-active" :disabled="addSaving" @click="saveAdd">
+              {{ addSaving ? 'กำลังบันทึก...' : 'เพิ่มนักเรียน' }}
+            </button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- ── Edit Student Modal ─────────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="modal-bg">
@@ -428,9 +488,12 @@
               </div>
             </div>
           </div>
+          <div v-if="editError" style="padding:0 24px 12px;font-size:13px;color:var(--color-danger)">{{ editError }}</div>
           <div class="imp-footer">
             <button class="imp-btn-cancel" @click="showEditModal = false">ยกเลิก</button>
-            <button class="imp-btn-confirm imp-btn-confirm-active" @click="saveEdit">บันทึก</button>
+            <button class="imp-btn-confirm imp-btn-confirm-active" :disabled="editSaving" @click="saveEdit">
+              {{ editSaving ? 'กำลังบันทึก...' : 'บันทึก' }}
+            </button>
           </div>
         </div>
       </Transition>
@@ -494,6 +557,7 @@
 
           <!-- Footer -->
           <div class="code-footer">
+            <div v-if="codeError" style="width:100%;font-size:13px;color:var(--color-danger);text-align:center;margin-bottom:4px">{{ codeError }}</div>
             <button
               class="code-generate-btn"
               :disabled="generatingCode"
@@ -645,6 +709,7 @@
           </div>
 
           <!-- Footer -->
+          <div v-if="promoteError" style="padding:0 24px 8px;font-size:13px;color:var(--color-danger)">{{ promoteError }}</div>
           <div class="promo-footer">
             <button class="promo-btn-cancel" @click="closePromoteModal">ยกเลิก</button>
             <button
@@ -702,16 +767,6 @@ const GRADES = ['K1','K2','P1','P2','P3','P4','P5','P6','S1','S2','S3','S4','S5'
 const PRE_ORDER_GRADES = ['K1','K2']
 const ACADEMIC_YEARS  = ['2023/2024','2024/2025','2025/2026','2026/2027','2027/2028']
 
-// ── Demo data ─────────────────────────────────────────────────────────────────
-const DEMO: Student[] = [
-  { uid:'STD-K1-0001', firstName:'สมหญิง', lastName:'ใจดี',   gradeLevel:'K1', className:'K1-A', guardianEmail:'suchart@dulwich.ac.th', cardUid:'04A3B5C6', cardStatus:'active',   balance:850,  lowThreshold:200, parentCount:1, canPreorder:true,  buffetGroup:'primary',   status:'active'   },
-  { uid:'STD-P3-0015', firstName:'สมชาย',  lastName:'ใจดี',   gradeLevel:'P3', className:'P3-B', guardianEmail:'suchart@dulwich.ac.th', cardUid:'04B1C2D3', cardStatus:'active',   balance:320,  lowThreshold:200, parentCount:1, canPreorder:false, buffetGroup:'primary',   status:'active'   },
-  { uid:'STD-K2-0008', firstName:'มานี',   lastName:'สุขดี',  gradeLevel:'K2', className:'K2-A', guardianEmail:'somying@gmail.com',     cardUid:'04C3D4E5', cardStatus:'active',   balance:150,  lowThreshold:200, parentCount:1, canPreorder:true,  buffetGroup:'primary',   status:'active'   },
-  { uid:'STD-P6-0022', firstName:'วิชัย',  lastName:'รักเรียน',gradeLevel:'P6', className:'P6-A', guardianEmail:'vichai.p@example.com',  cardUid:'04D5E6F7', cardStatus:'inactive', balance:500,  lowThreshold:200, parentCount:1, canPreorder:false, buffetGroup:'primary',   status:'active'   },
-  { uid:'STD-S1-0003', firstName:'อรุณี',  lastName:'ดีงาม',  gradeLevel:'S1', className:'S1-B', guardianEmail:'arunee.d@example.com',  cardUid:undefined,  cardStatus:undefined, balance:200,  lowThreshold:200, parentCount:1, canPreorder:false, buffetGroup:'secondary', status:'active'   },
-  { uid:'STD-K1-0012', firstName:'ปรีชา',  lastName:'มานะ',   gradeLevel:'K1', className:'K1-B', guardianEmail:'preecha@gmail.com',     cardUid:'04E7F8A9', cardStatus:'lost',     balance:0,    lowThreshold:200, parentCount:0, canPreorder:true,  buffetGroup:'primary',   status:'inactive' },
-]
-
 // ── State ─────────────────────────────────────────────────────────────────────
 const loading          = ref(false)
 const students         = ref<Student[]>([])
@@ -724,6 +779,45 @@ const pageSize         = ref(10)
 const showPromoteModal = ref(false)
 const showAddModal     = ref(false)
 const csvInput         = ref<HTMLInputElement | null>(null)
+
+// ── Add student state ──────────────────────────────────────────────────────
+interface AddForm {
+  firstName: string; lastName: string; gradeLevel: string
+  className: string; guardianEmail: string; uid: string
+}
+const addForm    = ref<AddForm>({ firstName: '', lastName: '', gradeLevel: 'P1', className: '', guardianEmail: '', uid: '' })
+const addSaving  = ref(false)
+const addError   = ref('')
+
+function openAddModal() {
+  addForm.value   = { firstName: '', lastName: '', gradeLevel: 'P1', className: '', guardianEmail: '', uid: '' }
+  addError.value  = ''
+  showAddModal.value = true
+}
+
+async function saveAdd() {
+  if (addSaving.value) return
+  const { firstName, lastName, gradeLevel, className, guardianEmail, uid } = addForm.value
+  if (!firstName.trim() || !lastName.trim() || !gradeLevel || !className.trim()) {
+    addError.value = 'กรุณากรอกข้อมูลจำเป็นให้ครบ'
+    return
+  }
+  addSaving.value = true
+  addError.value  = ''
+  try {
+    const payload: any = { firstName: firstName.trim(), lastName: lastName.trim(), gradeLevel, className: className.trim() }
+    if (guardianEmail.trim()) payload.guardianEmail = guardianEmail.trim()
+    if (uid.trim()) payload.uid = uid.trim()
+    const res = await api.post('/admin/students', payload)
+    const newStudent = mapStudent(res.data?.student ?? res.data)
+    students.value = [newStudent, ...students.value]
+    showAddModal.value = false
+  } catch (err: any) {
+    addError.value = err?.response?.data?.message ?? 'เพิ่มนักเรียนไม่สำเร็จ'
+  } finally {
+    addSaving.value = false
+  }
+}
 
 // ── Export enrollment codes ────────────────────────────────────────────────
 const exportingCodes = ref(false)
@@ -780,19 +874,8 @@ async function downloadEnrollmentCodes() {
 
     const today = new Date().toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')
     XLSX.writeFile(wb, `Enrollment_Codes_${today}.xlsx`)
-  } catch (err) {
-    // fallback: export from local students data
-    const wb = XLSX.utils.book_new()
-    const headers = ['ลำดับ', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ชั้น / ห้อง', 'อีเมล / เบอร์ผู้ปกครอง', 'หมายเหตุ']
-    const data = students.value.map((s, i) => [
-      i + 1, s.uid, `${s.firstName} ${s.lastName}`,
-      `${s.gradeLevel} / ${s.className}`, s.guardianEmail || '—',
-      'ไม่สามารถดึง Code ได้ กรุณา restart mock server',
-    ])
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...data])
-    ws['!cols'] = [{ wch: 6 }, { wch: 16 }, { wch: 22 }, { wch: 12 }, { wch: 28 }, { wch: 40 }]
-    XLSX.utils.book_append_sheet(wb, ws, 'นักเรียน')
-    XLSX.writeFile(wb, 'Students_Export.xlsx')
+  } catch {
+    // export failed — do nothing (no local fallback)
   } finally {
     exportingCodes.value = false
   }
@@ -801,26 +884,50 @@ async function downloadEnrollmentCodes() {
 // Edit modal state
 const showEditModal = ref(false)
 const editTarget    = ref<Student | null>(null)
+const editSaving    = ref(false)
+const editError     = ref('')
 
 function openEditModal(s: Student) {
   editTarget.value    = { ...s }
+  editError.value     = ''
   showEditModal.value = true
 }
-function saveEdit() {
-  if (!editTarget.value) return
-  const idx = students.value.findIndex(s => s.uid === editTarget.value!.uid)
-  if (idx >= 0) students.value[idx] = { ...editTarget.value }
-  showEditModal.value = false
+async function saveEdit() {
+  if (!editTarget.value || editSaving.value) return
+  editSaving.value = true
+  editError.value  = ''
+  try {
+    const { uid, firstName, lastName, gradeLevel, className, guardianEmail, status } = editTarget.value
+    const res = await api.patch(`/admin/students/${uid}`, { firstName, lastName, gradeLevel, className, guardianEmail, status })
+    const updated = res.data?.student ?? res.data
+    const mapped = mapStudent(updated)
+    const idx = students.value.findIndex(s => s.uid === uid)
+    if (idx >= 0) students.value[idx] = mapped
+    showEditModal.value = false
+  } catch (err: any) {
+    editError.value = err?.response?.data?.message ?? 'บันทึกไม่สำเร็จ'
+  } finally {
+    editSaving.value = false
+  }
 }
 
 // Toggle active/inactive
-function toggleStatus(s: Student) {
-  const idx = students.value.findIndex(x => x.uid === s.uid)
-  if (idx >= 0) {
-    students.value[idx] = {
-      ...students.value[idx],
-      status: students.value[idx].status === 'active' ? 'inactive' : 'active',
-    }
+const togglingUid = ref<string | null>(null)
+
+async function toggleStatus(s: Student) {
+  if (togglingUid.value) return
+  togglingUid.value = s.uid
+  const newStatus = s.status === 'active' ? 'inactive' : 'active'
+  try {
+    const res = await api.patch(`/admin/students/${s.uid}`, { status: newStatus })
+    const updated = res.data?.student ?? res.data
+    const mapped = mapStudent(updated)
+    const idx = students.value.findIndex(x => x.uid === s.uid)
+    if (idx >= 0) students.value[idx] = mapped
+  } catch {
+    // silently ignore — list not changed
+  } finally {
+    togglingUid.value = null
   }
 }
 
@@ -851,23 +958,17 @@ async function openCodeModal(student: Student) {
   }
 }
 
+const codeError = ref('')
+
 async function generateCode() {
   if (!codeData.value || generatingCode.value) return
   generatingCode.value = true
+  codeError.value      = ''
   try {
     const res = await api.post(`/admin/students/${codeData.value.studentUid}/code/generate`)
     codeData.value = res.data
-  } catch {
-    // fallback: local generation
-    const hex = () => Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0')
-    const exp  = new Date(); exp.setDate(exp.getDate() + 14); exp.setHours(23, 59, 59, 0)
-    codeData.value = {
-      ...codeData.value,
-      code:      `${hex().slice(0,8)}-${hex().slice(0,4)}`,
-      expiresAt: exp.toISOString(),
-      used:      false,
-      expired:   false,
-    }
+  } catch (err: any) {
+    codeError.value = err?.response?.data?.message ?? 'สร้าง Code ไม่สำเร็จ'
   } finally {
     generatingCode.value = false
   }
@@ -1095,67 +1196,60 @@ function handleImport(e: Event) {
 }
 
 function processFile(file: File) {
-
   const reader = new FileReader()
-  reader.onload = (evt) => {
+  reader.onload = async (evt) => {
     try {
-      const data    = new Uint8Array(evt.target?.result as ArrayBuffer)
-      const wb      = XLSX.read(data, { type: 'array' })
-      const ws      = wb.Sheets[wb.SheetNames[0]]
-      const rows    = XLSX.utils.sheet_to_json<Record<string,string>>(ws, { header: 1 }) as string[][]
+      const data = new Uint8Array(evt.target?.result as ArrayBuffer)
+      const wb   = XLSX.read(data, { type: 'array' })
+      const ws   = wb.Sheets[wb.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json<Record<string,string>>(ws, { header: 1 }) as string[][]
 
-      const errors: string[] = []
-      const imported: Student[] = []
-      const HEADER_ROW = 0
-      const NOTE_ROW   = 1
+      const parseErrors: string[] = []
+      interface ParsedRow {
+        firstName: string; lastName: string; gradeLevel: string
+        className: string; guardianEmail?: string; uid?: string
+        rowNum: number
+      }
+      const valid: ParsedRow[] = []
 
       for (let i = 2; i < rows.length; i++) {
         const r = rows[i]
-        if (!r || r.every(c => !c)) continue  // skip empty rows
+        if (!r || r.every(c => !c)) continue
 
-        const [uid, firstName, lastName, gradeLevel, className, dob, guardianEmail, cardUid, walletIdsRaw] = r.map(c => String(c ?? '').trim())
-        const walletIds = walletIdsRaw ? walletIdsRaw.split(',').map(w => w.trim()).filter(Boolean) : []
+        const [uid, firstName, lastName, gradeLevel, className, , guardianEmail] = r.map(c => String(c ?? '').trim())
 
-        if (!uid || !firstName || !lastName || !gradeLevel || !className) {
-          errors.push(`แถว ${i+1}: ข้อมูลจำเป็นไม่ครบ (รหัส/ชื่อ/ชั้น/ห้อง)`)
+        if (!firstName || !lastName || !gradeLevel || !className) {
+          parseErrors.push(`แถว ${i+1}: ข้อมูลจำเป็นไม่ครบ (ชื่อ/ชั้น/ห้อง)`)
           continue
         }
         if (!['K1','K2','P1','P2','P3','P4','P5','P6','S1','S2','S3','S4','S5','S6'].includes(gradeLevel)) {
-          errors.push(`แถว ${i+1}: ชั้นปี "${gradeLevel}" ไม่ถูกต้อง`)
+          parseErrors.push(`แถว ${i+1}: ชั้นปี "${gradeLevel}" ไม่ถูกต้อง`)
           continue
         }
-
-        imported.push({
-          uid, firstName, lastName, gradeLevel, className,
-          guardianEmail: guardianEmail || undefined,
-          cardUid:       cardUid || undefined,
-          cardStatus:    cardUid ? 'active' : undefined,
-          walletIds,
-          balance:       0,
-          lowThreshold:  200,
-          parentCount:   guardianEmail ? 0 : 0,
-          canPreorder:   ['K1','K2'].includes(gradeLevel),
-          buffetGroup:   ['K1','K2','P1','P2','P3','P4','P5','P6'].includes(gradeLevel) ? 'primary' : 'secondary',
-          status:        'active',
-        })
+        valid.push({ firstName, lastName, gradeLevel, className, guardianEmail: guardianEmail || undefined, uid: uid || undefined, rowNum: i + 1 })
       }
 
-      // Merge: update existing or add new
-      const uidSet = new Set(students.value.map(s => s.uid))
-      let updated = 0
-      for (const s of imported) {
-        if (uidSet.has(s.uid)) {
-          const idx = students.value.findIndex(x => x.uid === s.uid)
-          if (idx >= 0) { students.value[idx] = s; updated++ }
-        } else {
-          students.value.push(s)
+      let successCount = 0
+      const apiErrors: string[] = []
+      for (const row of valid) {
+        try {
+          const payload: any = { firstName: row.firstName, lastName: row.lastName, gradeLevel: row.gradeLevel, className: row.className }
+          if (row.guardianEmail) payload.guardianEmail = row.guardianEmail
+          if (row.uid) payload.uid = row.uid
+          await api.post('/admin/students', payload)
+          successCount++
+        } catch (err: any) {
+          const msg = err?.response?.data?.message ?? 'เพิ่มไม่สำเร็จ'
+          apiErrors.push(`แถว ${row.rowNum} (${row.firstName} ${row.lastName}): ${msg}`)
         }
       }
 
-      importResult.value = { success: imported.length, errors }
+      if (successCount > 0) await fetchStudents()
+
+      importResult.value    = { success: successCount, errors: [...parseErrors, ...apiErrors] }
       showImportResult.value = true
-    } catch (err) {
-      importResult.value = { success: 0, errors: ['ไม่สามารถอ่านไฟล์ได้ — กรุณาใช้ไฟล์ .xlsx หรือ .csv ตาม Template'] }
+    } catch {
+      importResult.value    = { success: 0, errors: ['ไม่สามารถอ่านไฟล์ได้ — กรุณาใช้ไฟล์ .xlsx หรือ .csv ตาม Template'] }
       showImportResult.value = true
     }
   }
@@ -1215,9 +1309,12 @@ function toggleSelectAll() {
   promoteConfirmed.value = false
 }
 
+const promoteError = ref('')
+
 async function promoteAll() {
   if (!promoteConfirmed.value || promoting.value || selectedUids.value.size === 0) return
-  promoting.value = true
+  promoting.value  = true
+  promoteError.value = ''
   try {
     await api.post('/admin/promote', {
       fromYear:     promoteFromYear.value,
@@ -1226,51 +1323,45 @@ async function promoteAll() {
     })
     await fetchStudents()
     closePromoteModal()
-  } catch {
-    // fallback: update local state only
-    const uids = selectedUids.value
-    students.value = students.value.map(s => {
-      if (!uids.has(s.uid)) return s
-      const idx = GRADES.indexOf(s.gradeLevel)
-      if (idx < 0) return s
-      if (idx === GRADES.length - 1) return { ...s, status: 'inactive' as const }
-      const newGrade = GRADES[idx + 1]
-      return {
-        ...s,
-        gradeLevel:  newGrade,
-        canPreorder: PRE_ORDER_GRADES.includes(newGrade),
-        buffetGroup: ['K1','K2','P1','P2','P3','P4','P5','P6'].includes(newGrade) ? 'primary' : 'secondary',
-      }
-    })
-    closePromoteModal()
+  } catch (err: any) {
+    promoteError.value = err?.response?.data?.message ?? 'เลื่อนชั้นไม่สำเร็จ'
   } finally {
     promoting.value = false
   }
 }
 
+// ── Map raw API student to local Student shape ────────────────────────────────
+function mapStudent(s: any): Student {
+  const grade = s.gradeLevel ?? s.grade_level ?? s.grade ?? ''
+  return {
+    uid:           s.uid ?? s._id,
+    firstName:     s.firstName ?? s.first_name,
+    lastName:      s.lastName  ?? s.last_name,
+    gradeLevel:    grade,
+    className:     s.className  ?? s.class_name  ?? '',
+    guardianEmail: s.guardianEmail ?? s.guardian_email,
+    cardUid:       s.cardUid ?? s.card_uid,
+    cardStatus:    s.cardStatus ?? undefined,
+    balance:       s.balance ?? 0,
+    lowThreshold:  s.lowThreshold ?? 200,
+    parentCount:   s.parentCount ?? 0,
+    canPreorder:   PRE_ORDER_GRADES.includes(grade),
+    buffetGroup:   ['K1','K2','P1','P2','P3','P4','P5','P6'].includes(grade) ? 'primary' : 'secondary',
+    status:        s.status ?? 'active',
+  }
+}
+
+const fetchError = ref('')
+
 async function fetchStudents() {
-  loading.value = true
+  loading.value    = true
+  fetchError.value = ''
   try {
     const res = await api.get('/admin/students')
-    students.value = (res.data?.students ?? res.data ?? []).map((s: any) => ({
-      uid:          s.uid ?? s.id,
-      firstName:    s.firstName ?? s.first_name,
-      lastName:     s.lastName  ?? s.last_name,
-      gradeLevel:   s.gradeLevel ?? s.grade_level ?? s.grade,
-      className:    s.className  ?? s.class_name  ?? '',
-      guardianEmail:s.guardianEmail ?? s.guardian_email,
-      cardUid:      s.cardUid ?? s.card_uid,
-      cardStatus:   s.cardStatus ?? 'active',
-      balance:      s.balance ?? 0,
-      lowThreshold: s.lowThreshold ?? 200,
-      parentCount:  s.parentCount ?? 0,
-      canPreorder:  PRE_ORDER_GRADES.includes(s.gradeLevel ?? s.grade ?? ''),
-      buffetGroup:  ['K1','K2','P1','P2','P3','P4','P5','P6'].includes(s.gradeLevel ?? '') ? 'primary' : 'secondary',
-      status:       s.status ?? 'active',
-    }))
-    if (students.value.length === 0) students.value = DEMO
-  } catch {
-    students.value = DEMO
+    students.value = (res.data?.students ?? res.data ?? []).map(mapStudent)
+  } catch (err: any) {
+    fetchError.value = err?.response?.data?.message ?? 'โหลดข้อมูลไม่สำเร็จ'
+    students.value = []
   } finally {
     loading.value = false
   }
