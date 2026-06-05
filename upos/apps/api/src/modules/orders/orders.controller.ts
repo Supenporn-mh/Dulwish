@@ -162,6 +162,18 @@ export const ordersController = new Elysia({ prefix: '/orders' })
     }),
   })
 
+  .get('/stats', async ({ query }) => {
+    const date = query.date
+    if (!date) return { stats: [] }
+    const result = await Order.aggregate([
+      { $match: { serveDate: date, status: { $ne: 'cancelled' } } },
+      { $group: { _id: '$mealPeriodId', count: { $sum: 1 } } },
+    ])
+    return { stats: result.map((r: any) => ({ mealPeriodId: String(r._id), count: r.count })) }
+  }, {
+    query: t.Object({ date: t.Optional(t.String()) }),
+  })
+
   .get('/:id', async ({ params }) => {
     const order = await Order.findById(params.id).lean()
     return { order }

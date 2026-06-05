@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useLocaleStore }       from '@/stores/locale'
 import { useParentStore }       from '@/stores/parent'
 import api                      from '@/api/axios'
@@ -85,7 +85,7 @@ const sessions = computed((): MealSession[] => {
       cutoffHour,
       cutoffMin,
       quota:      p.seatCapacity ?? 0,
-      booked:     0,
+      booked:     bookedMap.value[p._id] ?? 0,
       status,
       _id:        p._id,
     } satisfies MealSession & { _id: string; timeRange: string }
@@ -143,6 +143,7 @@ interface MenuItem   { _id: string; name: string; price: number; isPreorderable:
 const mealPeriods  = ref<MealPeriod[]>([])
 const cafeShopId   = ref<string>('')
 const menuItems    = ref<MenuItem[]>([])  // only isPreorderable:true items
+const bookedMap    = ref<Record<string, number>>({})  // mealPeriodId → confirmed order count
 
 // period _id keyed by session key (breakfast/lunch/dinner)
 const periodIdByKey = ref<Record<string, string>>({})
@@ -176,6 +177,9 @@ async function loadInitialData() {
     const allItems: MenuItem[] = menuRes.data.items ?? []
     menuItems.value = allItems.filter(i => i.isPreorderable)
 
+    // fetch booking counts for selected date
+    await fetchStats(selectedISO.value)
+
     // map session key → period _id
     const map: Record<string, string> = {}
     for (const p of mealPeriods.value) {
@@ -189,6 +193,19 @@ async function loadInitialData() {
     loadingInit.value = false
   }
 }
+
+async function fetchStats(date: string) {
+  try {
+    const res = await api.get('/orders/stats', { params: { date } })
+    const map: Record<string, number> = {}
+    for (const s of (res.data.stats ?? [])) map[s.mealPeriodId] = s.count
+    bookedMap.value = map
+  } catch {
+    bookedMap.value = {}
+  }
+}
+
+watch(selectedISO, (date) => fetchStats(date))
 
 // ── Menu sheet ───────────────────────────────────────────────────────────────
 const menuSession = ref<MealSession | null>(null)
