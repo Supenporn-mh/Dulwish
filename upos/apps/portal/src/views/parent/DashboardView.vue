@@ -38,22 +38,13 @@ const loading      = ref(true)
 const apiBookings  = ref<Booking[]>([])  // จาก API
 let fetchSeq       = 0  // cancel stale wallet fetches
 
-// computed: merge store bookings (real-time) + API bookings, dedup per session
+// computed: merge store bookings (real-time) + API bookings (already deduped in fetchBookings)
 const bookings = computed(() => {
   const d = new Date()
   const todayLocal = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
   const storeItems = parentStore.todayBookings.filter(b => b.serveDate === todayLocal)
   const storeIds   = new Set(storeItems.map(b => b.id))
-  // dedup API bookings by mealPeriodCode — keep first per session
-  const seenCodes  = new Set<string>()
-  const uniqueApi  = apiBookings.value.filter(b => {
-    if (storeIds.has(b.id)) return false
-    const code = (b as any).mealPeriodCode
-    if (code && seenCodes.has(code)) return false
-    if (code) seenCodes.add(code)
-    return true
-  })
-  return [...storeItems, ...uniqueApi]
+  return [...storeItems, ...apiBookings.value.filter(b => !storeIds.has(b.id))]
 })
 
 // ── Carousel ────────────────────────────────────────────────────────────────
@@ -132,16 +123,23 @@ async function fetchBookings(_childId: string) {
     const d = new Date()
     const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
     const res = await api.get(`/orders?from=${today}&to=${today}`)
-    apiBookings.value = (res.data?.orders ?? []).map((o: any) => ({
-      ...o,
-      id: o.id ?? o._id,
-      sessionTh: CODE_TO_TH[o.mealPeriodCode] ?? o.mealPeriodName,
-      sessionEn: CODE_TO_EN[o.mealPeriodCode] ?? o.mealPeriodName,
-    }))
+    const seenSessions = new Set<string>()
+    apiBookings.value = (res.data?.orders ?? [])
+      .map((o: any) => ({
+        ...o,
+        id: o.id ?? o._id,
+        sessionTh: CODE_TO_TH[o.mealPeriodCode] ?? o.mealPeriodName,
+        sessionEn: CODE_TO_EN[o.mealPeriodCode] ?? o.mealPeriodName,
+      }))
+      .filter((o: any) => {
+        const key = o.mealPeriodCode || o.sessionTh
+        if (!key || seenSessions.has(key)) return false
+        seenSessions.add(key)
+        return true
+      })
   } catch {
     apiBookings.value = []
   }
-  // bookings computed จะ merge store+API อัตโนมัติ
 }
 
 async function fetchChildData(childId: string) {
