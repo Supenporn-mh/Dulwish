@@ -47,7 +47,6 @@ const enrollmentCodeSchema = new Schema({
   expiresAt:       { type: Date, required: true },
   createdBy:       { type: Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: { createdAt: true, updatedAt: false } })
-enrollmentCodeSchema.index({ code: 1 })
 enrollmentCodeSchema.index({ studentUserId: 1 })
 
 export const EnrollmentCode = mongoose.model('EnrollmentCode', enrollmentCodeSchema)
