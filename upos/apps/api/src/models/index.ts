@@ -157,6 +157,7 @@ const mealPeriodSchema = new Schema({
   endTime:        { type: String, required: true },
   cutoffMinutes:  { type: Number, default: 180 },
   seatCapacity:   { type: Number },
+  description:    { type: String },
   active:         { type: Boolean, default: true },
 })
 

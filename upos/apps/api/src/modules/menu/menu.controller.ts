@@ -26,9 +26,70 @@ export const menuController = new Elysia({ prefix: '/menu' })
     return { shops }
   })
 
-  .get('/meal-periods', async () => {
-    const periods = await MealPeriod.find({ active: true }).lean()
-    return { periods }
+  .get('/meal-periods', async ({ query }) => {
+    const filter: any = query.scope === 'all' ? {} : { active: true }
+    const periods = await MealPeriod.find(filter).sort({ startTime: 1 }).lean()
+    // return both keys for compatibility with parent (mealPeriods) + older (periods)
+    return { periods, mealPeriods: periods }
+  }, {
+    query: t.Object({ scope: t.Optional(t.String()) }),
+  })
+
+  // ── Meal period admin CRUD (admin/supervisor) — drives parent booking rounds ──
+  .post('/meal-periods', async ({ body, currentUser, set }) => {
+    if (!['admin','supervisor'].includes(currentUser.role)) {
+      set.status = 403
+      return { error: { code: 'AUTH_008', message: 'Admin or supervisor only' } }
+    }
+    try {
+      const period = await MealPeriod.create(body)
+      return { period, mealPeriod: period }
+    } catch (err: unknown) {
+      set.status = 400
+      return { error: { code: 'PERIOD_001', message: err instanceof Error ? err.message : 'Create failed' } }
+    }
+  }, {
+    body: t.Object({
+      code:          t.String(),
+      name:          t.String(),
+      startTime:     t.String(),
+      endTime:       t.String(),
+      cutoffMinutes: t.Optional(t.Number()),
+      seatCapacity:  t.Optional(t.Number()),
+      description:   t.Optional(t.String()),
+      active:        t.Optional(t.Boolean()),
+    }),
+  })
+
+  .patch('/meal-periods/:id', async ({ params, body, currentUser, set }) => {
+    if (!['admin','supervisor'].includes(currentUser.role)) {
+      set.status = 403
+      return { error: { code: 'AUTH_008', message: 'Admin or supervisor only' } }
+    }
+    const period = await MealPeriod.findByIdAndUpdate(params.id, body, { new: true })
+    if (!period) { set.status = 404; return { error: { code: 'PERIOD_002', message: 'Meal period not found' } } }
+    return { period, mealPeriod: period }
+  }, {
+    body: t.Object({
+      code:          t.Optional(t.String()),
+      name:          t.Optional(t.String()),
+      startTime:     t.Optional(t.String()),
+      endTime:       t.Optional(t.String()),
+      cutoffMinutes: t.Optional(t.Number()),
+      seatCapacity:  t.Optional(t.Number()),
+      description:   t.Optional(t.String()),
+      active:        t.Optional(t.Boolean()),
+    }),
+  })
+
+  .delete('/meal-periods/:id', async ({ params, currentUser, set }) => {
+    if (!['admin','supervisor'].includes(currentUser.role)) {
+      set.status = 403
+      return { error: { code: 'AUTH_008', message: 'Admin or supervisor only' } }
+    }
+    const period = await MealPeriod.findByIdAndDelete(params.id)
+    if (!period) { set.status = 404; return { error: { code: 'PERIOD_002', message: 'Meal period not found' } } }
+    return { ok: true }
   })
 
   .get('/buffet-pricing', async () => {

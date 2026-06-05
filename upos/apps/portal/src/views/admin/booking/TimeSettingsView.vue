@@ -189,17 +189,59 @@ import {
   PhPlus, PhMagnifyingGlass, PhPencilSimple, PhTrash,
   PhCheckCircle, PhCircle, PhWarning,
 } from '@phosphor-icons/vue'
-import {
-  listTimeSlots,
-  createTimeSlot,
-  updateTimeSlot,
-  deleteTimeSlot,
-} from '../../../api/booking'
-import type { BookingTimeSlot } from '../../../api/types'
+import api from '../../../api/axios'
 
-// Backend returns Mongo documents: _id is the string ObjectId
-interface SlotDoc extends Omit<BookingTimeSlot, 'id'> {
+// UI row shape — all logic uses this; _id is the Mongo ObjectId string
+interface SlotDoc {
   _id: string
+  name: string
+  meal: 'breakfast' | 'lunch' | 'dinner'
+  startTime: string
+  endTime: string
+  capacity: number
+  cutoffHours: number
+  description: string
+  enabled: boolean
+}
+
+// MealPeriod document as returned by the backend
+interface MealPeriod {
+  _id: string
+  code: string
+  name: string
+  startTime: string
+  endTime: string
+  cutoffMinutes: number
+  seatCapacity: number
+  description: string
+  active: boolean
+}
+
+function mpToRow(mp: MealPeriod): SlotDoc {
+  return {
+    _id: mp._id,
+    name: mp.name,
+    meal: mp.code.toLowerCase() as 'breakfast' | 'lunch' | 'dinner',
+    startTime: mp.startTime,
+    endTime: mp.endTime,
+    capacity: mp.seatCapacity,
+    cutoffHours: mp.cutoffMinutes / 60,
+    description: mp.description ?? '',
+    enabled: mp.active,
+  }
+}
+
+function rowToPayload(f: FormShape): Record<string, unknown> {
+  return {
+    code: f.meal.toUpperCase(),
+    name: f.name,
+    startTime: f.startTime,
+    endTime: f.endTime,
+    cutoffMinutes: Math.round(f.cutoffHours * 60),
+    seatCapacity: f.capacity,
+    description: f.description,
+    active: f.enabled,
+  }
 }
 
 const slots       = ref<SlotDoc[]>([])
@@ -244,7 +286,9 @@ onMounted(async () => {
   loading.value = true
   error.value = null
   try {
-    slots.value = (await listTimeSlots()) as unknown as SlotDoc[]
+    const { data } = await api.get('/menu/meal-periods', { params: { scope: 'all' } })
+    const list: MealPeriod[] = data.mealPeriods ?? data.periods ?? []
+    slots.value = list.map(mpToRow)
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ'
   } finally {
@@ -279,12 +323,13 @@ async function save() {
   error.value = null
   try {
     if (editTarget.value) {
-      const updated = await updateTimeSlot(editTarget.value._id, form.value) as unknown as SlotDoc
+      const { data } = await api.patch(`/menu/meal-periods/${editTarget.value._id}`, rowToPayload(form.value))
+      const updated = mpToRow(data.mealPeriod as MealPeriod)
       const idx = slots.value.findIndex(s => s._id === editTarget.value!._id)
       if (idx >= 0) slots.value[idx] = updated
     } else {
-      const created = await createTimeSlot(form.value as Omit<BookingTimeSlot, 'id'>) as unknown as SlotDoc
-      slots.value.push(created)
+      const { data } = await api.post('/menu/meal-periods', rowToPayload(form.value))
+      slots.value.push(mpToRow(data.mealPeriod as MealPeriod))
     }
     showModal.value = false
   } catch (e: unknown) {
@@ -298,7 +343,7 @@ async function deleteSlot(s: SlotDoc) {
   savingId.value = s._id
   error.value = null
   try {
-    await deleteTimeSlot(s._id)
+    await api.delete(`/menu/meal-periods/${s._id}`)
     slots.value = slots.value.filter(x => x._id !== s._id)
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'ลบไม่สำเร็จ'
@@ -311,7 +356,8 @@ async function toggleEnabled(s: SlotDoc) {
   savingId.value = s._id
   error.value = null
   try {
-    const updated = await updateTimeSlot(s._id, { enabled: !s.enabled }) as unknown as SlotDoc
+    const { data } = await api.patch(`/menu/meal-periods/${s._id}`, { active: !s.enabled })
+    const updated = mpToRow(data.mealPeriod as MealPeriod)
     const idx = slots.value.findIndex(x => x._id === s._id)
     if (idx >= 0) slots.value[idx] = updated
   } catch (e: unknown) {

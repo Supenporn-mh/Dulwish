@@ -164,7 +164,7 @@ async function loadInitialData() {
       api.get('/menu'),
     ])
 
-    mealPeriods.value = periodsRes.data.mealPeriods ?? []
+    mealPeriods.value = periodsRes.data.mealPeriods ?? periodsRes.data.periods ?? []
 
     const shops: Shop[] = shopsRes.data.shops ?? []
     const cafe = shops.find(s => s.code === 'CAFE')
