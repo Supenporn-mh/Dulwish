@@ -240,48 +240,31 @@ async function handleTopup() {
     const userId = child?.walletId ?? child?._id
     if (!userId) throw new Error('ไม่พบข้อมูลนักเรียน')
 
-    // Show QR modal immediately (mock flow)
     showQr.value = true
     loading.value = false
 
-    // Start countdown
+    // Countdown is visual only — does NOT trigger payment completion
     countdown.value = 30
     countdownTimer = setInterval(() => {
       countdown.value--
-      if (countdown.value <= 0) {
-        clearInterval(countdownTimer!)
-        // Simulate payment success
-        completePayment(userId)
-      }
+      if (countdown.value <= 0) clearInterval(countdownTimer!)
     }, 1000)
 
-    // Actually call API in parallel (fire-and-forget for mock)
-    try {
-      await walletStore.topup(userId, finalAmount.value, method.value)
-    } catch {
-      // In mock mode, we simulate success regardless
-    }
+    // Wait for actual API — topup() already calls fetchWallet internally
+    await walletStore.topup(userId, finalAmount.value, method.value)
+    clearInterval(countdownTimer!)
 
-    // Simulate payment success after 3 seconds for demo
-    setTimeout(() => {
-      if (!paymentDone.value) {
-        clearInterval(countdownTimer!)
-        completePayment(userId)
-      }
-    }, 3000)
+    // Refresh transactions (store already has updated balance)
+    walletStore.fetchTransactions(userId, true)
+
+    newBalance.value = walletStore.wallet?.balance ?? (currentBalance.value + finalAmount.value)
+    paymentDone.value = true
   } catch (e: any) {
+    clearInterval(countdownTimer!)
+    showQr.value = false
     loading.value = false
     error.value = e?.message ?? e?.response?.data?.message ?? 'เกิดข้อผิดพลาด กรุณาลองใหม่'
   }
-}
-
-async function completePayment(userId: string) {
-  newBalance.value = currentBalance.value + finalAmount.value
-  paymentDone.value = true
-  await Promise.all([
-    walletStore.fetchWallet(userId),
-    walletStore.fetchTransactions(userId, true),
-  ])
 }
 
 function closeQr() {
