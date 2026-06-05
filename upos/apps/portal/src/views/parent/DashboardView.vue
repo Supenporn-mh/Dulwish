@@ -36,6 +36,7 @@ const balance      = ref(0)
 const transactions = ref<Transaction[]>([])
 const loading      = ref(true)
 const apiBookings  = ref<Booking[]>([])  // จาก API
+let fetchSeq       = 0  // cancel stale wallet fetches
 
 // computed: merge store bookings (real-time) + API bookings, dedup per session
 const bookings = computed(() => {
@@ -145,12 +146,14 @@ async function fetchBookings(_childId: string) {
 
 async function fetchChildData(childId: string) {
   if (!childId) return
+  const mySeq = ++fetchSeq  // mark this fetch; discard if a newer one arrives first
   loading.value = true
   try {
     const [walletRes, txRes] = await Promise.all([
       api.get(`/wallets/${childId}`),
       api.get(`/wallets/${childId}/transactions?limit=5`),
     ])
+    if (mySeq !== fetchSeq) return  // stale — a newer fetchChildData has started
     balance.value = walletRes.data?.wallet?.balance ?? walletRes.data?.balance ?? 0
     parentStore.updateBalance(childId, balance.value)
 
@@ -174,10 +177,11 @@ async function fetchChildData(childId: string) {
       description: t.description ?? t.note ?? t.type,
     }))
   } catch {
+    if (mySeq !== fetchSeq) return
     balance.value = selectedChild.value?.balance ?? 0
     transactions.value = demoTransactions
   } finally {
-    loading.value = false
+    if (mySeq === fetchSeq) loading.value = false
   }
   fetchBookings(childId)
 }
