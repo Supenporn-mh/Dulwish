@@ -1,7 +1,21 @@
 <template>
-  <div style="display:flex;flex-direction:column;gap:12px">
+  <div style="background:#fff;border-radius:12px;border:1px solid #EBEBEB;overflow:hidden">
 
-    <!-- Page header — title อยู่ใน topbar ของ AdminLayout แล้ว -->
+    <!-- Tab bar -->
+    <div class="ay-tabs">
+      <button
+        v-for="tab in tabs"
+        :key="tab.key"
+        :class="['ay-tab', activeTab === tab.key ? 'ay-tab-active' : '']"
+        @click="activeTab = tab.key"
+      >{{ tab.label }}</button>
+    </div>
+
+    <div class="ay-content">
+    <!-- Tab: ภาคเรียน -->
+    <template v-if="activeTab === 'semesters'">
+
+    <!-- Page header -->
     <div class="flex items-center justify-between">
       <p style="font-size:13px;color:#8E8E93">จัดการปีการศึกษาและวันที่ของภาคเรียน</p>
       <button class="ay-btn-primary" @click="addYear">
@@ -327,6 +341,13 @@
       </button>
     </div>
 
+    </template>
+    <!-- Tab: ระดับชั้น -->
+    <GradeLevelTab v-else-if="activeTab === 'grades'" />
+    <!-- Tab: ลงทะเบียนระหว่างปี -->
+    <MidYearEnrollTab v-else-if="activeTab === 'mid-year-enroll'" />
+    </div><!-- /ay-content -->
+
   </div>
 </template>
 
@@ -344,6 +365,17 @@ import {
   updateAcademicYear,
   deleteAcademicYear,
 } from '@/api/settings'
+import GradeLevelTab from './GradeLevelTab.vue'
+import MidYearEnrollTab from './MidYearEnrollTab.vue'
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+const tabs = [
+  { key: 'semesters',       label: 'ภาคเรียน'           },
+  { key: 'grades',          label: 'ระดับชั้น'           },
+  { key: 'mid-year-enroll', label: 'ลงทะเบียนระหว่างปี' },
+] as const
+type TabKey = typeof tabs[number]['key']
+const activeTab = ref<TabKey>('semesters')
 
 // ── UI-extended type (UI-only fields never sent to API) ───────────────────────
 interface AcademicYearUI extends AcademicYear {
@@ -724,9 +756,9 @@ function cancelLeave() {
 .ay-year-input-error { border-color: var(--color-danger) !important; }
 
 /* Modal */
-.modal-backdrop { position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.4); }
+.modal-backdrop { position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.4); }
 .modal-box {
-  position:fixed;top:50%;left:50%;z-index:51;
+  position:fixed;top:50%;left:50%;z-index:201;
   transform:translate(-50%,-50%);
   background:#fff;border-radius:16px;
   /* default size — overridden per modal via inline style */
@@ -749,4 +781,30 @@ function cancelLeave() {
   overflow: hidden; max-height: 600px;
 }
 .expand-enter-from, .expand-leave-to { opacity: 0; max-height: 0; }
+
+/* ── Tabs ─────────────────────────────────────────────────────────────── */
+.ay-tabs {
+  display: flex; gap: 4px;
+  border-bottom: 1.5px solid #EBEBEB;
+  padding: 4px 20px 0;
+  margin-bottom: 0;
+}
+.ay-content {
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.ay-tab {
+  height: 36px; padding: 0 16px;
+  background: none; border: none;
+  font-size: 14px; font-weight: 500; font-family: inherit;
+  color: var(--color-text-secondary); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1.5px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.ay-tab:hover { color: #1C1C1E; }
+.ay-tab-active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
 </style>

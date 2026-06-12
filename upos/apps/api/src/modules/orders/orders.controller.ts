@@ -87,6 +87,15 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       channel: 'mobile_web',
       paymentMethod: 'card_wallet',
       status: 'success',
+      items: lineItems.map((li: any) => {
+        const menu = menuItems.find(m => String(m._id) === String(li.menuItemId))
+        return {
+          name:      menu?.name ?? '',
+          qty:       li.qty,
+          unitPrice: li.unitPrice,
+          lineTotal: li.lineTotal,
+        }
+      }),
     })
 
     const order = await Order.create({

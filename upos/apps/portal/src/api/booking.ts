@@ -5,6 +5,8 @@ import type {
   BookingTimeSlot,
   BookingMenuImportRow,
   ImportResult,
+  BookingConfig,
+  BookingBlackout,
 } from './types'
 
 // ── Normalizers ───────────────────────────────────────────────────────────────
@@ -90,4 +92,34 @@ export async function updateTimeSlot(id: string, payload: Partial<BookingTimeSlo
 export async function deleteTimeSlot(id: string): Promise<{ ok: true }> {
   const { data } = await api.delete(`/booking/time-slots/${id}`)
   return data
+}
+
+// ── Booking Schedule (/booking/config, /booking/blackouts) ───────────────────
+
+function normBlackout(b: any): BookingBlackout {
+  return { ...b, id: String(b._id ?? b.id) }
+}
+
+export async function getBookingConfig(): Promise<BookingConfig> {
+  const { data } = await api.get('/booking/config')
+  return data.config
+}
+
+export async function updateBookingConfig(openDays: number[]): Promise<BookingConfig> {
+  const { data } = await api.patch('/booking/config', { openDays })
+  return data.config
+}
+
+export async function listBookingBlackouts(): Promise<BookingBlackout[]> {
+  const { data } = await api.get('/booking/blackouts')
+  return (data.blackouts ?? []).map(normBlackout)
+}
+
+export async function createBookingBlackout(date: string, endDate?: string, reason?: string): Promise<BookingBlackout> {
+  const { data } = await api.post('/booking/blackouts', { date, endDate, reason })
+  return normBlackout(data.blackout)
+}
+
+export async function deleteBookingBlackout(id: string): Promise<void> {
+  await api.delete(`/booking/blackouts/${id}`)
 }

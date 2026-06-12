@@ -47,42 +47,51 @@
               <input v-model="form.price" type="number" class="pd-input" placeholder="ราคาสินค้า*" min="0" />
             </div>
             <div class="pd-field">
-              <input v-model="form.group" class="pd-input" placeholder="หมวดหมู่*" />
-            </div>
-          </div>
-          <div class="pd-row">
-            <div class="pd-field">
               <select v-model="form.unit" class="pd-input pd-select">
                 <option value="" disabled>หน่วยนับ*</option>
                 <option v-for="u in units" :key="u.id" :value="u.name">{{ u.name }}</option>
               </select>
             </div>
+          </div>
+          <div class="pd-row">
             <div class="pd-field">
               <select v-model="form.branch" class="pd-input pd-select">
                 <option value="" disabled>สาขา*</option>
-                <option value="00000">Headquarter (00000)</option>
+                <option v-for="b in branches" :key="b.code" :value="b.code">{{ b.name }} ({{ b.code }})</option>
               </select>
+            </div>
+            <div class="pd-field">
+              <div class="pd-float-wrap">
+                <label class="pd-float-label">ประเภทอาหาร</label>
+                <select v-model="form.categoryCode" class="pd-input pd-select pd-float-input">
+                  <option value="">-- ไม่ระบุ --</option>
+                  <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+                </select>
+              </div>
             </div>
           </div>
           <div class="pd-row">
             <div class="pd-field">
-              <select v-model="form.categoryCode" class="pd-input pd-select">
-                <option value="" disabled>หมวดหมู่</option>
-                <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
-              </select>
+              <div class="pd-float-wrap">
+                <label class="pd-float-label">ครัว</label>
+                <select v-model="form.kitchenCode" class="pd-input pd-select pd-float-input">
+                  <option value="">-- ไม่ระบุ --</option>
+                  <option v-for="k in kitchens" :key="k.id" :value="k.id">{{ k.name }}</option>
+                </select>
+              </div>
             </div>
-            <div class="pd-field">
-              <div style="display:flex;align-items:center;gap:10px">
-                <span style="font-size:13px;color:var(--color-text-secondary);white-space:nowrap">เลือกไอคอน</span>
-                <div style="display:flex;gap:8px">
-                  <button
-                    v-for="icon in ICONS"
-                    :key="icon"
-                    :class="['pd-icon-btn', form.icon===icon?'pd-icon-btn--on':'']"
-                    @click="form.icon = form.icon===icon ? '' : icon"
-                    type="button"
-                  >{{ icon }}</button>
-                </div>
+          </div>
+          <div class="pd-row">
+            <div class="pd-field" style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:13px;color:var(--color-text-secondary);white-space:nowrap">เลือกไอคอน</span>
+              <div style="display:flex;gap:8px">
+                <button
+                  v-for="icon in ICONS"
+                  :key="icon"
+                  :class="['pd-icon-btn', form.icon===icon?'pd-icon-btn--on':'']"
+                  @click="form.icon = form.icon===icon ? '' : icon"
+                  type="button"
+                >{{ icon }}</button>
               </div>
             </div>
           </div>
@@ -184,9 +193,14 @@ import {
   createProduct as apiCreateProduct,
   updateProduct as apiUpdateProduct,
   listCategories as apiListCategories,
+  listKitchens as apiListKitchens,
   listUnits as apiListUnits,
 } from '@/api/products'
-import type { Product, ProductCategory, Unit } from '@/api/types'
+import { listBranches } from '@/api/settings'
+import type { Product, ProductCategory, Kitchen, Unit } from '@/api/types'
+
+// local type — not exported, avoids touching api/types.ts
+interface BranchOption { code: string; name: string }
 
 const route  = useRoute()
 const router = useRouter()
@@ -194,7 +208,9 @@ const isNew  = computed(() => route.path.endsWith('/new'))
 const productCode = computed(() => route.params.id as string)
 
 const categories = ref<ProductCategory[]>([])
+const kitchens   = ref<Kitchen[]>([])
 const units      = ref<Unit[]>([])
+const branches   = ref<BranchOption[]>([])
 const ICONS = ['🍜','🍱','🥗','☕','🌿']
 
 const tab      = ref<'basic'|'extra'>('basic')
@@ -207,7 +223,7 @@ interface Attribute  { name: string; type: 'single'|'number'|'multiple'; options
 
 const form = ref({
   id: '', barcode: '', name: '', cost: null as number|null, price: null as number|null,
-  group: '', unit: '', branch: '', categoryCode: '', icon: '',
+  unit: '', branch: '', categoryCode: '', kitchenCode: '', icon: '',
   imageUrl: '', attributes: [] as Attribute[],
 })
 
@@ -215,12 +231,16 @@ const canSave       = computed(() => !!form.value.id && !!form.value.name)
 const attrSubmitted = ref(false)
 
 onMounted(async () => {
-  const [cats, unitList] = await Promise.all([
+  const [cats, kits, unitList, branchList] = await Promise.all([
     apiListCategories().catch(() => [] as ProductCategory[]),
+    apiListKitchens().catch(() => [] as Kitchen[]),
     apiListUnits().catch(() => [] as Unit[]),
+    listBranches().catch(() => [] as BranchOption[]),
   ])
   categories.value = cats
-  units.value = unitList
+  kitchens.value   = kits
+  units.value      = unitList
+  branches.value   = branchList
 
   if (isNew.value) return
   loading.value = true
@@ -234,10 +254,10 @@ onMounted(async () => {
       form.value.name         = p.name
       form.value.cost         = p.cost ?? null
       form.value.price        = p.price ?? null
-      form.value.group        = p.group ?? ''
       form.value.unit         = p.unit ?? ''
       form.value.branch       = p.branch ?? ''
       form.value.categoryCode = p.categoryCode ?? ''
+      form.value.kitchenCode  = p.kitchenCode ?? ''
       form.value.imageUrl     = p.imageUrl ?? ''
       form.value.attributes   = (p.attributes ?? []).map(a => ({
         name: a.name,
@@ -275,9 +295,9 @@ async function save() {
     price:        form.value.price ?? 0,
     cost:         form.value.cost ?? undefined,
     categoryCode: form.value.categoryCode,
+    kitchenCode:  form.value.kitchenCode || undefined,
     unit:         form.value.unit,
     barcode:      form.value.barcode || undefined,
-    group:        form.value.group || undefined,
     branch:       form.value.branch || undefined,
     imageUrl:     form.value.imageUrl || undefined,
     attributes:   form.value.attributes.length > 0 ? form.value.attributes : undefined,
@@ -313,7 +333,7 @@ async function save() {
   cursor:pointer; font-family:inherit; margin-bottom:-2px;
   transition:color 0.15s, border-color 0.15s, background 0.15s;
 }
-.pd-tab--inactive { background:var(--color-bg-secondary); color:var(--color-text-secondary); }
+.pd-tab--inactive { background:#fff; color:var(--color-text-secondary); }
 .pd-tab--active   { background:#fff; color:var(--color-primary); border-bottom-color:var(--color-primary); }
 
 /* Body */
@@ -324,8 +344,9 @@ async function save() {
   display:flex; gap:24px; align-items:flex-start;
 }
 .pd-fields { flex:1; display:flex; flex-direction:column; gap:14px; }
-.pd-row    { display:flex; gap:14px; }
+.pd-row    { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 .pd-field  { flex:1; }
+.pd-row > .pd-field:only-child { grid-column: 1 / -1; }
 
 /* Input */
 .pd-input {

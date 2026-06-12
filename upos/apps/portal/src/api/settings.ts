@@ -2,6 +2,7 @@ import api from './axios'
 import type {
   WalletPermission,
   AcademicYear,
+  GradeLevel,
   Branch,
   StoreSettings,
 } from './types'
@@ -57,6 +58,48 @@ export async function updateAcademicYear(
 export async function deleteAcademicYear(id: string): Promise<{ ok: true }> {
   const { data } = await api.delete(`/settings/academic-years/${id}`)
   return data
+}
+
+// ── Grade Levels (/settings/grade-levels) ────────────────────────────────────
+
+function normGradeLevel(g: any): GradeLevel {
+  return { ...g, id: String(g._id ?? g.id) }
+}
+
+export async function listGradeLevels(): Promise<GradeLevel[]> {
+  const { data } = await api.get('/settings/grade-levels')
+  return (data.gradeLevels ?? []).map(normGradeLevel)
+}
+
+export async function createGradeLevel(payload: Omit<GradeLevel, 'id'>): Promise<GradeLevel> {
+  const { data } = await api.post('/settings/grade-levels', payload)
+  return normGradeLevel(data.gradeLevel)
+}
+
+export async function updateGradeLevel(id: string, payload: Partial<GradeLevel>): Promise<GradeLevel> {
+  const { data } = await api.patch(`/settings/grade-levels/${id}`, payload)
+  return normGradeLevel(data.gradeLevel)
+}
+
+export async function reorderGradeLevels(items: { id: string; sortOrder: number }[]): Promise<GradeLevel[]> {
+  const { data } = await api.patch('/settings/grade-levels/reorder', { items })
+  return (data.gradeLevels ?? []).map(normGradeLevel)
+}
+
+export async function deleteGradeLevel(id: string): Promise<{ ok: true }> {
+  const { data } = await api.delete(`/settings/grade-levels/${id}`)
+  return data
+}
+
+// ── Mid-year Enrollment (/settings/mid-year-enroll) ──────────────────────────
+
+export async function midYearEnroll(payload: {
+  studentId: string
+  gradeLevel: string
+  className?: string
+}): Promise<any> {
+  const { data } = await api.post('/settings/mid-year-enroll', payload)
+  return data.student
 }
 
 // ── Store Settings (/settings/store) — singleton ─────────────────────────────

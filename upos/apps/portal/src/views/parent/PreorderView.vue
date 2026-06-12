@@ -34,6 +34,7 @@ onUnmounted(() => clearInterval(clockTick))
 // Thai labels by code — fallback to period.name if code unknown
 const CODE_TO_TH: Record<string, string> = {
   BREAKFAST: 'เช้า',
+  BREAK:     'เช้า',
   LUNCH:     'กลางวัน',
   DINNER:    'เย็น',
 }
@@ -151,6 +152,7 @@ const periodIdByKey = ref<Record<string, string>>({})
 // map backend mealPeriodCode → session key
 const CODE_TO_KEY: Record<string, string> = {
   BREAKFAST: 'breakfast',
+  BREAK:     'breakfast',
   LUNCH:     'lunch',
   DINNER:    'dinner',
 }
@@ -171,8 +173,8 @@ async function loadInitialData() {
     mealPeriods.value = periodsRes.data.mealPeriods ?? periodsRes.data.periods ?? []
 
     const shops: Shop[] = shopsRes.data.shops ?? []
-    const cafe = shops.find(s => s.code === 'CAFE')
-    cafeShopId.value = cafe?._id ?? ''
+    const canteen = shops.find(s => s.code === 'CANTEEN') ?? shops.find(s => s.code === 'CAFE') ?? shops[0]
+    cafeShopId.value = canteen?._id ?? ''
 
     const allItems: MenuItem[] = menuRes.data.items ?? []
     menuItems.value = allItems.filter(i => i.isPreorderable)
@@ -207,8 +209,50 @@ async function fetchStats(date: string) {
 
 watch(selectedISO, (date) => fetchStats(date))
 
-// ── Menu sheet ───────────────────────────────────────────────────────────────
+// ── Menu sheet / item selection ──────────────────────────────────────────────
 const menuSession = ref<MealSession | null>(null)
+
+// selectedQtys: menu_item_id → qty (0 = not selected)
+const selectedQtys = ref<Record<string, number>>({})
+
+// Reset selection when opening menu for a new session
+function openMenu(s: MealSession) {
+  selectedQtys.value = {}
+  menuSession.value = s
+}
+
+function incQty(itemId: string) {
+  selectedQtys.value = { ...selectedQtys.value, [itemId]: (selectedQtys.value[itemId] ?? 0) + 1 }
+}
+function decQty(itemId: string) {
+  const cur = selectedQtys.value[itemId] ?? 0
+  if (cur <= 0) return
+  const next = cur - 1
+  const updated = { ...selectedQtys.value }
+  if (next === 0) delete updated[itemId]
+  else updated[itemId] = next
+  selectedQtys.value = updated
+}
+
+// Whether at least one item is selected
+const hasSelection = computed(() =>
+  Object.values(selectedQtys.value).some(q => q > 0)
+)
+
+// Build items payload from selection
+const selectedItems = computed(() =>
+  Object.entries(selectedQtys.value)
+    .filter(([, q]) => q > 0)
+    .map(([menu_item_id, qty]) => ({ menu_item_id, qty }))
+)
+
+// Proceed from menu sheet → confirm sheet
+function confirmFromMenu() {
+  if (!hasSelection.value || !menuSession.value) return
+  const s = menuSession.value
+  menuSession.value = null
+  openConfirm(s)
+}
 
 // ── Confirm booking ───────────────────────────────────────────────────────────
 const confirmSession    = ref<MealSession | null>(null)
@@ -327,7 +371,6 @@ async function confirmCancel() {
   }
 }
 
-function openMenu(s: MealSession)    { menuSession.value = s }
 function openConfirm(s: MealSession) {
   if (isBooked(s)) return  // already booked — don't reopen
   bookingError.value   = ''
@@ -336,14 +379,14 @@ function openConfirm(s: MealSession) {
 
 async function submitBooking() {
   if (!confirmSession.value) return
-  const s           = confirmSession.value
-  const child       = parentStore.selectedChild
-  const periodId    = periodIdByKey.value[s.key]
-  const shopId      = cafeShopId.value
-  const firstItem   = menuItems.value[0]
+  const s        = confirmSession.value
+  const child    = parentStore.selectedChild
+  const periodId = periodIdByKey.value[s.key]
+  const shopId   = cafeShopId.value
+  const items    = selectedItems.value
 
-  if (!child || !periodId || !shopId || !firstItem) {
-    bookingError.value = 'ข้อมูลไม่ครบ — กรุณาลองใหม่'
+  if (!child || !periodId || !shopId || items.length === 0) {
+    bookingError.value = 'ข้อมูลไม่ครบ — กรุณาเลือกเมนูก่อน'
     return
   }
 
@@ -355,7 +398,7 @@ async function submitBooking() {
       shop_id:         shopId,
       meal_period_id:  periodId,
       serve_date:      selectedISO.value,
-      items: [{ menu_item_id: firstItem._id, qty: 1 }],
+      items,
     })
     const order = res.data.order
 
@@ -375,6 +418,15 @@ async function submitBooking() {
     bookingSuccess.value    = true
     confirmSession.value    = null
 
+    // Refresh quota counts so the bar updates immediately
+    fetchStats(selectedISO.value)
+
+    // Build fallback items from selection for store
+    const fallbackItems = items.map(sel => {
+      const mi = menuItems.value.find(m => m._id === sel.menu_item_id)
+      return { name: mi?.name ?? '', qty: sel.qty, lineTotal: (mi?.price ?? 0) * sel.qty }
+    })
+
     // Share to parentStore → DashboardView แสดง "การจองวันนี้" ทันที
     parentStore.addTodayBooking({
       id:          order?._id ?? `order-${Date.now()}`,
@@ -386,7 +438,7 @@ async function submitBooking() {
       sessionEn:   s.en,
       serveDate:   selectedISO.value,
       totalAmount: order?.totalAmount ?? 0,
-      items:       (order?.items ?? [{ name: firstItem.name, qty: 1, lineTotal: firstItem.price }])
+      items:       (order?.items ?? fallbackItems)
         .map((i: any) => ({
           name:      i.name ?? i.menuItemName ?? '',
           qty:       i.qty ?? i.quantity ?? 1,
@@ -401,8 +453,8 @@ async function submitBooking() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function sessionTitle(s: MealSession)  { return locale.lang === 'th' ? s.en : s.en }
-function sessionSub(s: MealSession)    { return locale.lang === 'th' ? s.th : s.th }
+function sessionTitle(s: MealSession)  { return s.en }
+function sessionSub(s: MealSession)    { return s.th }
 function remaining(s: MealSession)     { return s.quota - s.booked }
 
 function statusLabel(s: MealSession) {
@@ -509,14 +561,6 @@ function statusLabel(s: MealSession) {
 
         <!-- Action buttons -->
         <div class="flex gap-2 mt-4">
-          <button
-            @click="openMenu(s)"
-            class="btn-menu flex items-center gap-1.5"
-          >
-            <PhForkKnife :size="15" weight="fill" />
-            <span>{{ locale.t('เมนู', 'Menu') }}</span>
-          </button>
-
           <!-- จองแล้ว — ยังยกเลิกได้ (before cutoff) -->
           <template v-if="isBooked(s) && canCancel(s)">
             <button disabled class="btn-confirm btn-confirm-booked flex items-center justify-center gap-1.5" style="flex:1.5">
@@ -547,14 +591,16 @@ function statusLabel(s: MealSession) {
             {{ locale.t('ปิดรับจอง', 'Closed') }}
           </button>
 
-          <!-- เปิดรับจอง -->
-          <button
-            v-else
-            @click="openConfirm(s)"
-            class="btn-confirm flex-1"
-          >
-            {{ locale.t('ยืนยันการจอง', 'Book Now') }}
-          </button>
+          <!-- เปิดรับจอง — เลือกเมนูก่อน แล้วยืนยัน -->
+          <template v-else>
+            <button @click="openMenu(s)" class="btn-menu flex items-center gap-1.5">
+              <PhForkKnife :size="15" weight="fill" />
+              <span>{{ locale.t('เมนู', 'Menu') }}</span>
+            </button>
+            <button @click="openMenu(s)" class="btn-confirm flex-1">
+              {{ locale.t('จองอาหาร', 'Book Now') }}
+            </button>
+          </template>
         </div>
 
         <!-- Cancel success toast inline -->
@@ -572,33 +618,65 @@ function statusLabel(s: MealSession) {
 
   </div>
 
-  <!-- ── Menu sheet ─────────────────────────────────────────────────────────── -->
+  <!-- ── Menu sheet (item selection) ──────────────────────────────────────── -->
   <Teleport to="body">
     <Transition name="backdrop">
       <div v-if="menuSession" class="sheet-backdrop" @click="menuSession = null" />
     </Transition>
     <Transition name="sheet">
-      <div v-if="menuSession" class="bottom-sheet">
+      <div v-if="menuSession" class="bottom-sheet" style="max-height: 85vh; overflow-y: auto">
         <div class="sheet-handle" />
         <button class="sheet-close-btn" @click="menuSession = null">
           <PhX :size="16" weight="bold" />
         </button>
-        <p class="text-[18px] font-medium px-5 pb-3 pt-1" style="color: var(--color-text-primary)">
-          {{ menuSession.en }} — {{ locale.t('เมนู', 'Menu') }}
+        <p class="text-[18px] font-medium px-5 pb-1 pt-1" style="color: var(--color-text-primary)">
+          {{ menuSession.en }} — {{ locale.t('เลือกเมนู', 'Select Items') }}
         </p>
-        <div class="px-5 pb-8 flex flex-col gap-0 overflow-hidden rounded-[12px]" style="background: var(--color-bg-surface)">
+        <p class="text-[13px] px-5 pb-3" style="color: var(--color-text-secondary)">
+          {{ locale.t('เลือกอย่างน้อย 1 รายการ', 'Select at least 1 item') }}
+        </p>
+
+        <!-- Item list with qty controls -->
+        <div class="px-5 flex flex-col gap-0 overflow-hidden rounded-[12px]" style="background: var(--color-bg-surface)">
           <p v-if="menuItems.length === 0" class="text-[14px] py-3" style="color: var(--color-text-secondary)">
             {{ locale.t('ไม่มีเมนู', 'No menu items') }}
           </p>
           <div
             v-for="(item, i) in menuItems"
             :key="item._id"
-            class="flex items-center justify-between py-3"
+            class="flex items-center gap-3 py-3"
             :style="i > 0 ? 'border-top: 0.5px solid var(--color-border-tertiary)' : ''"
           >
-            <span class="text-[15px]" style="color: var(--color-text-primary)">{{ item.name }}</span>
-            <span class="text-[14px] font-medium" style="color: var(--color-primary)">฿{{ item.price }}</span>
+            <!-- Name + price -->
+            <div class="flex-1 min-w-0">
+              <p class="text-[15px]" style="color: var(--color-text-primary)">{{ item.name }}</p>
+              <p class="text-[13px] font-medium" style="color: var(--color-primary)">฿{{ item.price }}</p>
+            </div>
+            <!-- Qty stepper -->
+            <div class="flex items-center gap-2">
+              <button
+                class="qty-btn"
+                :disabled="!(selectedQtys[item._id] > 0)"
+                @click="decQty(item._id)"
+              >–</button>
+              <span class="w-5 text-center text-[15px] font-medium tabular-nums" style="color: var(--color-text-primary)">
+                {{ selectedQtys[item._id] ?? 0 }}
+              </span>
+              <button class="qty-btn qty-btn-add" @click="incQty(item._id)">+</button>
+            </div>
           </div>
+        </div>
+
+        <!-- Confirm button -->
+        <div class="px-5 pt-4 pb-8">
+          <button
+            class="btn-confirm w-full"
+            :class="!hasSelection ? 'btn-confirm-disabled' : ''"
+            :disabled="!hasSelection"
+            @click="confirmFromMenu"
+          >
+            {{ locale.t('เลือกเมนูนี้', 'Confirm Selection') }}
+          </button>
         </div>
       </div>
     </Transition>
@@ -633,7 +711,7 @@ function statusLabel(s: MealSession) {
                 {{ locale.t('มื้ออาหาร','Meal') }}
               </span>
               <span class="text-[14px] font-medium" style="color:var(--color-text-primary)">
-                {{ cancelSession.en }} · {{ cancelSession.th }}
+                {{ cancelSession.en }}
               </span>
             </div>
             <div class="flex justify-between">
@@ -715,7 +793,7 @@ function statusLabel(s: MealSession) {
                 {{ locale.t('มื้ออาหาร', 'Meal') }}
               </span>
               <span class="text-[14px] font-medium" style="color: var(--color-text-primary)">
-                {{ confirmSession.en }} · {{ confirmSession.th }}
+                {{ confirmSession.en }}
               </span>
             </div>
             <div class="flex justify-between">
@@ -724,6 +802,22 @@ function statusLabel(s: MealSession) {
               </span>
               <span class="text-[14px] font-medium" style="color: var(--color-text-primary)">
                 {{ displayDate }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Selected items summary -->
+          <div v-if="selectedItems.length > 0" class="card px-4 py-3 flex flex-col gap-1.5">
+            <p class="text-[12px] font-medium uppercase tracking-wide mb-1" style="color: var(--color-text-tertiary)">
+              {{ locale.t('เมนูที่เลือก', 'Selected Items') }}
+            </p>
+            <div v-for="sel in selectedItems" :key="sel.menu_item_id" class="flex justify-between">
+              <span class="text-[14px]" style="color: var(--color-text-primary)">
+                {{ menuItems.find(m => m._id === sel.menu_item_id)?.name ?? sel.menu_item_id }}
+                <span class="text-[12px]" style="color: var(--color-text-tertiary)"> ×{{ sel.qty }}</span>
+              </span>
+              <span class="text-[13px] font-medium" style="color: var(--color-primary)">
+                ฿{{ ((menuItems.find(m => m._id === sel.menu_item_id)?.price ?? 0) * sel.qty).toLocaleString() }}
               </span>
             </div>
           </div>
@@ -973,6 +1067,26 @@ function statusLabel(s: MealSession) {
   text-align: center;
   box-shadow: var(--shadow-modal);
 }
+
+/* Qty stepper buttons */
+.qty-btn {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-primary);
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.qty-btn:active { background: var(--color-primary-tint); }
+.qty-btn:disabled { border-color: var(--color-border-secondary); color: var(--color-border-secondary); cursor: not-allowed; }
+.qty-btn-add { background: var(--color-primary); color: #fff; }
+.qty-btn-add:active { opacity: 0.8; background: var(--color-primary); }
 
 /* Transitions */
 .sheet-enter-active, .sheet-leave-active   { transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); }

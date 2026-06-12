@@ -18,10 +18,16 @@ type TxType    = 'topup' | 'purchase' | 'buffet' | 'booking' | 'refund'
 type FilterKey = 'all' | TxType
 
 interface PurchaseItem { name: string; qty: number; price: number }
+
+// Structured item from API (purchase/buffet orders)
+interface ApiLineItem { name: string; qty: number; unitPrice: number; lineTotal: number }
+
 interface Transaction {
   id: string; type: TxType; description: string
   amount: number; createdAt: string
   refNo?: string; channel?: string; paymentMethod?: string
+  // structured items array from API (purchase/buffet)
+  items?: ApiLineItem[]
   // topup
   topupSource?: string
   // purchase
@@ -46,81 +52,6 @@ const RATING: Record<number, { th: string; en: string }> = {
   5: { th: 'ดีมาก',  en: 'Excellent'            },
 }
 function rLabel(n: number) { const r = RATING[n]; return r ? (locale.lang === 'th' ? r.th : r.en) : '' }
-
-// ── Demo data — ใช้ hours offset เพื่อให้ข้อมูลอยู่ในเดือนปัจจุบันเสมอ ────────
-const D = Date.now()
-const H = 3600000  // 1 hour in ms
-
-const DEMO: Transaction[] = [
-  // Top-ups (ครอบคลุมทุกช่องทาง)
-  { id:'t1',  type:'topup', description:'เติมเงินผ่าน PromptPay',
-    amount:  500, createdAt: new Date(D - H*1).toISOString(),
-    refNo:'TXN001', channel:'mobile_web', paymentMethod:'promptpay',
-    topupSource:'PromptPay' },
-  { id:'t5',  type:'topup', description:'เติมเงินผ่าน WeChat Pay',
-    amount:  300, createdAt: new Date(D - H*6).toISOString(),
-    refNo:'TXN004', channel:'mobile_web', paymentMethod:'wechat',
-    topupSource:'WeChat Pay' },
-  { id:'t10', type:'topup', description:'เติมเงินผ่าน Credit Card',
-    amount: 1000, createdAt: new Date(D - H*10).toISOString(),
-    refNo:'TXN008', channel:'mobile_web', paymentMethod:'credit_card',
-    topupSource:'Visa Credit Card' },
-  { id:'t13', type:'topup', description:'เติมเงินผ่านเจ้าหน้าที่',
-    amount:  200, createdAt: new Date(D - H*16).toISOString(),
-    refNo:'TXN011', channel:'kiosk', paymentMethod:'staff',
-    topupSource:'เจ้าหน้าที่โรงเรียน' },
-
-  // Purchases (มีรายการสินค้าชัดเจน)
-  { id:'t2',  type:'purchase', description:'ซื้อ Ham Sandwich + โค้ก',
-    amount: -110, createdAt: new Date(D - H*2).toISOString(),
-    refNo:'TXN002', channel:'kiosk', paymentMethod:'wallet',
-    purchaseItems:[{ name:'Ham Sandwich', qty:1, price:85 },{ name:'โค้ก 1 กระป๋อง', qty:1, price:25 }] },
-  { id:'t6',  type:'purchase', description:'ซื้อ Chicken Wrap + น้ำเปล่า',
-    amount: -115, createdAt: new Date(D - H*7).toISOString(),
-    refNo:'TXN005', channel:'kiosk', paymentMethod:'wallet',
-    purchaseItems:[{ name:'Chicken Wrap', qty:1, price:95 },{ name:'น้ำเปล่า 1 ขวด', qty:1, price:20 }] },
-  { id:'t11', type:'purchase', description:'ซื้อ Blueberry Muffin + Orange Juice',
-    amount: -90, createdAt: new Date(D - H*11).toISOString(),
-    refNo:'TXN009', channel:'kiosk', paymentMethod:'wallet',
-    purchaseItems:[{ name:'Blueberry Muffin', qty:2, price:45 }] },
-
-  // Buffets
-  { id:'t3', type:'buffet', description:'Buffet กลางวัน K1-A',
-    amount: -120, createdAt: new Date(D - H*3).toISOString(),
-    refNo:'TXN003', channel:'kiosk', paymentMethod:'wallet',
-    buffetSession:'lunch',
-    buffetItems:['ข้าวผัดกุ้ง','ต้มยำไก่','ไข่เจียว','น้ำส้มคั้น','ขนมปังปิ้งเนย'] },
-  { id:'t7', type:'buffet', description:'Buffet เช้า K1-A',
-    amount: -80, createdAt: new Date(D - H*8).toISOString(),
-    refNo:'TXN006', channel:'kiosk', paymentMethod:'wallet',
-    buffetSession:'breakfast',
-    buffetItems:['โจ๊กไก่','ไข่ดาว','ไส้กรอก','นมจืด','น้ำเก๊กฮวย'] },
-  { id:'t12', type:'buffet', description:'Buffet เย็น K1-A',
-    amount: -150, createdAt: new Date(D - H*14).toISOString(),
-    refNo:'TXN010', channel:'kiosk', paymentMethod:'wallet',
-    buffetSession:'dinner',
-    buffetItems:['ผัดไทย','ต้มข่าไก่','ข้าวสวย','น้ำมะนาว','ไอศกรีม'] },
-
-  // Bookings
-  { id:'t4', type:'booking', description:'จองอาหาร Breakfast',
-    amount: 0, createdAt: new Date(D - H*4).toISOString(),
-    refNo:'BKG001', channel:'mobile_web',
-    bookingMeal:'breakfast',
-    bookingStatus:'consumed',
-    bookingItems:['Ham Sandwich ×1','Orange Juice ×1'] },
-  { id:'t8', type:'booking', description:'จองอาหาร Lunch',
-    amount: 0, createdAt: new Date(D - H*9).toISOString(),
-    refNo:'BKG002', channel:'mobile_web',
-    bookingMeal:'lunch',
-    bookingStatus:'confirmed',
-    bookingItems:['Veggie Salad ×1','Blueberry Muffin ×1','Green Tea ×1'] },
-
-  // Refund
-  { id:'t9', type:'refund', description:'คืนเงินรายการที่ยกเลิก',
-    amount: 85, createdAt: new Date(D - H*13).toISOString(),
-    refNo:'TXN007', channel:'system', paymentMethod:'wallet',
-    refundFor:'TXN002' },
-]
 
 // ── Month navigation ──────────────────────────────────────────────────────────
 const today       = new Date()
@@ -225,7 +156,7 @@ function fmtAmt(n: number) { return `฿${n.toLocaleString('th-TH', { minimumFra
 interface Group { label: string; items: Transaction[] }
 const grouped = computed((): Group[] => {
   const todayStr = today.toDateString()
-  const yestStr  = new Date(D-86400000).toDateString()
+  const yestStr  = new Date(today.getTime() - 86400000).toDateString()
   const map: Record<string, Transaction[]> = {}
   for (const tx of typeFiltered.value) {
     const d = new Date(tx.createdAt)
@@ -284,16 +215,21 @@ function txIcon(t: TxType)      { return t==='topup' ? PhArrowUp : t==='purchase
 function txIconColor(t: TxType) { return t==='topup'?'#03BA81': t==='purchase'?'#FF9800': t==='buffet'?'#1264E3': t==='booking'?'#3C3489':'#999999' }
 function txIconBg(t: TxType)    { return t==='topup'?'#E0FAF3': t==='purchase'?'#FFF3E0': t==='buffet'?'#EAF1FD': t==='booking'?'#EEEDFE':'#F5F5F5' }
 
-// Derive purchase items from description when API data has no purchaseItems
+// Derive purchase items — prefer structured items array, fall back to purchaseItems, then description parse
 function derivePurchaseItems(tx: Transaction): PurchaseItem[] {
+  // 1. Structured items array from API (purchase/buffet transactions)
+  if (tx.items?.length) {
+    return tx.items.map(i => ({ name: i.name, qty: i.qty, price: i.unitPrice ?? (i.lineTotal / (i.qty || 1)) }))
+  }
+  // 2. Legacy purchaseItems field
   if (tx.purchaseItems?.length) return tx.purchaseItems
+  // 3. Fallback: derive from description string
   if (tx.type !== 'purchase' || !tx.amount) return []
-  // Parse "ซื้อ Ham Sandwich" or "Buy Ham Sandwich" → [{name, qty:1, price}]
   const desc = (tx.description ?? '')
     .replace(/^ซื้อ\s+/i, '')
     .replace(/^Buy\s+/i, '')
     .trim()
-  const qty  = 1
+  const qty   = 1
   const price = Math.abs(tx.amount) / qty
   return desc ? [{ name: desc, qty, price }] : [{ name: locale.t('รายการสินค้า','Item'), qty:1, price: Math.abs(tx.amount) }]
 }
@@ -387,6 +323,7 @@ async function fetchHistory(childId: string) {
         ...t,
         id:          t.id ?? t._id,
         description: t.description ?? t.note ?? '',
+        items:       t.items ?? undefined,
       }))
     : []
 
@@ -451,9 +388,19 @@ watch(() => parentStore.selectedChildId, (newId) => {
 
     <!-- ── Sub-header: subtitle + date filter + summary ──────────────── -->
     <div class="px-4 pt-3 pb-4" style="background:var(--color-bg-surface); border-bottom:0.5px solid var(--color-border-tertiary)">
-      <p class="text-[12px] mb-3" style="color:var(--color-text-secondary)">
-        {{ locale.t('ข้อมูลย้อนหลัง 12 เดือน','Spending data available past 12 months') }}
-      </p>
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-[12px]" style="color:var(--color-text-secondary)">
+          {{ locale.t('ข้อมูลย้อนหลัง 12 เดือน','Spending data available past 12 months') }}
+        </p>
+        <!-- Date range filter trigger -->
+        <button
+          @click="openDateSheet()"
+          :class="['date-filter-btn', hasDateFilter && 'active']"
+        >
+          <PhCalendarBlank :size="13" weight="bold"/>
+          {{ hasDateFilter ? dateFilterLabel : locale.t('กรอง','Filter') }}
+        </button>
+      </div>
 
       <!-- Summary cards -->
       <div class="grid grid-cols-2 gap-3 mt-3">
@@ -613,12 +560,21 @@ watch(() => parentStore.selectedChildId, (newId) => {
                     <span class="dv">{{ deriveVenue(tx) }}</span>
                   </div>
                 </div>
-                <!-- Items -->
-                <div class="detail-section" v-if="tx.buffetItems?.length">
+                <!-- Items: structured items array preferred, fall back to buffetItems strings -->
+                <div class="detail-section" v-if="tx.items?.length || tx.buffetItems?.length">
                   <p class="detail-section-title">{{ locale.t('เมนูที่กินในมื้อนี้','Consumed Items') }}</p>
-                  <div class="items-grid">
-                    <span v-for="item in tx.buffetItems" :key="item" class="item-chip">{{ item }}</span>
-                  </div>
+                  <template v-if="tx.items?.length">
+                    <div v-for="item in tx.items" :key="item.name" class="purchase-row">
+                      <span class="flex-1 text-[14px]" style="color:var(--color-text-primary)">{{ item.name }}</span>
+                      <span class="text-[13px]" style="color:var(--color-text-secondary)">×{{ item.qty }}</span>
+                      <span class="text-[14px] font-medium w-16 text-right" style="color:var(--color-text-primary)">{{ fmtAmt(item.lineTotal) }}</span>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="items-grid">
+                      <span v-for="item in tx.buffetItems" :key="item" class="item-chip">{{ item }}</span>
+                    </div>
+                  </template>
                 </div>
                 <div class="review-section">
                   <div v-if="rated.has(tx.id)" class="flex items-center justify-between">

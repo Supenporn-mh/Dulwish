@@ -36,10 +36,10 @@ async function submitFeedback() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        channel: 'kiosk',
-        rating: rating.value,
-        category: selectedCategory.value,
-        comment: comment.value.trim(),
+        channel:  'kiosk',
+        rating:   rating.value,
+        category: selectedCategory.value || undefined,
+        comment:  comment.value.trim() || undefined,
       }),
     })
   } catch {

@@ -102,6 +102,7 @@ function startQrTimer() {
 async function simulatePayment() {
   if (submitting.value || qrExpired.value) return
   submitting.value = true
+  errorType.value  = null
   if (qrTimer) clearInterval(qrTimer)
 
   try {
@@ -113,17 +114,19 @@ async function simulatePayment() {
       paymentMethod: selectedMethod.value === 'promptpay' ? 'scb_qr' : 'credit_card',
     })
     childBalance.value += numericAmount.value
-  } catch {
-    childBalance.value += numericAmount.value // demo fallback
-  }
-
-  paidAmount.value  = numericAmount.value
-  successAt.value   = new Date()
-  submitting.value  = false
-  phase.value       = 'success'
-  // Update store balance so dashboard reflects new amount
-  if (activeChild.value) {
-    parentStore.updateBalance(activeChild.value.id, childBalance.value)
+    paidAmount.value    = numericAmount.value
+    successAt.value     = new Date()
+    phase.value         = 'success'
+    // Update store balance so dashboard reflects new amount
+    if (activeChild.value) {
+      parentStore.updateBalance(activeChild.value.id, childBalance.value)
+    }
+  } catch (err: any) {
+    // Show real error — no demo fallback
+    const status = err?.response?.status
+    errorType.value = status === 503 || status === 500 ? 'service' : 'network'
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -267,6 +270,11 @@ onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })
              style="border: 2px dashed var(--color-border-secondary); background: var(--color-bg-secondary)">
           <PhQrCode :size="72" weight="thin" style="color: var(--color-text-tertiary)" />
           <span class="text-[11px] font-medium" style="color: var(--color-text-tertiary)">SCAN QR CODE</span>
+          <!-- Test mode label — payment is simulated, not real -->
+          <span class="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                style="background: var(--color-warning-bg); color: var(--color-warning)">
+            โหมดทดสอบ
+          </span>
         </div>
 
         <div class="text-center">

@@ -603,7 +603,7 @@
               <div class="promo-year-col">
                 <label class="promo-label">จากปีการศึกษา</label>
                 <select v-model="promoteFromYear" class="promo-select">
-                  <option v-for="y in ACADEMIC_YEARS" :key="y" :value="y">{{ y }}</option>
+                  <option v-for="y in academicYears" :key="y" :value="y">{{ y }}</option>
                 </select>
               </div>
               <div class="promo-year-col">
@@ -742,6 +742,7 @@ import {
 } from '@phosphor-icons/vue'
 import * as XLSX from 'xlsx'
 import api from '@/api/axios'
+import { listAcademicYears } from '@/api/settings'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Student {
@@ -765,7 +766,8 @@ interface Student {
 // ── Constants ─────────────────────────────────────────────────────────────────
 const GRADES = ['K1','K2','P1','P2','P3','P4','P5','P6','S1','S2','S3','S4','S5','S6']
 const PRE_ORDER_GRADES = ['K1','K2']
-const ACADEMIC_YEARS  = ['2023/2024','2024/2025','2025/2026','2026/2027','2027/2028']
+// populated from API; fallback keeps the UI usable if API is slow/unreachable
+const academicYears = ref<string[]>(['2023/2024','2024/2025','2025/2026','2026/2027','2027/2028'])
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const loading          = ref(false)
@@ -1367,7 +1369,17 @@ async function fetchStudents() {
   }
 }
 
-onMounted(fetchStudents)
+onMounted(async () => {
+  await fetchStudents()
+  try {
+    const years = await listAcademicYears()
+    if (years.length > 0) {
+      academicYears.value = years.map(y => y.year)
+    }
+  } catch {
+    // keep fallback values
+  }
+})
 </script>
 
 <style scoped>

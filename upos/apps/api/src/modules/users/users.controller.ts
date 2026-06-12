@@ -96,6 +96,75 @@ export const usersController = new Elysia({ prefix: '/users' })
     return { cards }
   })
 
+  .post('/:id/cards', async ({ params, body, currentUser, set }) => {
+    if (!['admin','supervisor'].includes(currentUser.role)) {
+      set.status = 403
+      return { error: { code: 'AUTH_008', message: 'Forbidden' } }
+    }
+    const user = await User.findById(params.id).lean()
+    if (!user) {
+      set.status = 404
+      return { error: { code: 'NOT_FOUND', message: 'User not found' } }
+    }
+    const existing = await Card.findOne({ cardUid: body.cardUid }).lean()
+    if (existing) {
+      set.status = 400
+      return { error: { code: 'CARD_001', message: 'Card UID already exists' } }
+    }
+    const card = await Card.create({
+      cardUid:  body.cardUid,
+      userId:   params.id,
+      cardType: body.cardType,
+    })
+    return { card }
+  }, {
+    body: t.Object({
+      cardUid:  t.String(),
+      cardType: t.Union([t.Literal('student'), t.Literal('staff'), t.Literal('visitor_temp')]),
+    }),
+  })
+
+  .patch('/:id/cards/:cardId', async ({ params, body, currentUser, set }) => {
+    if (!['admin','supervisor'].includes(currentUser.role)) {
+      set.status = 403
+      return { error: { code: 'AUTH_008', message: 'Forbidden' } }
+    }
+    const card = await Card.findOne({ _id: params.cardId, userId: params.id })
+    if (!card) {
+      set.status = 404
+      return { error: { code: 'NOT_FOUND', message: 'Card not found' } }
+    }
+    card.status = body.status
+    if (body.status === 'lost' || body.status === 'inactive') {
+      card.deactivatedAt = new Date()
+      if (body.reason !== undefined) card.reason = body.reason
+    } else {
+      // reactivating
+      card.deactivatedAt = undefined
+      card.reason = undefined
+    }
+    await card.save()
+    return { card: card.toObject() }
+  }, {
+    body: t.Object({
+      status: t.Union([t.Literal('active'), t.Literal('inactive'), t.Literal('lost')]),
+      reason: t.Optional(t.String()),
+    }),
+  })
+
+  .delete('/:id/cards/:cardId', async ({ params, currentUser, set }) => {
+    if (!['admin','supervisor'].includes(currentUser.role)) {
+      set.status = 403
+      return { error: { code: 'AUTH_008', message: 'Forbidden' } }
+    }
+    const deleted = await Card.findOneAndDelete({ _id: params.cardId, userId: params.id })
+    if (!deleted) {
+      set.status = 404
+      return { error: { code: 'NOT_FOUND', message: 'Card not found' } }
+    }
+    return { ok: true }
+  })
+
   .post('/me/add-student', async ({ body, currentUser, set }) => {
     if (currentUser.role !== 'parent') {
       set.status = 403

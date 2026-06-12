@@ -7,6 +7,16 @@
       <div v-for="i in 6" :key="i" class="policy-skeleton" />
     </div>
 
+    <!-- Load error -->
+    <div v-else-if="loadError" style="padding:24px;color:var(--color-danger);background:#FEF2F2;border-radius:10px;font-size:14px">
+      {{ loadError }}
+    </div>
+
+    <!-- Empty -->
+    <div v-else-if="policies.length === 0" style="padding:40px;text-align:center;color:#AEAEB2;font-size:13px">
+      ไม่มีข้อมูลนโยบาย
+    </div>
+
     <!-- Policy cards -->
     <div v-else class="policies-grid">
       <div
@@ -50,7 +60,7 @@
                 </button>
                 <button
                   class="cancel-icon-btn"
-                  @click="editing = null"
+                  @click="editing = null; saveError = null"
                   title="ยกเลิก"
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -58,6 +68,7 @@
                   </svg>
                 </button>
               </div>
+              <p v-if="saveError && editing === p.key" class="policy-save-error">{{ saveError }}</p>
               <p class="policy-desc">{{ p.description }}</p>
             </template>
           </div>
@@ -87,20 +98,13 @@ interface Policy {
   description: string
 }
 
-const DEFAULTS: Policy[] = [
-  { key: 'negative_balance_limit',     value: 100,  description: 'ติดลบได้สูงสุด (฿)' },
-  { key: 'low_balance_threshold',      value: 200,  description: 'เตือนเมื่อยอดต่ำกว่า (฿)' },
-  { key: 'topup_min',                  value: 20,   description: 'เติมเงินขั้นต่ำ (฿)' },
-  { key: 'topup_max',                  value: 5000, description: 'เติมเงินสูงสุดต่อครั้ง (฿)' },
-  { key: 'preorder_max_days',          value: 7,    description: 'สั่งล่วงหน้าได้กี่วัน' },
-  { key: 'verification_code_ttl_days', value: 14,   description: 'อายุรหัสยืนยัน (วัน)' },
-]
-
 const loading = ref(false)
+const loadError = ref<string | null>(null)
 const policies = ref<Policy[]>([])
 const editing = ref<string | null>(null)
 const editVal = ref('')
 const saving = ref<string | null>(null)
+const saveError = ref<string | null>(null)
 
 function formatVal(key: string, val: number | string): string {
   const monetaryKeys = ['limit', 'threshold', 'min', 'max']
@@ -119,34 +123,29 @@ async function save(p: Policy) {
   const num = Number(raw)
   const val = !isNaN(num) && raw !== '' ? num : raw
   saving.value = p.key
+  saveError.value = null
   try {
     await api.patch(`/admin/policies/${p.key}`, { value: val })
     p.value = val
+    editing.value = null
     ElMessage.success('บันทึกสำเร็จ')
-  } catch {
-    p.value = val
-    ElMessage.warning('API ไม่พร้อม — อัปเดตเฉพาะ UI')
+  } catch (e: unknown) {
+    saveError.value = e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ'
+    // p.value is NOT updated — keep the old value
   } finally {
     saving.value = null
-    editing.value = null
   }
 }
 
 onMounted(async () => {
   loading.value = true
+  loadError.value = null
   try {
     const { data } = await api.get('/admin/policies')
-    const apiPolicies: Policy[] = data.policies ?? []
-    if (apiPolicies.length > 0) {
-      policies.value = apiPolicies.map((p) => ({
-        ...p,
-        description: DEFAULTS.find((d) => d.key === p.key)?.description ?? '',
-      }))
-    } else {
-      policies.value = DEFAULTS
-    }
-  } catch {
-    policies.value = DEFAULTS
+    policies.value = data.policies ?? []
+  } catch (e: unknown) {
+    loadError.value = e instanceof Error ? e.message : 'โหลดนโยบายไม่สำเร็จ'
+    policies.value = []
   } finally {
     loading.value = false
   }
@@ -226,6 +225,12 @@ onMounted(async () => {
   color: #6E6E73;
   margin: 0;
   line-height: 1.4;
+}
+
+.policy-save-error {
+  font-size: 12px;
+  color: #FF3B30;
+  margin: 0 0 4px 0;
 }
 
 /* Edit mode */

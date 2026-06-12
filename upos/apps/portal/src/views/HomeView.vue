@@ -42,12 +42,12 @@
         </button>
       </div>
 
-      <!-- Parent register shortcut -->
+      <!-- Register shortcut -->
       <div class="flex items-center justify-center mt-3">
         <button @click="router.push('/parent/register')"
           class="text-[13px] font-medium underline"
           style="color: var(--color-primary); background: none; border: none; cursor: pointer; padding: 4px 0;">
-          ผู้ปกครองใหม่? ลงทะเบียนที่นี่
+          ยังไม่มีบัญชี? ลงทะเบียนที่นี่
         </button>
       </div>
 

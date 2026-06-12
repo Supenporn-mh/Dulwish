@@ -33,17 +33,21 @@ const parentStudentSchema = new Schema({
   boundAt:       { type: Date, default: Date.now },
 })
 parentStudentSchema.index({ parentUserId: 1, studentUserId: 1 }, { unique: true })
-parentStudentSchema.index({ studentUserId: 1 }, { unique: true })
+// A student may be linked to multiple parents — only the (parent,student) pair is unique.
+// studentUserId is indexed (non-unique) for lookup performance.
+parentStudentSchema.index({ studentUserId: 1 })
 
 export const ParentStudent = mongoose.model('ParentStudent', parentStudentSchema)
 
 // ─── EnrollmentCode ────────────────────────────────────────────────────────────
 const enrollmentCodeSchema = new Schema({
   code:            { type: String, required: true, unique: true },
-  studentUserId:   { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  studentUserId:   { type: Schema.Types.ObjectId, ref: 'User' },
+  memberUserId:    { type: Schema.Types.ObjectId, ref: 'User' },
   used:            { type: Boolean, default: false },
   usedAt:          { type: Date },
   usedByParentId:  { type: Schema.Types.ObjectId, ref: 'User' },
+  usedByMemberId:  { type: Schema.Types.ObjectId, ref: 'User' },
   expiresAt:       { type: Date, required: true },
   createdBy:       { type: Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: { createdAt: true, updatedAt: false } })
@@ -85,6 +89,15 @@ const txnSplitSchema = new Schema({
   ref:             { type: String },
 }, { _id: false })
 
+// Structured line-item snapshot stored on the transaction so history screens
+// don't have to parse the free-text `note`/description.
+const txnItemSchema = new Schema({
+  name:      { type: String, required: true },
+  qty:       { type: Number, default: 1 },
+  unitPrice: { type: Number, default: 0 },
+  lineTotal: { type: Number, default: 0 },
+}, { _id: false })
+
 const transactionSchema = new Schema({
   refNo:           { type: String, required: true, unique: true },
   walletId:        { type: Schema.Types.ObjectId, ref: 'Wallet', required: true },
@@ -99,10 +112,11 @@ const transactionSchema = new Schema({
   relatedOrderId:  { type: Schema.Types.ObjectId, ref: 'Order' },
   relatedBuffetId: { type: Schema.Types.ObjectId, ref: 'BuffetSession' },
   voidedByTxnId:  { type: Schema.Types.ObjectId, ref: 'Transaction' },
-  status:          { type: String, default: 'success', enum: ['pending','success','failed','voided'] },
+  status:          { type: String, default: 'success', enum: ['pending','success','failed','voided','wait'] },
   note:            { type: String },
   metadata:        { type: Schema.Types.Mixed },
   splits:          [txnSplitSchema],
+  items:           [txnItemSchema],
 }, { timestamps: true })
 transactionSchema.index({ walletId: 1, createdAt: -1 })
 transactionSchema.index({ type: 1, createdAt: -1 })
@@ -162,10 +176,23 @@ const mealPeriodSchema = new Schema({
 
 export const MealPeriod = mongoose.model('MealPeriod', mealPeriodSchema)
 
+// ─── BuffetRound ──────────────────────────────────────────────────────────────
+const buffetRoundSchema = new Schema({
+  name:      { type: String, required: true },
+  startTime: { type: String, required: true }, // "07:00"
+  endTime:   { type: String, required: true }, // "09:00"
+  active:    { type: Boolean, default: true },
+  sortOrder: { type: Number, default: 0 },
+}, { timestamps: true })
+
+export const BuffetRound = mongoose.model('BuffetRound', buffetRoundSchema)
+
 // ─── BuffetPricing ────────────────────────────────────────────────────────────
 const buffetPricingSchema = new Schema({
-  userGroup:     { type: String, required: true, enum: ['primary','secondary','staff','visitor'] },
-  mealPeriodId:  { type: Schema.Types.ObjectId, ref: 'MealPeriod' },
+  userType:      { type: String, required: true, enum: ['member', 'student'] },
+  gradeLevelId:  { type: Schema.Types.ObjectId, ref: 'GradeLevel' }, // student only
+  buffetRoundId: { type: Schema.Types.ObjectId, ref: 'BuffetRound' }, // null = all rounds
+  categoryIds:   [{ type: Schema.Types.ObjectId, ref: 'BuffetCategory' }], // empty = all categories
   price:         { type: Number, required: true },
   effectiveFrom: { type: Date, required: true },
   effectiveTo:   { type: Date },
@@ -176,15 +203,20 @@ export const BuffetPricing = mongoose.model('BuffetPricing', buffetPricingSchema
 // ─── BuffetSession ────────────────────────────────────────────────────────────
 const buffetSessionSchema = new Schema({
   userId:        { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  mealPeriodId:  { type: Schema.Types.ObjectId, ref: 'MealPeriod', required: true },
+  buffetRoundId: { type: Schema.Types.ObjectId, ref: 'BuffetRound', required: true },
   entryDate:     { type: String, required: true },
   priceCharged:  { type: Number, required: true },
   payMethod:     { type: String, required: true },
   transactionId: { type: Schema.Types.ObjectId, ref: 'Transaction' },
   enteredAt:     { type: Date, default: Date.now },
+  buffetCategoryId: { type: Schema.Types.ObjectId, ref: 'BuffetCategory' },
   deviceId:      { type: String },
+  voidedAt:      { type: Date },    // set when voided (soft-delete)
+  voidReason:    { type: String },
 })
-buffetSessionSchema.index({ userId: 1, mealPeriodId: 1, entryDate: 1 }, { unique: true })
+// unique only among non-voided sessions — enforced in application code, not DB
+buffetSessionSchema.index({ userId: 1, entryDate: 1 })
+buffetSessionSchema.index({ entryDate: 1, voidedAt: 1 })
 
 export const BuffetSession = mongoose.model('BuffetSession', buffetSessionSchema)
 
@@ -205,7 +237,7 @@ const orderSchema = new Schema({
   mealPeriodId:         { type: Schema.Types.ObjectId, ref: 'MealPeriod', required: true },
   serveDate:            { type: String, required: true },
   totalAmount:          { type: Number, required: true },
-  status:               { type: String, default: 'confirmed', enum: ['pending_payment','confirmed','redeemed','cancelled','expired'] },
+  status:               { type: String, default: 'confirmed', enum: ['pending_payment','confirmed','redeemed','cancelled','expired','select_payment','wait_payment','complete','void'] },
   items:                [orderItemSchema],
   redeemedAt:           { type: Date },
   redeemedByCashierId:  { type: Schema.Types.ObjectId, ref: 'User' },
@@ -217,6 +249,34 @@ orderSchema.index({ studentUserId: 1, serveDate: 1 })
 orderSchema.index({ serveDate: 1, status: 1 })
 
 export const Order = mongoose.model('Order', orderSchema)
+
+// ─── TaxInvoice ───────────────────────────────────────────────────────────────
+const partySchema = new Schema({
+  name:    { type: String, default: '' },
+  address: { type: String, default: '' },
+  taxId:   { type: String, default: '' },
+  branch:  { type: String, default: '' },
+  phone:   { type: String, default: '' },
+  email:   { type: String, default: '' },
+}, { _id: false })
+
+const taxInvoiceSchema = new Schema({
+  transactionId:  { type: Schema.Types.ObjectId, ref: 'Transaction', required: true, unique: true },
+  invoiceNo:      { type: String, required: true },
+  issuedAt:       { type: Date, required: true },
+  seller:         { type: partySchema, default: () => ({}) },
+  buyer:          {
+    type: new Schema({ ...partySchema.obj, paymentMethod: { type: String, default: '' } }, { _id: false }),
+    default: () => ({}),
+  },
+  subtotal:       { type: Number, default: 0 },
+  vatAmount:      { type: Number, default: 0 },
+  grandTotal:     { type: Number, default: 0 },
+  note:           { type: String, default: '' },
+  createdBy:      { type: Schema.Types.ObjectId, ref: 'User' },
+}, { timestamps: true })
+
+export const TaxInvoice = mongoose.model('TaxInvoice', taxInvoiceSchema)
 
 // ─── AuditLog ─────────────────────────────────────────────────────────────────
 const auditLogSchema = new Schema({
@@ -341,20 +401,23 @@ export const BookingMenu = mongoose.model('BookingMenu', bookingMenuSchema)
 
 // ─── Booking ──────────────────────────────────────────────────────────────────
 const bookingSchema = new Schema({
-  code:         { type: String, required: true, unique: true },
-  name:         { type: String, required: true },
-  type:         { type: String },
-  bookingDate:  { type: String },
-  slotId:       { type: Schema.Types.ObjectId, ref: 'BookingTimeSlot' },
-  slot:         { type: String },
-  slotTime:     { type: String },
-  status:       { type: String, enum: ['จองแล้ว', 'เสร็จสิ้น', 'ยกเลิก', 'ไม่มา'], default: 'จองแล้ว' },
-  bookedAt:     { type: Date },
-  cancelledAt:  { type: Date },
-  cancelReason: { type: String },
-  adminCode:    { type: String },
+  code:           { type: String, required: true, unique: true },
+  name:           { type: String, required: true },
+  type:           { type: String },
+  bookingDate:    { type: String },
+  slotId:         { type: Schema.Types.ObjectId, ref: 'BookingTimeSlot' },
+  slot:           { type: String },
+  slotTime:       { type: String },
+  status:         { type: String, enum: ['จองแล้ว', 'เสร็จสิ้น', 'ยกเลิก', 'ไม่มา'], default: 'จองแล้ว' },
+  bookedAt:       { type: Date },
+  cancelledAt:    { type: Date },
+  cancelReason:   { type: String },
+  adminCode:      { type: String },
+  studentUserId:  { type: Schema.Types.ObjectId, ref: 'User' },
+  parentUserId:   { type: Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true })
 bookingSchema.index({ bookingDate: 1, status: 1 })
+bookingSchema.index({ studentUserId: 1, bookingDate: 1 })
 
 export const Booking = mongoose.model('Booking', bookingSchema)
 
@@ -403,6 +466,17 @@ const academicYearSchema = new Schema({
 
 export const AcademicYear = mongoose.model('AcademicYear', academicYearSchema)
 
+// ─── GradeLevel ───────────────────────────────────────────────────────────────
+const gradeLevelSchema = new Schema({
+  code:       { type: String, required: true, unique: true },
+  name:       { type: String, required: true },
+  sortOrder:  { type: Number, required: true, default: 0 },
+  gradeGroup: { type: String, required: true, enum: ['primary','secondary','staff','visitor'], default: 'secondary' },
+  canRepeat:  { type: Boolean, default: false },
+})
+
+export const GradeLevel = mongoose.model('GradeLevel', gradeLevelSchema)
+
 // ─── Branch ───────────────────────────────────────────────────────────────────
 const branchSchema = new Schema({
   code: { type: String, required: true, unique: true },
@@ -421,3 +495,99 @@ const storeSettingsSchema = new Schema({
 })
 
 export const StoreSettings = mongoose.model('StoreSettings', storeSettingsSchema)
+
+// ─── BuffetConfig (singleton) ─────────────────────────────────────────────────
+const buffetConfigSchema = new Schema({
+  key:      { type: String, default: 'default', unique: true },
+  openDays: { type: [Number], default: [1,2,3,4,5] }, // 0=Sun … 6=Sat
+})
+export const BuffetConfig = mongoose.model('BuffetConfig', buffetConfigSchema)
+
+// ─── BuffetBlackout ───────────────────────────────────────────────────────────
+const buffetBlackoutSchema = new Schema({
+  date:    { type: String, required: true }, // YYYY-MM-DD start
+  endDate: { type: String },                 // YYYY-MM-DD end (optional, for ranges)
+  reason:  { type: String, default: '' },
+}, { timestamps: true })
+export const BuffetBlackout = mongoose.model('BuffetBlackout', buffetBlackoutSchema)
+
+// ─── BuffetCategory ───────────────────────────────────────────────────────────
+const buffetCategorySchema = new Schema({
+  code:      { type: String, required: true, unique: true },
+  name:      { type: String, required: true },
+  active:    { type: Boolean, default: true },
+  sortOrder: { type: Number, default: 0 },
+}, { timestamps: true })
+
+export const BuffetCategory = mongoose.model('BuffetCategory', buffetCategorySchema)
+
+// ─── BookingConfig (singleton) ────────────────────────────────────────────────
+const bookingConfigSchema = new Schema({
+  key:      { type: String, default: 'default', unique: true },
+  openDays: { type: [Number], default: [1,2,3,4,5] }, // 0=Sun … 6=Sat
+})
+export const BookingConfig = mongoose.model('BookingConfig', bookingConfigSchema)
+
+// ─── BookingBlackout ──────────────────────────────────────────────────────────
+const bookingBlackoutSchema = new Schema({
+  date:    { type: String, required: true }, // YYYY-MM-DD start
+  endDate: { type: String },                 // YYYY-MM-DD end (optional, for ranges)
+  reason:  { type: String, default: '' },
+}, { timestamps: true })
+export const BookingBlackout = mongoose.model('BookingBlackout', bookingBlackoutSchema)
+
+// ─── Banner ───────────────────────────────────────────────────────────────────
+const bannerSchema = new Schema({
+  name:        { type: String, required: true },
+  imageBase64: { type: String },
+  isVisible:   { type: Boolean, default: true },
+  sortOrder:   { type: Number, default: 0 },
+}, { timestamps: true })
+
+export const Banner = mongoose.model('Banner', bannerSchema)
+
+// ─── SaleScreenPanel ──────────────────────────────────────────────────────────
+const saleScreenPanelItemSchema = new Schema({
+  productId:   { type: String, required: true },
+  productName: { type: String, required: true },
+  textColor:   { type: String, default: '#000000' },
+  bgColor:     { type: String, default: '#FFFFFF' },
+}, { _id: false })
+
+const saleScreenPanelSchema = new Schema({
+  name:        { type: String, required: true },
+  branch:      { type: String, required: true },
+  isVisible:   { type: Boolean, default: true },
+  imageBase64: { type: String },
+  items:       [saleScreenPanelItemSchema],
+}, { timestamps: true })
+
+export const SaleScreenPanel = mongoose.model('SaleScreenPanel', saleScreenPanelSchema)
+
+// ─── Device ───────────────────────────────────────────────────────────────────
+const deviceSchema = new Schema({
+  deviceId:   { type: String, required: true, unique: true },
+  name:       { type: String, required: true },
+  type:       { type: String, enum: ['pos','kiosk','tablet','printer','other'], default: 'pos' },
+  branchCode: { type: String },
+  status:     { type: String, enum: ['active','inactive'], default: 'active' },
+  lastSeenAt: { type: Date },
+  note:       { type: String },
+}, { timestamps: true })
+deviceSchema.index({ branchCode: 1 })
+
+export const Device = mongoose.model('Device', deviceSchema)
+
+// ─── Notification ───────────────────────────────────────────────────────────────
+const notificationSchema = new Schema({
+  userId:    { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  type:      { type: String, default: 'info' },   // info | low_balance | order | topup | system
+  title:     { type: String, required: true },
+  body:      { type: String },
+  action:    { type: String },                     // optional route the FE can navigate to
+  read:      { type: Boolean, default: false },
+  readAt:    { type: Date },
+}, { timestamps: { createdAt: true, updatedAt: false } })
+notificationSchema.index({ userId: 1, read: 1, createdAt: -1 })
+
+export const Notification = mongoose.model('Notification', notificationSchema)

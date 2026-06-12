@@ -8,12 +8,17 @@ import {
 import { useLocaleStore }                        from '@/stores/locale'
 import { useNotificationStore }                  from '@/stores/notifications'
 import type { Notification }                     from '@/stores/notifications'
+import { useAuthStore }                          from '@/stores/auth'
+import { useParentStore }                        from '@/stores/parent'
 import api from '@/api/axios'
+import { listNotifications, markAllRead as apiMarkAllRead } from '@/api/notification'
 
-const router    = useRouter()
-const route     = useRoute()
-const locale    = useLocaleStore()
-const notifStore = useNotificationStore()
+const router      = useRouter()
+const route       = useRoute()
+const locale      = useLocaleStore()
+const notifStore  = useNotificationStore()
+const auth        = useAuthStore()
+const parentStore = useParentStore()
 
 const showProfile = ref(false)
 // showNotifs synced with store so any component can open it
@@ -22,7 +27,33 @@ const showNotifs  = computed({
   set: (v) => { notifStore.showSheet = v },
 })
 
-onMounted(() => { /* notifications come from real wallet fetch */ })
+onMounted(async () => {
+  // Load server notifications and merge into store
+  try {
+    const serverNotifs = await listNotifications()
+    for (const n of serverNotifs) {
+      // Map server notification to store shape — avoid duplicate ids
+      const existing = notifStore.items.find(x => x.id === n._id)
+      if (!existing) {
+        notifStore.items.push({
+          id:        n._id,
+          type:      n.type,
+          title:     n.title,
+          titleEn:   n.titleEn ?? n.title,
+          body:      n.body,
+          bodyEn:    n.bodyEn ?? n.body,
+          action:    n.action,
+          createdAt: n.createdAt,
+          read:      n.read,
+        })
+      }
+    }
+    // Sort: newest first
+    notifStore.items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  } catch {
+    // non-fatal — store may still have client-side notifications
+  }
+})
 
 // ── Toast notification ────────────────────────────────────────────────────────
 const toast        = ref<Notification | null>(null)
@@ -79,8 +110,8 @@ const pageTitle = computed(() => {
 
 function logout() {
   showProfile.value = false
-  localStorage.removeItem('upos_token')
-  localStorage.removeItem('upos_user')
+  parentStore.reset()
+  auth.logout()
   router.push('/')
 }
 
@@ -280,7 +311,7 @@ async function submitChangePw() {
     <!-- ── Notification Sheet ───────────────────────────────────────────── -->
     <Transition name="backdrop">
       <div v-if="showNotifs" class="fixed inset-0 z-30 bg-black/40"
-        @click="showNotifs = false; notifStore.markAllRead()" />
+        @click="showNotifs = false; notifStore.markAllRead(); apiMarkAllRead().catch(() => {})" />
     </Transition>
     <Transition name="sheet">
       <div v-if="showNotifs" class="profile-sheet">

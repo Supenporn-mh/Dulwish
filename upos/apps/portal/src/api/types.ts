@@ -23,9 +23,9 @@ export interface Product {
   price: number
   cost?: number
   categoryCode: string
+  kitchenCode?: string
   unit: string
   barcode?: string
-  group?: string
   branch?: string
   imageUrl?: string
   attributes?: ProductAttribute[]
@@ -125,6 +125,128 @@ export interface AcademicYear {
   semesters: Semester[]
 }
 
+export interface GradeLevel {
+  id: string
+  code: string
+  name: string
+  sortOrder: number
+  gradeGroup?: 'secondary' | 'staff' | 'visitor'
+  canRepeat: boolean
+}
+
+export interface BuffetRound {
+  id: string
+  name: string
+  startTime: string
+  endTime: string
+  active: boolean
+  sortOrder: number
+}
+
+export type UserType = 'member' | 'student'
+
+export interface BuffetCategory {
+  id: string
+  code: string
+  name: string
+  active: boolean
+  sortOrder: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface BuffetPricing {
+  id: string
+  userType: UserType
+  gradeLevelId: string | null
+  gradeLevel?: { _id: string; code: string; name: string } | null
+  buffetRoundId: string | null
+  buffetRound?: { _id: string; name: string; startTime: string; endTime: string } | null
+  categoryIds?: string[]
+  categories?: Array<{ _id: string; name: string }>
+  price: number
+  effectiveFrom: string
+  effectiveTo: string | null
+}
+
+export interface BuffetConfig {
+  key: string
+  openDays: number[]
+}
+
+export interface BookingConfig {
+  key: string
+  openDays: number[]
+}
+
+export interface BookingBlackout {
+  id: string
+  date: string
+  endDate?: string
+  reason?: string
+}
+
+export interface BuffetBlackout {
+  id: string
+  date: string
+  endDate?: string
+  reason: string
+}
+
+export interface BuffetSessionSummary {
+  id: string
+  studentName: string
+  uid: string
+  price: number
+  enteredAt: string
+  transactionId: string
+}
+
+export interface BuffetRoundBreakdown {
+  roundId: string
+  roundName: string
+  count: number
+  revenue: number
+  sessions: BuffetSessionSummary[]
+}
+
+export interface BuffetUsage {
+  date: string
+  totalCount: number
+  totalRevenue: number
+  breakdown: BuffetRoundBreakdown[]
+}
+
+export interface BuffetHistorySession {
+  id: string
+  studentName: string
+  uid: string
+  roundId: string
+  roundName: string
+  entryDate: string
+  enteredAt: string
+  price: number
+  status: 'active' | 'voided'
+  payMethod?: string
+}
+
+export interface BuffetHistoryResult {
+  sessions: BuffetHistorySession[]
+  total: number
+  totalRevenue: number
+  page: number
+  limit: number
+}
+
+export interface MealPeriod {
+  id: string
+  code: string
+  name: string
+  startTime: string
+  endTime: string
+  active: boolean
+}
+
 export interface Branch {
   code: string
   name: string
@@ -169,6 +291,27 @@ export interface BookingMenuImportRow {
   startDate?: string
   /** DD/MM/YYYY */
   endDate?: string
+}
+
+// ── Feedback ──────────────────────────────────────────────────────────────────
+
+export interface FeedbackAdminItem {
+  id: string
+  userName: string | null
+  userUid: string | null
+  userRole: string | null
+  channel: 'kiosk' | 'mobile'
+  rating: number | null
+  category: string | null
+  comment: string | null
+  createdAt: string
+}
+
+export interface FeedbackAdminResult {
+  feedbacks: FeedbackAdminItem[]
+  total: number
+  page: number
+  limit: number
 }
 
 /** Generic import result returned by all /import endpoints */

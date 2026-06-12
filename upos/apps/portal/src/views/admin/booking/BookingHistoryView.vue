@@ -86,7 +86,7 @@
                 <button class="adm-action-btn" title="แก้ไข" @click="openEdit(b)">
                   <PhPencilSimple :size="14" />
                 </button>
-                <button class="adm-action-btn danger" title="ลบ" @click="deleteBooking(b)">
+                <button class="adm-action-btn danger" title="ยกเลิกการจอง" @click="openDirectCancel(b)">
                   <PhTrash :size="14" />
                 </button>
               </div>
@@ -129,7 +129,7 @@
         <!-- Header -->
         <div class="bh-modal-header">
           <div>
-            <h3 class="bh-modal-title">แก้ไขสถานะการจอง</h3>
+            <h3 class="bh-modal-title">ยกเลิกการจอง</h3>
             <p style="font-size:12px;color:var(--color-text-tertiary);margin-top:2px">{{ editTarget.code }}</p>
           </div>
           <button class="bh-close" @click="showModal=false"><PhX :size="18" weight="bold" /></button>
@@ -145,47 +145,18 @@
             </div>
           </div>
 
-          <!-- เลือกสถานะ -->
-          <div class="bh-field">
-            <label class="bh-label">สถานะ <span style="color:var(--color-danger)">*</span></label>
-            <select v-model="editForm.status" class="bh-input bh-select">
-              <option value="จองแล้ว">จองแล้ว</option>
-              <option value="รอชำระ">รอชำระ</option>
-              <option value="เสร็จสิ้น">เสร็จสิ้น</option>
-              <option value="ไม่มา">ไม่มา</option>
-              <option value="ยกเลิก">ยกเลิก</option>
-            </select>
-            <p v-if="editForm.status !== 'ยกเลิก'" style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">
-              ระบบรองรับเฉพาะการยกเลิกออร์เดอร์ผ่านหน้านี้ สถานะอื่นอัปเดตโดยอัตโนมัติจากระบบ
-            </p>
-          </div>
-
-          <!-- ส่วนยกเลิก — แสดงเฉพาะเมื่อเลือก "ยกเลิก" -->
-          <Transition name="cancel-section">
-            <div v-if="editForm.status === 'ยกเลิก'" class="bh-cancel-section">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px">
-                <PhWarning :size="16" weight="fill" style="color:var(--color-warning);flex-shrink:0" />
-                <span style="font-size:13px;color:var(--color-warning);font-weight:500">กรุณากรอกข้อมูลเพื่อยืนยันการยกเลิก</span>
-              </div>
-              <div style="display:flex;flex-direction:column;gap:14px">
-                <div class="bh-field">
-                  <label class="bh-label">เหตุผลการยกเลิก <span style="color:var(--color-danger)">*</span></label>
-                  <textarea v-model="editForm.cancelReason" class="bh-input bh-textarea"
-                    placeholder="ระบุเหตุผลการยกเลิกการจอง..." />
-                </div>
-                <div class="bh-field">
-                  <label class="bh-label">รหัสพนักงาน Admin <span style="color:var(--color-danger)">*</span></label>
-                  <input v-model="editForm.adminCode" class="bh-input"
-                    placeholder="กรอกรหัสพนักงาน Admin เพื่อยืนยัน"
-                    style="font-family:monospace"
-                    autocomplete="off" />
-                  <p style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">
-                    รหัสพนักงานจะถูกบันทึกเป็นหลักฐานการยกเลิก
-                  </p>
-                </div>
-              </div>
+          <!-- ส่วนยกเลิก -->
+          <div class="bh-cancel-section">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px">
+              <PhWarning :size="16" weight="fill" style="color:var(--color-warning);flex-shrink:0" />
+              <span style="font-size:13px;color:var(--color-warning);font-weight:500">กรุณากรอกข้อมูลเพื่อยืนยันการยกเลิก</span>
             </div>
-          </Transition>
+            <div class="bh-field">
+              <label class="bh-label">เหตุผลการยกเลิก <span style="color:var(--color-danger)">*</span></label>
+              <textarea v-model="editForm.cancelReason" class="bh-input bh-textarea"
+                placeholder="ระบุเหตุผลการยกเลิกการจอง..." />
+            </div>
+          </div>
         </div>
 
         <!-- Footer -->
@@ -196,11 +167,11 @@
         <div style="display:flex;gap:10px;padding:16px 24px;justify-content:flex-end">
           <button class="adm-hdr-btn adm-hdr-btn-ghost" :disabled="saving" @click="showModal=false">ยกเลิก</button>
           <button
-            :class="['adm-hdr-btn', editForm.status==='ยกเลิก' ? 'adm-hdr-btn-danger-btn' : 'adm-hdr-btn-primary']"
+            class="adm-hdr-btn adm-hdr-btn-danger-btn"
             :disabled="!canSave || saving"
             @click="saveEdit"
           >
-            {{ saving ? 'กำลังบันทึก...' : editForm.status === 'ยกเลิก' ? 'ยืนยันการยกเลิก' : 'บันทึก' }}
+            {{ saving ? 'กำลังบันทึก...' : 'ยืนยันการยกเลิก' }}
           </button>
         </div>
 
@@ -309,29 +280,28 @@ const paginated  = computed(() => filtered.value.slice((currentPage.value-1)*pag
 
 const showModal  = ref(false)
 const editTarget = ref<OrderRow | null>(null)
-const editForm   = ref({ status: 'จองแล้ว' as ThaiStatus, cancelReason: '', adminCode: '' })
+const editForm   = ref({ cancelReason: '' })
 const saving     = ref(false)
 const saveError  = ref<string | null>(null)
 
-const canSave = computed(() => {
-  if (editForm.value.status !== 'ยกเลิก') return true
-  return !!editForm.value.cancelReason.trim() && !!editForm.value.adminCode.trim()
-})
+const canSave = computed(() => !!editForm.value.cancelReason.trim())
 
 function openEdit(b: OrderRow) {
   editTarget.value = b
-  editForm.value = { status: b.status, cancelReason: '', adminCode: '' }
+  editForm.value = { cancelReason: '' }
+  saveError.value = null
+  showModal.value = true
+}
+
+function openDirectCancel(b: OrderRow) {
+  editTarget.value = b
+  editForm.value = { cancelReason: '' }
   saveError.value = null
   showModal.value = true
 }
 
 async function saveEdit() {
   if (!editTarget.value || !canSave.value) return
-
-  if (editForm.value.status !== 'ยกเลิก') {
-    saveError.value = 'ระบบรองรับเฉพาะการยกเลิกเท่านั้น กรุณาเลือกสถานะ "ยกเลิก"'
-    return
-  }
 
   saving.value = true
   saveError.value = null
@@ -355,29 +325,13 @@ async function saveEdit() {
   }
 }
 
-async function deleteBooking(b: OrderRow) {
-  if (!confirm(`ยืนยันการยกเลิกออร์เดอร์ ${b.code}?`)) return
-  try {
-    await api.patch(`/orders/${b.id}/cancel`, { reason: 'ยกเลิกโดย Admin' })
-    const idx = bookings.value.findIndex(x => x.id === b.id)
-    if (idx >= 0) {
-      bookings.value[idx] = {
-        ...bookings.value[idx],
-        status: 'ยกเลิก',
-        cancelledAt: new Date().toISOString().slice(0, 10),
-      }
-    }
-  } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : 'ยกเลิกไม่สำเร็จ'
-  }
-}
 </script>
 
 <style scoped>
 /* Edit modal */
-.bh-backdrop { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,0.4); }
+.bh-backdrop { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.4); }
 .bh-modal {
-  position:fixed; top:50%; left:50%; z-index:51; transform:translate(-50%,-50%);
+  position:fixed; top:50%; left:50%; z-index:201; transform:translate(-50%,-50%);
   background:#fff; border-radius:14px; width:calc(100vw - 48px); max-width:460px;
   box-shadow:0 16px 48px rgba(0,0,0,0.16); overflow:hidden;
 }

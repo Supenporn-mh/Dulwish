@@ -53,8 +53,8 @@
             <th>ชื่อเมนู</th>
             <th class="center" style="width:100px">ช่วงเวลา</th>
             <th class="center" style="width:110px">สถานะ</th>
-            <th class="center" style="width:100px">วันที่เริ่ม</th>
-            <th class="center" style="width:100px">วันที่สิ้นสุด</th>
+            <th class="center" style="width:120px">วันที่เริ่ม</th>
+            <th class="center" style="width:120px">วันที่สิ้นสุด</th>
             <th class="center" style="width:90px">การดำเนินการ</th>
           </tr>
         </thead>
@@ -77,8 +77,8 @@
                 {{ m.enabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน' }}
               </span>
             </td>
-            <td class="center" style="font-size:12px;color:var(--color-text-secondary)">{{ m.startDate || '—' }}</td>
-            <td class="center" style="font-size:12px;color:var(--color-text-secondary)">{{ m.endDate || '—' }}</td>
+            <td class="center" style="font-size:12px;color:var(--color-text-secondary);white-space:nowrap">{{ m.startDate || '—' }}</td>
+            <td class="center" style="font-size:12px;color:var(--color-text-secondary);white-space:nowrap">{{ m.endDate || '—' }}</td>
             <td class="center">
               <div class="adm-actions">
                 <button class="adm-action-btn" title="แก้ไข" @click="openEdit(m)">
@@ -441,8 +441,8 @@ async function confirmImport() {
 .bm-status-on  { background:var(--color-primary-tint); color:var(--color-primary); }
 .bm-status-off { background:var(--color-bg-secondary); color:var(--color-text-tertiary); }
 
-.bm-backdrop { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,0.4); }
-.bm-modal { position:fixed; top:50%; left:50%; z-index:51; transform:translate(-50%,-50%); background:#fff; border-radius:14px; width:calc(100vw - 48px); max-width:500px; padding:24px; box-shadow:0 16px 48px rgba(0,0,0,0.14); max-height:90vh; overflow-y:auto; }
+.bm-backdrop { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.4); }
+.bm-modal { position:fixed; top:50%; left:50%; z-index:201; transform:translate(-50%,-50%); background:#fff; border-radius:14px; width:calc(100vw - 48px); max-width:500px; padding:24px; box-shadow:0 16px 48px rgba(0,0,0,0.14); max-height:90vh; overflow-y:auto; }
 .bm-modal-title { font-size:17px; font-weight:500; color:var(--color-text-primary); }
 .bm-field { display:flex; flex-direction:column; gap:5px; }
 .bm-label { font-size:12px; color:var(--color-text-secondary); }
@@ -458,7 +458,7 @@ async function confirmImport() {
 .ts-toggle-on .ts-toggle-thumb { transform:translateX(20px); }
 
 /* Import modal */
-.imp-modal-bm { position:fixed; top:50%; left:50%; z-index:51; transform:translate(-50%,-50%); background:#fff; border-radius:16px; width:calc(100vw - 48px); max-width:520px; max-height:90vh; overflow-y:auto; box-shadow:0 16px 48px rgba(0,0,0,0.18); }
+.imp-modal-bm { position:fixed; top:50%; left:50%; z-index:201; transform:translate(-50%,-50%); background:#fff; border-radius:16px; width:calc(100vw - 48px); max-width:520px; max-height:90vh; overflow-y:auto; box-shadow:0 16px 48px rgba(0,0,0,0.18); }
 .imp-header  { display:flex; justify-content:space-between; align-items:center; padding:20px 24px 16px; }
 .imp-title   { font-size:18px; font-weight:500; color:#1C1C1E; }
 .imp-close   { background:none; border:none; cursor:pointer; color:#8E8E93; display:flex; align-items:center; padding:4px; border-radius:6px; }

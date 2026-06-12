@@ -14,6 +14,11 @@ import { productsController } from './modules/products/products.controller'
 import { bookingController }  from './modules/booking/booking.controller'
 import { groupsController }   from './modules/groups/groups.controller'
 import { settingsController } from './modules/settings/settings.controller'
+import { buffetController }   from './modules/buffet/buffet.controller'
+import { bannerController }  from './modules/banner/banner.controller'
+import { panelController }   from './modules/panel/panel.controller'
+import { deviceController }  from './modules/device/device.controller'
+import { notificationController } from './modules/notification/notification.controller'
 
 await connectDB()
 
@@ -49,6 +54,11 @@ const app = new Elysia()
   .use(bookingController)
   .use(groupsController)
   .use(settingsController)
+  .use(buffetController)
+  .use(bannerController)
+  .use(panelController)
+  .use(deviceController)
+  .use(notificationController)
   .onError(({ error, set }) => {
     console.error('[API Error]', error)
     set.status = 500

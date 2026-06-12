@@ -61,12 +61,6 @@ const selectedChild   = computed(() => parentStore.selectedChild)
 const selectedChildId = computed(() => parentStore.selectedChildId)
 const children        = computed(() => parentStore.children)
 
-const demoTransactions: Transaction[] = [
-  { id: '1', type: 'topup',    description: 'เติมเงินผ่าน PromptPay', amount:  500, createdAt: new Date(Date.now() - 3600000 * 2).toISOString() },
-  { id: '2', type: 'purchase', description: 'ซื้อ Ham Sandwich',      amount: -85,  createdAt: new Date(Date.now() - 86400000).toISOString()    },
-  { id: '3', type: 'buffet',   description: 'Buffet กลางวัน',         amount: -120, createdAt: new Date(Date.now() - 86400000 * 2).toISOString() },
-]
-
 const LOW_BALANCE_THRESHOLD = 200
 const isLowBalance = computed(() => balance.value < LOW_BALANCE_THRESHOLD && balance.value >= 0)
 
@@ -181,7 +175,7 @@ async function fetchChildData(childId: string) {
   } catch {
     if (mySeq !== fetchSeq) return
     balance.value = selectedChild.value?.balance ?? 0
-    transactions.value = demoTransactions
+    transactions.value = []
   } finally {
     if (mySeq === fetchSeq) loading.value = false
   }

@@ -1,6 +1,14 @@
 import { Elysia, t } from 'elysia'
+import bcrypt from 'bcryptjs'
 import { authPlugin } from '../../middleware/auth'
-import { User, Transaction, Wallet, Order, BuffetSession, AuditLog, Policy, EnrollmentCode, Card, ParentStudent } from '../../models'
+import { User, Transaction, Wallet, Order, BuffetSession, AuditLog, Policy, EnrollmentCode, Card, ParentStudent, TaxInvoice, GradeLevel } from '../../models'
+
+function genRefNo(prefix = 'TXN') {
+  const d = new Date()
+  const date = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`
+  const rand = Math.floor(Math.random() * 999999).toString().padStart(6, '0')
+  return `${prefix}${date}-${rand}`
+}
 
 // ── Grade order (K1→K2→K3→P1…P6→S1…S6) ──────────────────────────────────────
 const GRADES_ORDER = ['K1','K2','K3','P1','P2','P3','P4','P5','P6','S1','S2','S3','S4','S5','S6']
@@ -88,7 +96,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
     const sessions = await BuffetSession.find({
       entryDate: { $gte: from, $lte: to },
     }).populate('userId', 'firstName lastName uid role studentProfile')
-      .populate('mealPeriodId', 'name code')
+      .populate('buffetRoundId', 'name startTime endTime')
       .sort({ enteredAt: -1 })
       .lean()
     return { sessions, from, to }
@@ -102,25 +110,82 @@ export const adminController = new Elysia({ prefix: '/admin' })
   // ── All Transactions ───────────────────────────────────────────────────────
   .get('/transactions', async ({ query }) => {
     const filter: any = {}
-    if (query.type)   filter.type   = query.type
-    if (query.status) filter.status = query.status
-    if (query.from || query.to) {
+    if (query.type)          filter.type          = query.type
+    if (query.status)        filter.status        = query.status
+    if (query.paymentMethod) filter.paymentMethod = query.paymentMethod
+    if (query.date) {
+      const d = new Date(query.date)
+      const next = new Date(d); next.setDate(d.getDate() + 1)
+      filter.createdAt = { $gte: d, $lt: next }
+    } else if (query.from || query.to) {
       filter.createdAt = {}
       if (query.from) filter.createdAt.$gte = new Date(query.from)
       if (query.to)   filter.createdAt.$lte = new Date(query.to)
     }
     const txns = await Transaction.find(filter)
+      .populate('relatedOrderId', 'status orderNo')
       .sort({ createdAt: -1 })
-      .limit(Number(query.limit ?? 100))
+      .limit(Number(query.limit ?? 200))
       .lean()
     return { transactions: txns, total: txns.length }
   }, {
     query: t.Object({
-      type:   t.Optional(t.String()),
-      status: t.Optional(t.String()),
-      from:   t.Optional(t.String()),
-      to:     t.Optional(t.String()),
-      limit:  t.Optional(t.String()),
+      type:          t.Optional(t.String()),
+      status:        t.Optional(t.String()),
+      paymentMethod: t.Optional(t.String()),
+      date:          t.Optional(t.String()),
+      from:          t.Optional(t.String()),
+      to:            t.Optional(t.String()),
+      limit:         t.Optional(t.String()),
+    }),
+  })
+
+  // ── Transaction Detail ─────────────────────────────────────────────────────
+  .get('/transactions/:id', async ({ params }) => {
+    const tx = await Transaction.findById(params.id)
+      .populate({
+        path: 'walletId',
+        populate: { path: 'userId', select: 'firstName lastName uid role studentProfile' },
+      })
+      .populate({
+        path: 'relatedOrderId',
+        populate: [
+          { path: 'items.menuItemId', select: 'name sku' },
+          { path: 'shopId', select: 'name code' },
+        ],
+      })
+      .populate('cashierId', 'firstName lastName uid')
+      .lean()
+    if (!tx) return new Response(JSON.stringify({ error: 'Not found' }), { status: 404 })
+    return { transaction: tx }
+  }, {
+    params: t.Object({ id: t.String() }),
+  })
+
+  // ── Tax Invoice ────────────────────────────────────────────────────────────
+  .get('/transactions/:id/tax-invoice', async ({ params }) => {
+    const inv = await TaxInvoice.findOne({ transactionId: params.id }).lean()
+    return { invoice: inv ?? null }
+  }, { params: t.Object({ id: t.String() }) })
+
+  .post('/transactions/:id/tax-invoice', async ({ params, body, currentUser }) => {
+    const inv = await TaxInvoice.findOneAndUpdate(
+      { transactionId: params.id },
+      { ...body, transactionId: params.id, createdBy: currentUser._id },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    )
+    return { invoice: inv }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({
+      invoiceNo:  t.String(),
+      issuedAt:   t.String(),
+      seller:     t.Optional(t.Any()),
+      buyer:      t.Optional(t.Any()),
+      subtotal:   t.Optional(t.Number()),
+      vatAmount:  t.Optional(t.Number()),
+      grandTotal: t.Optional(t.Number()),
+      note:       t.Optional(t.String()),
     }),
   })
 
@@ -396,9 +461,77 @@ export const adminController = new Elysia({ prefix: '/admin' })
     }
   })
 
+  // ── Member enrollment codes ───────────────────────────────────────────────
+
+  .get('/members/:uid/code', async ({ params, set }) => {
+    const MEMBER_ROLES = ['admin', 'supervisor', 'cashier', 'teacher', 'staff']
+    const m = await User.findOne({ uid: params.uid, role: { $in: MEMBER_ROLES } }).lean()
+    if (!m) { set.status = 404; return { error: { code: 'MEM_404', message: 'ไม่พบสมาชิก' } } }
+
+    const entry = await EnrollmentCode.findOne({ memberUserId: m._id })
+      .sort({ createdAt: -1 })
+      .lean()
+
+    return {
+      memberUid:  m.uid,
+      firstName:  m.firstName,
+      lastName:   m.lastName,
+      role:       m.role,
+      code:       entry?.code      ?? null,
+      expiresAt:  entry?.expiresAt ?? null,
+      used:       entry?.used      ?? false,
+      expired:    entry ? entry.expiresAt < new Date() : false,
+    }
+  })
+
+  .post('/members/:uid/code/generate', async ({ params, currentUser, set }) => {
+    const MEMBER_ROLES = ['admin', 'supervisor', 'cashier', 'teacher', 'staff']
+    const m = await User.findOne({ uid: params.uid, role: { $in: MEMBER_ROLES } }).lean()
+    if (!m) { set.status = 404; return { error: { code: 'MEM_404', message: 'ไม่พบสมาชิก' } } }
+
+    await EnrollmentCode.updateMany(
+      { memberUserId: m._id, used: false },
+      { $set: { used: true, usedAt: new Date() } },
+    )
+
+    let code = generateEnrollmentCode()
+    let attempts = 0
+    while (attempts < 5) {
+      const exists = await EnrollmentCode.findOne({ code }).lean()
+      if (!exists) break
+      code = generateEnrollmentCode()
+      attempts++
+    }
+    const exp   = codeExpiresAt()
+    const entry = await EnrollmentCode.create({
+      code,
+      memberUserId: m._id,
+      used:      false,
+      expiresAt: exp,
+      createdBy: currentUser._id,
+    })
+
+    return {
+      memberUid:  m.uid,
+      firstName:  m.firstName,
+      lastName:   m.lastName,
+      role:       m.role,
+      code:       entry.code,
+      expiresAt:  entry.expiresAt,
+      used:       false,
+      expired:    false,
+    }
+  })
+
   // 7. Promote students
   .post('/promote', async ({ body, set }) => {
     const { fromYear, toYear, studentUids } = (body as any) ?? {}
+
+    // Build the grade order from the DB (student grades only), ascending by sortOrder.
+    const gradeDocs = await GradeLevel.find({ gradeGroup: { $in: ['primary', 'secondary'] } })
+      .sort({ sortOrder: 1 })
+      .lean()
+    const gradeOrder = gradeDocs.map(g => g.code)
 
     let query: any = { role: 'student' }
     if (studentUids?.length) query = { role: 'student', uid: { $in: studentUids } }
@@ -410,16 +543,16 @@ export const adminController = new Elysia({ prefix: '/admin' })
 
     await Promise.all(students.map(async s => {
       const grade = s.studentProfile?.gradeLevel ?? ''
-      const idx   = GRADES_ORDER.indexOf(grade)
+      const idx   = gradeOrder.indexOf(grade)
       if (idx < 0) return
 
-      if (idx === GRADES_ORDER.length - 1) {
+      if (idx === gradeOrder.length - 1) {
         await User.updateOne({ _id: s._id }, {
           $set: { status: 'inactive', 'studentProfile.gradeLevel': 'GRADUATED' },
         })
         graduated.push(s.uid)
       } else {
-        const nextGrade = GRADES_ORDER[idx + 1]
+        const nextGrade = gradeOrder[idx + 1]
         await User.updateOne({ _id: s._id }, {
           $set: { 'studentProfile.gradeLevel': nextGrade },
         })
@@ -440,5 +573,238 @@ export const adminController = new Elysia({ prefix: '/admin' })
       fromYear:    t.Optional(t.String()),
       toYear:      t.Optional(t.String()),
       studentUids: t.Optional(t.Array(t.String())),
+    }),
+  })
+
+  // ── AD4: Void a transaction (admin/supervisor) ───────────────────────────────
+  // Mirrors POST /pos/sale/:txnId/void: refund the wallet split, create a void
+  // transaction, link voidedByTxnId, write AuditLog.
+  .post('/transactions/:id/void', async ({ params, body, currentUser, set }) => {
+    // supervisorCode: the POS void validates only by role (no PIN/password compare),
+    // and the route guard already restricts this to admin/supervisor — mirror that.
+    if (!['supervisor','admin'].includes(currentUser.role)) {
+      set.status = 403
+      return { error: { code: 'POS_003', message: 'Supervisor PIN required' } }
+    }
+
+    const txn = await Transaction.findById(params.id)
+    if (!txn) { set.status = 404; return { error: { code: 'NOT_FOUND', message: 'Transaction not found' } } }
+    if (txn.status === 'voided') {
+      set.status = 409
+      return { error: { code: 'POS_003', message: 'Already voided' } }
+    }
+
+    // Refund the wallet that was debited. Prefer the card_wallet split (used by
+    // multi-tender POS sales); fall back to the transaction's own wallet for
+    // single-wallet debits (preorders, buffet, seeded/legacy txns with no splits).
+    const walletSplit = txn.splits?.find((s: any) => s.tenderMethod === 'card_wallet')
+    let refundWalletId: any = walletSplit?.sourceWalletId
+    let refundAmount: number = walletSplit?.amount ?? 0
+    if (!refundWalletId && txn.walletId && txn.amount < 0) {
+      refundWalletId = txn.walletId
+      refundAmount = -txn.amount   // amount is negative for debits
+    }
+    let balanceAfter = 0
+    if (refundWalletId && refundAmount) {
+      const wallet = await Wallet.findById(refundWalletId)
+      if (wallet) {
+        wallet.balance += refundAmount
+        wallet.version += 1
+        await wallet.save()
+        balanceAfter = wallet.balance
+      }
+    }
+
+    // Create void transaction
+    const refNo = genRefNo('VOID')
+    await Transaction.create({
+      refNo,
+      walletId: txn.walletId,
+      type: 'void',
+      amount: -txn.amount,
+      balanceAfter,
+      channel: 'admin',
+      paymentMethod: txn.paymentMethod,
+      cashierId: currentUser._id,
+      voidedByTxnId: txn._id,
+      status: 'success',
+      note: body.reason,
+    })
+
+    txn.status = 'voided'
+    await txn.save()
+
+    await AuditLog.create({
+      actorUserId: currentUser._id,
+      actorRole: currentUser.role,
+      action: 'void_txn',
+      entityType: 'Transaction',
+      entityId: String(txn._id),
+      reason: body.reason,
+      beforeData: { status: 'success' },
+      afterData:  { status: 'voided' },
+    })
+
+    return { success: true, txnId: txn._id }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({
+      reason:         t.String(),
+      supervisorCode: t.Optional(t.String()),
+    }),
+  })
+
+  // ── AD4: Confirm a pending payment (admin/supervisor) ────────────────────────
+  // Only pending/wait → success is allowed. If the linked order is awaiting
+  // payment, move it to confirmed.
+  .patch('/transactions/:id/payment-status', async ({ params, body, currentUser, set }) => {
+    const txn = await Transaction.findById(params.id)
+    if (!txn) { set.status = 404; return { error: { code: 'NOT_FOUND', message: 'Transaction not found' } } }
+
+    if (body.status !== 'success') {
+      set.status = 400
+      return { error: { code: 'TXN_STATUS_001', message: `เปลี่ยนสถานะเป็น ${body.status} ไม่ได้` } }
+    }
+    if (!['pending', 'wait'].includes(txn.status)) {
+      set.status = 400
+      return { error: { code: 'TXN_STATUS_002', message: `ยืนยันได้เฉพาะรายการที่รอชำระ (สถานะปัจจุบัน: ${txn.status})` } }
+    }
+
+    const before = txn.status
+    txn.status = 'success'
+    await txn.save()
+
+    // Advance the related order if it is awaiting payment
+    if (txn.relatedOrderId) {
+      const order = await Order.findById(txn.relatedOrderId)
+      if (order && ['select_payment', 'wait_payment', 'pending_payment'].includes(order.status)) {
+        order.status = 'confirmed'
+        await order.save()
+      }
+    }
+
+    await AuditLog.create({
+      actorUserId: currentUser._id,
+      actorRole: currentUser.role,
+      action: 'payment_status_change',
+      entityType: 'Transaction',
+      entityId: String(txn._id),
+      beforeData: { status: before },
+      afterData:  { status: 'success' },
+    })
+
+    return { success: true, transaction: txn }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({ status: t.String() }),
+  })
+
+  // ── AD1: Create a staff member (admin/supervisor) ────────────────────────────
+  .post('/staff', async ({ body, currentUser, set }) => {
+    const STAFF_ROLES = ['cashier', 'supervisor', 'admin', 'teacher', 'staff']
+    if (!STAFF_ROLES.includes(body.role)) {
+      set.status = 400
+      return { error: { code: 'STAFF_ROLE_001', message: `บทบาทไม่ถูกต้อง: ${body.role}` } }
+    }
+
+    try {
+      const count = await User.countDocuments({ role: { $in: STAFF_ROLES } })
+      const uid   = `STF-${String(count + 1).padStart(4, '0')}`
+
+      const passwordHash = body.password ? await bcrypt.hash(body.password, 10) : undefined
+
+      const user = await User.create({
+        uid,
+        role:      body.role,
+        firstName: body.firstName,
+        lastName:  body.lastName,
+        email:     body.email?.trim().toLowerCase(),
+        status:    'active',
+        ...(passwordHash ? { passwordHash } : {}),
+      })
+
+      // Mirror parent-register: every account gets a wallet.
+      await Wallet.create({ userId: user._id, balance: 0 })
+
+      if (body.cardUid) {
+        await Card.create({
+          cardUid:  body.cardUid,
+          userId:   user._id,
+          cardType: 'staff',
+          status:   'active',
+        })
+      }
+
+      await AuditLog.create({
+        actorUserId: currentUser._id,
+        actorRole: currentUser.role,
+        action: 'staff_create',
+        entityType: 'User',
+        entityId: String(user._id),
+        afterData: { uid: user.uid, role: user.role },
+      })
+
+      const { passwordHash: _ph, ...safeUser } = user.toObject()
+      return { user: safeUser }
+    } catch (err: unknown) {
+      set.status = 400
+      return { error: { code: 'STAFF_CREATE_001', message: err instanceof Error ? err.message : 'Create failed' } }
+    }
+  }, {
+    body: t.Object({
+      firstName:  t.String(),
+      lastName:   t.String(),
+      email:      t.Optional(t.String()),
+      role:       t.String(),
+      branchCode: t.Optional(t.String()),
+      cardUid:    t.Optional(t.String()),
+      password:   t.Optional(t.String()),
+    }),
+  })
+
+  // ── AD2: Update a staff member by uid (admin/supervisor) ─────────────────────
+  .patch('/staff/:uid', async ({ params, body, currentUser, set }) => {
+    const STAFF_ROLES = ['cashier', 'supervisor', 'admin', 'teacher', 'staff']
+    const user = await User.findOne({ uid: params.uid, role: { $in: STAFF_ROLES } })
+    if (!user) { set.status = 404; return { error: { code: 'STAFF_404', message: 'ไม่พบสมาชิก' } } }
+
+    const before = { firstName: user.firstName, lastName: user.lastName, email: user.email, status: user.status }
+
+    if (body.firstName !== undefined) user.firstName = body.firstName
+    if (body.lastName  !== undefined) user.lastName  = body.lastName
+    if (body.email     !== undefined) user.email     = body.email?.trim().toLowerCase()
+    if (body.status    !== undefined) user.status    = body.status as any
+    await user.save()
+
+    if (body.cardUid !== undefined && body.cardUid) {
+      const existing = await Card.findOne({ userId: user._id })
+      if (existing) {
+        existing.cardUid = body.cardUid
+        await existing.save()
+      } else {
+        await Card.create({ cardUid: body.cardUid, userId: user._id, cardType: 'staff', status: 'active' })
+      }
+    }
+
+    await AuditLog.create({
+      actorUserId: currentUser._id,
+      actorRole: currentUser.role,
+      action: 'staff_update',
+      entityType: 'User',
+      entityId: String(user._id),
+      beforeData: before,
+      afterData: { firstName: user.firstName, lastName: user.lastName, email: user.email, status: user.status },
+    })
+
+    const { passwordHash: _ph, ...safeUser } = user.toObject()
+    return { user: safeUser }
+  }, {
+    params: t.Object({ uid: t.String() }),
+    body: t.Object({
+      firstName: t.Optional(t.String()),
+      lastName:  t.Optional(t.String()),
+      email:     t.Optional(t.String()),
+      status:    t.Optional(t.String()),
+      cardUid:   t.Optional(t.String()),
     }),
   })

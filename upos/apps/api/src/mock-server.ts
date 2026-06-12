@@ -128,6 +128,24 @@ const ADMIN_TXNS = Array.from({ length: 20 }, (_, i) => ({
   createdAt:    new Date(Date.now() - 3600000 * (i + 1) * 3).toISOString(),
 }))
 
+// ── Booking Schedule mock data ────────────────────────────────────────────────
+let BOOKING_CONFIG = { key: 'default', openDays: [1,2,3,4,5] }
+let BOOKING_BLACKOUTS: any[] = []
+let _bkBlackoutSeq = 1
+
+// ── Wallet Permissions mock data ─────────────────────────────────────────────
+let WALLET_PERMISSIONS: any[] = [
+  { code: 'W001', name: 'เติมเงินทั่วไป',    desc: 'เติมเงินปกติสำหรับทุกบัญชี',       amount: 1000,  enabled: true,  startDate: '', endDate: '' },
+  { code: 'W002', name: 'เติมเงินพิเศษ',     desc: 'เติมเงินพิเศษวงเงินสูง',           amount: 5000,  enabled: true,  startDate: '', endDate: '' },
+  { code: 'W003', name: 'เติมเงินรายเดือน',  desc: 'เติมเงินรายเดือนสำหรับผู้ดูแล',    amount: 10000, enabled: false, startDate: '', endDate: '' },
+]
+
+// ── Groups mock data ──────────────────────────────────────────────────────────
+let MOCK_GROUPS: any[] = [
+  { code: 'GRP-STD-001', name: 'นักเรียนประถม',   kind: 'student', permissions: ['W001'], members: [] },
+  { code: 'GRP-MEM-001', name: 'สมาชิกทั่วไป',    kind: 'member',  permissions: ['W001'], members: [] },
+]
+
 const AUDIT_LOGS = Array.from({ length: 15 }, (_, i) => ({
   _id:        `audit${i}`,
   action:     ['login','topup','policy_update','user_create','order_redeem'][i % 5],
@@ -747,6 +765,85 @@ const app = new Elysia()
       used:       false,
       expired:    false,
     }
+  })
+
+  // ── Settings: Groups ─────────────────────────────────────────────────────
+  .get('/groups', ({ query }: any) => {
+    const list = MOCK_GROUPS.filter((g: any) => !query.kind || g.kind === query.kind)
+    return { groups: list.map((g: any) => ({ id: g.code, name: g.name, kind: g.kind, permissions: g.permissions, memberCount: g.members.length })) }
+  })
+  .post('/groups', ({ body }: any) => {
+    const g = { code: body.id, name: body.name, kind: body.kind ?? 'member', permissions: body.permissions ?? [], members: [] }
+    MOCK_GROUPS.push(g)
+    return { group: { id: g.code, name: g.name, kind: g.kind, permissions: g.permissions, memberCount: 0 } }
+  })
+  .patch('/groups/:code', ({ params, body }: any) => {
+    const g: any = MOCK_GROUPS.find((x: any) => x.code === params.code)
+    if (!g) return { error: { code: 'GRP_001', message: 'Group not found' } }
+    if (body.name        !== undefined) g.name        = body.name
+    if (body.permissions !== undefined) g.permissions = body.permissions
+    return { group: { id: g.code, name: g.name, kind: g.kind, permissions: g.permissions, memberCount: g.members.length } }
+  })
+  .delete('/groups/:code', ({ params }: any) => {
+    const idx = MOCK_GROUPS.findIndex((x: any) => x.code === params.code)
+    if (idx >= 0) MOCK_GROUPS.splice(idx, 1)
+    return { ok: true }
+  })
+  .get('/groups/:code/members', ({ params, set }: any) => {
+    const g: any = MOCK_GROUPS.find((x: any) => x.code === params.code)
+    if (!g) { set.status = 404; return { error: { code: 'GRP_001', message: 'Group not found' } } }
+    return { members: g.members }
+  })
+  .post('/groups/:code/members', ({ params, body, set }: any) => {
+    const g: any = MOCK_GROUPS.find((x: any) => x.code === params.code)
+    if (!g) { set.status = 404; return { error: { code: 'GRP_001', message: 'Group not found' } } }
+    if (g.members.find((m: any) => m.userId === body.userId)) { set.status = 409; return { error: { code: 'GRP_002', message: 'Already in group' } } }
+    const entry = { userId: body.userId, id: body.userId, name: body.userId, joinedAt: new Date().toISOString() }
+    g.members.push(entry)
+    return { member: entry }
+  })
+  .delete('/groups/:code/members/:userId', ({ params, set }: any) => {
+    const g: any = MOCK_GROUPS.find((x: any) => x.code === params.code)
+    if (!g) { set.status = 404; return { error: { code: 'GRP_001', message: 'Group not found' } } }
+    g.members = g.members.filter((m: any) => m.userId !== params.userId)
+    return { ok: true }
+  })
+
+  // ── Settings: Wallet Permissions ─────────────────────────────────────────
+  // ── Booking schedule ────────────────────────────────────────────────────────
+  .get('/booking/config', () => ({ config: BOOKING_CONFIG }))
+  .patch('/booking/config', ({ body }: any) => {
+    BOOKING_CONFIG.openDays = body.openDays
+    return { config: BOOKING_CONFIG }
+  })
+  .get('/booking/blackouts', () => ({ blackouts: BOOKING_BLACKOUTS }))
+  .post('/booking/blackouts', ({ body }: any) => {
+    const b = { id: String(_bkBlackoutSeq++), date: body.date, endDate: body.endDate, reason: body.reason }
+    BOOKING_BLACKOUTS.push(b)
+    BOOKING_BLACKOUTS.sort((a: any, b: any) => a.date.localeCompare(b.date))
+    return { blackout: b }
+  })
+  .delete('/booking/blackouts/:id', ({ params, set }: any) => {
+    const idx = BOOKING_BLACKOUTS.findIndex((b: any) => b.id === params.id)
+    if (idx < 0) { set.status = 404; return { error: { message: 'not found' } } }
+    BOOKING_BLACKOUTS.splice(idx, 1)
+    return { ok: true }
+  })
+
+  .get('/settings/wallet-permissions', () => ({ walletPermissions: WALLET_PERMISSIONS }))
+  .patch('/settings/wallet-permissions/:code', ({ params, body }: any) => {
+    let p = WALLET_PERMISSIONS.find((x: any) => x.code === params.code)
+    if (!p) {
+      p = { code: params.code, name: '', desc: '', amount: 0, enabled: false, startDate: '', endDate: '' }
+      WALLET_PERMISSIONS.push(p)
+    }
+    if (body.name      !== undefined) p.name      = body.name
+    if (body.desc      !== undefined) p.desc      = body.desc
+    if (body.amount    !== undefined) p.amount    = body.amount
+    if (body.enabled   !== undefined) p.enabled   = body.enabled
+    if (body.startDate !== undefined) p.startDate = body.startDate
+    if (body.endDate   !== undefined) p.endDate   = body.endDate
+    return { walletPermission: p }
   })
 
   .listen(4000)

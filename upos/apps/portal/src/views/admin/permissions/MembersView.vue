@@ -9,7 +9,7 @@
           <PhDownloadSimple :size="14" />
           {{ exportingCodes ? 'กำลังสร้าง...' : 'ดาวน์โหลด Enrollment Code' }}
         </button>
-        <button class="adm-hdr-btn adm-hdr-btn-ghost" @click="showImportModal = true">
+        <button class="adm-hdr-btn adm-hdr-btn-ghost" @click="showImportModal = true" title="นำเข้าข้อมูล (ดาวน์โหลด template เท่านั้น)">
           <PhUploadSimple :size="14" /> นำเข้าไฟล์ Excel
         </button>
         <button class="adm-hdr-btn adm-hdr-btn-primary" @click="openAddModal">
@@ -268,6 +268,7 @@
               <span class="code-expiry-text">หมดอายุ {{ formatExpiry(codeData.expiresAt) }}</span>
             </div>
           </div>
+          <div v-if="codeData?._generateError" style="padding:0 20px 8px;font-size:12px;color:var(--color-danger,#CC3333)">{{ codeData._generateError }}</div>
           <div class="promo-divider" />
           <div class="code-footer">
             <button class="code-generate-btn" :disabled="generatingCode" @click="generateCode">
@@ -334,9 +335,12 @@
             <li style="font-size:13px;color:#3C3C43">รหัสสิทธิ์: W001,W002,W003,W004,W005 คั่นด้วย ,</li>
           </ul>
         </div>
+        <div style="padding:0 24px 12px;font-size:12px;color:var(--color-text-tertiary)">
+          ⚠ การนำเข้าผ่านไฟล์ Excel ยังไม่รองรับในขณะนี้ (ยังไม่มี endpoint)
+        </div>
         <div class="imp-footer">
           <button class="imp-btn-cancel" @click="closeImport">ยกเลิก</button>
-          <button :class="['imp-btn-confirm',importFileMem?'imp-btn-confirm-active':'']" :disabled="!importFileMem" @click="closeImport">ยืนยัน</button>
+          <button class="imp-btn-confirm" disabled title="ยังไม่รองรับ">ยืนยัน</button>
         </div>
       </div>
     </Transition>
@@ -433,34 +437,47 @@ function openAddModal() { editTarget.value = { uid:'', firstName:'', lastName:''
 function openEdit(m: Member) { editTarget.value = { ...m }; showEditModal.value = true }
 async function saveEdit() {
   if (!editTarget.value || savingEdit.value) return
-  savingEdit.value  = true
+  savingEdit.value    = true
   saveEditError.value = ''
   if (!editTarget.value.uid) {
-    // New member — no backend endpoint for user creation here (staff CRUD deferred to UsersView)
-    // TODO: no backend endpoint yet — local-only add
-    editTarget.value.uid = `EMP-${String(members.value.length + 1).padStart(3,'0')}`
-    members.value.unshift({ ...editTarget.value })
-    savingEdit.value  = false
-    showEditModal.value = false
-    return
-  }
-  // Existing member
-  const original = members.value.find(m => m.uid === editTarget.value.uid)
-  // Persist status change via backend
-  if (original && editTarget.value.status !== original.status) {
-    try {
-      await api.patch(`/users/${editTarget.value.uid}/status`, { status: editTarget.value.status })
-    } catch {
-      saveEditError.value = 'บันทึกสถานะไม่สำเร็จ กรุณาลองใหม่'
+    // New staff member — POST /admin/staff
+    if (!editTarget.value.firstName || !editTarget.value.lastName || !editTarget.value.email) {
+      saveEditError.value = 'กรุณากรอกชื่อ นามสกุล และอีเมล'
       savingEdit.value = false
       return
     }
+    try {
+      await api.post('/admin/staff', {
+        firstName: editTarget.value.firstName,
+        lastName:  editTarget.value.lastName,
+        email:     editTarget.value.email,
+        role:      editTarget.value.role ?? 'cashier',
+      })
+      await fetchMembers()
+      showEditModal.value = false
+    } catch (err: any) {
+      saveEditError.value = err?.response?.data?.message ?? 'สร้างสมาชิกไม่สำเร็จ กรุณาลองใหม่'
+    } finally {
+      savingEdit.value = false
+    }
+    return
   }
-  // TODO: no backend endpoint yet for firstName/lastName/email/cardUid/cardStatus — local update only
-  const idx = members.value.findIndex(m => m.uid === editTarget.value.uid)
-  if (idx >= 0) members.value[idx] = { ...editTarget.value }
-  savingEdit.value  = false
-  showEditModal.value = false
+  // Existing member — PATCH /admin/staff/:uid
+  try {
+    const body: Record<string, any> = {
+      firstName: editTarget.value.firstName,
+      lastName:  editTarget.value.lastName,
+      email:     editTarget.value.email,
+    }
+    if (editTarget.value.cardUid !== undefined) body.cardUid = editTarget.value.cardUid
+    await api.patch(`/admin/staff/${editTarget.value.uid}`, body)
+    await fetchMembers()
+    showEditModal.value = false
+  } catch (err: any) {
+    saveEditError.value = err?.response?.data?.message ?? 'บันทึกไม่สำเร็จ กรุณาลองใหม่'
+  } finally {
+    savingEdit.value = false
+  }
 }
 
 const togglingStatus = ref<Record<string, boolean>>({})
@@ -493,8 +510,8 @@ async function openCodeModal(m: Member) {
   showCodeModal.value = true
   codeData.value = null
   try {
-    const res = await api.get(`/admin/students/${m.uid}/code`)
-    codeData.value = { ...res.data, firstName: m.firstName, lastName: m.lastName }
+    const res = await api.get(`/admin/members/${m.uid}/code`)
+    codeData.value = { ...res.data, uid: m.uid, firstName: m.firstName, lastName: m.lastName }
   } catch {
     codeData.value = { uid: m.uid, firstName: m.firstName, lastName: m.lastName, code: null, expiresAt: null, used: false, expired: false }
   }
@@ -503,12 +520,12 @@ async function generateCode() {
   if (!codeData.value || generatingCode.value) return
   generatingCode.value = true
   try {
-    const res = await api.post(`/admin/students/${codeData.value.uid}/code/generate`)
-    codeData.value = { ...res.data, firstName: codeData.value.firstName, lastName: codeData.value.lastName }
-  } catch {
-    const hex = () => Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8,'0')
-    const exp = new Date(); exp.setDate(exp.getDate()+14); exp.setHours(23,59,59,0)
-    codeData.value = { ...codeData.value, code:`${hex().slice(0,8)}-${hex().slice(0,4)}`, expiresAt:exp.toISOString(), used:false, expired:false }
+    const res = await api.post(`/admin/members/${codeData.value.uid}/code/generate`)
+    codeData.value = { ...res.data, uid: codeData.value.uid, firstName: codeData.value.firstName, lastName: codeData.value.lastName }
+  } catch (err: any) {
+    // Surface the real error — do not fabricate a fake code
+    const msg = err?.response?.data?.message ?? 'สร้าง Code ไม่สำเร็จ กรุณาลองใหม่'
+    codeData.value = { ...codeData.value, _generateError: msg }
   } finally { generatingCode.value = false }
 }
 function copyCode() {
@@ -591,8 +608,8 @@ function downloadTemplate() {
 
 <style scoped>
 /* Import modal */
-.modal-backdrop { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,0.4); }
-.imp-modal-mem { position:fixed; top:50%; left:50%; z-index:51; transform:translate(-50%,-50%); background:#fff; border-radius:16px; width:calc(100vw - 48px); max-width:520px; max-height:90vh; overflow-y:auto; box-shadow:0 16px 48px rgba(0,0,0,0.18); }
+.modal-backdrop { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.4); }
+.imp-modal-mem { position:fixed; top:50%; left:50%; z-index:201; transform:translate(-50%,-50%); background:#fff; border-radius:16px; width:calc(100vw - 48px); max-width:520px; max-height:90vh; overflow-y:auto; box-shadow:0 16px 48px rgba(0,0,0,0.18); }
 .imp-header  { display:flex; justify-content:space-between; align-items:center; padding:20px 24px 16px; }
 .imp-title   { font-size:18px; font-weight:500; color:#1C1C1E; }
 .imp-close   { background:none; border:none; cursor:pointer; color:#8E8E93; display:flex; align-items:center; padding:4px; border-radius:6px; }
@@ -644,7 +661,7 @@ function downloadTemplate() {
 .edit-input:focus { border-color:var(--color-primary); }
 
 /* Modal shared styles */
-.modal-backdrop { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,0.4); }
+.modal-backdrop { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.4); }
 .modal-bg-enter-active, .modal-bg-leave-active { transition:opacity 0.2s; }
 .modal-bg-enter-from, .modal-bg-leave-to { opacity:0; }
 .modal-up-enter-active, .modal-up-leave-active { transition:opacity 0.25s,transform 0.25s; }
@@ -652,7 +669,7 @@ function downloadTemplate() {
 
 /* Enrollment code modal */
 .code-modal {
-  position:fixed; top:50%; left:50%; z-index:51; transform:translate(-50%,-50%);
+  position:fixed; top:50%; left:50%; z-index:201; transform:translate(-50%,-50%);
   background:#fff; border-radius:16px; width:calc(100vw - 48px); max-width:400px;
   box-shadow:0 16px 48px rgba(0,0,0,0.16); overflow:hidden;
 }
@@ -684,7 +701,7 @@ function downloadTemplate() {
 
 /* Imp modal reuse */
 .imp-modal {
-  position:fixed; top:50%; left:50%; z-index:51; transform:translate(-50%,-50%);
+  position:fixed; top:50%; left:50%; z-index:201; transform:translate(-50%,-50%);
   background:#fff; border-radius:16px; width:calc(100vw - 48px);
   max-height:90vh; overflow-y:auto; box-shadow:0 16px 48px rgba(0,0,0,0.18);
 }

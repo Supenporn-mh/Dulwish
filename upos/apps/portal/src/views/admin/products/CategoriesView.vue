@@ -309,9 +309,9 @@ function onImgDrop(e: DragEvent) {
 }
 .cat-dropzone:hover { border-color: var(--color-primary); background: var(--color-primary-tint); }
 
-.k-backdrop { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,0.4); }
+.k-backdrop { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.4); }
 .k-modal {
-  position:fixed; top:50%; left:50%; z-index:51; transform:translate(-50%,-50%);
+  position:fixed; top:50%; left:50%; z-index:201; transform:translate(-50%,-50%);
   background:#fff; border-radius:14px; width:calc(100vw - 48px); max-width:440px;
   padding:24px; box-shadow:0 16px 48px rgba(0,0,0,0.14);
 }
@@ -332,9 +332,9 @@ function onImgDrop(e: DragEvent) {
 .modal-up-enter-from,   .modal-up-leave-to     { opacity:0; transform:translate(-50%,-48%); }
 
 /* Image modal / Lightbox */
-.lb-backdrop  { position:fixed; inset:0; z-index:60; background:rgba(0,0,0,0.55); }
+.lb-backdrop  { position:fixed; inset:0; z-index:210; background:rgba(0,0,0,0.55); }
 .lb-wrap {
-  position:fixed; inset:0; z-index:61;
+  position:fixed; inset:0; z-index:211;
   display:flex; align-items:center; justify-content:center; padding:24px;
 }
 .lb-card {
