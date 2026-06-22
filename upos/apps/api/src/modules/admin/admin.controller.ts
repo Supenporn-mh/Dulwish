@@ -426,25 +426,35 @@ export const adminController = new Elysia({ prefix: '/admin' })
   })
 
   // 6. Generate a new enrollment code (max 2 pending + linked combined)
-  .post('/students/:uid/code/generate', async ({ params, currentUser, set }) => {
+  .post('/students/:uid/code/generate', async ({ params, body, currentUser, set }) => {
     const s = await User.findOne({ uid: params.uid, role: 'student' }).lean()
     if (!s) { set.status = 404; return { error: { code: 'STD_404', message: 'ไม่พบนักเรียน' } } }
 
     const now = new Date()
-    const parentCount  = await ParentStudent.countDocuments({ studentUserId: s._id })
-    const pendingCount = await EnrollmentCode.countDocuments({
+    const parentCount = await ParentStudent.countDocuments({ studentUserId: s._id })
+    const pendingEntries = await EnrollmentCode.find({
       studentUserId: s._id,
       used:      false,
       expiresAt: { $gt: now },
-    })
+    }).sort({ createdAt: 1 }).lean()
+    const pendingCount = pendingEntries.length
 
     if (parentCount >= 2) {
       set.status = 400
       return { error: { code: 'CODE_MAX', message: 'นักเรียนมีผู้ปกครองครบ 2 คนแล้ว' } }
     }
 
+    const slot: number | undefined = (body as any)?.slot  // 0 or 1 (index of pending code to replace)
     const remainingSlots = 2 - parentCount
-    if (pendingCount >= remainingSlots) {
+
+    if (typeof slot === 'number' && pendingEntries[slot]) {
+      // Replace specific slot only
+      await EnrollmentCode.updateOne(
+        { _id: pendingEntries[slot]._id },
+        { $set: { used: true, usedAt: now } },
+      )
+    } else if (pendingCount >= remainingSlots) {
+      // Auto: expire oldest when full
       await EnrollmentCode.findOneAndUpdate(
         { studentUserId: s._id, used: false, expiresAt: { $gt: now } },
         { $set: { used: true, usedAt: now } },

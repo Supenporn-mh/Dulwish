@@ -590,8 +590,16 @@
             <!-- Pending codes per parent slot -->
             <div v-if="codeData?.pendingCodes?.length" style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
               <div v-for="(entry, idx) in codeData.pendingCodes" :key="idx">
-                <div style="font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">
-                  CODE ผู้ปกครองคนที่ {{ (codeData.parentCount ?? 0) + idx + 1 }}
+                <div style="font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;display:flex;align-items:center;justify-content:space-between">
+                  <span>CODE ผู้ปกครองคนที่ {{ (codeData.parentCount ?? 0) + idx + 1 }}</span>
+                  <button
+                    class="code-replace-btn"
+                    :disabled="generatingCode"
+                    @click="generateCodeForSlot(idx)"
+                  >
+                    <PhArrowClockwise :size="11" :class="{ spin: generatingCode }" />
+                    <span>สร้าง Code ใหม่</span>
+                  </button>
                 </div>
                 <div class="code-box">
                   <span class="code-text">{{ entry.code }}</span>
@@ -607,10 +615,27 @@
               </div>
             </div>
 
-            <!-- Empty state -->
-            <div v-if="codeData && !codeData.pendingCodes?.length && !(codeData.parentCount)" class="code-box code-box-empty" style="margin-top:8px">
-              <span style="color:#AEAEB2;font-size:13px">ยังไม่มี Code — กด "สร้าง Code" ด้านล่าง</span>
-            </div>
+            <!-- Empty slots: generate buttons when no code exists for a slot -->
+            <template v-if="codeData && (codeData.parentCount ?? 0) < 2">
+              <div
+                v-for="slotN in (2 - (codeData.parentCount ?? 0) - (codeData.pendingCodes?.length ?? 0))"
+                :key="'empty-' + slotN"
+                style="margin-top:8px"
+              >
+                <div style="font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">
+                  CODE ผู้ปกครองคนที่ {{ (codeData.parentCount ?? 0) + (codeData.pendingCodes?.length ?? 0) + slotN }}
+                </div>
+                <button
+                  class="code-generate-btn"
+                  style="height:40px;font-size:13px"
+                  :disabled="generatingCode"
+                  @click="generateCode"
+                >
+                  <PhArrowClockwise :size="13" :class="{ spin: generatingCode }" />
+                  สร้าง Code
+                </button>
+              </div>
+            </template>
           </div>
 
           <div class="promo-divider" />
@@ -618,16 +643,6 @@
           <!-- Footer -->
           <div class="code-footer">
             <div v-if="codeError" style="width:100%;font-size:13px;color:var(--color-danger);text-align:center;margin-bottom:4px">{{ codeError }}</div>
-            <button
-              class="code-generate-btn"
-              :disabled="generatingCode || (codeData?.parentCount ?? 0) >= 2"
-              @click="generateCode"
-            >
-              <PhArrowClockwise :size="15" :class="{ 'spin': generatingCode }" />
-              <span v-if="generatingCode">กำลังสร้าง...</span>
-              <span v-else-if="codeData?.pendingCodes?.length">สร้าง Code ใหม่ (แทน Code เดิม)</span>
-              <span v-else>สร้าง Code ใหม่</span>
-            </button>
             <p v-if="(codeData?.parentCount ?? 0) >= 2" class="code-footer-note" style="color:#059669">นักเรียนมีผู้ปกครองครบ 2 คนแล้ว</p>
             <p v-else class="code-footer-note">Code มีอายุ 14 วัน นับจากวันที่สร้าง</p>
           </div>
@@ -1146,6 +1161,20 @@ async function generateCode() {
   codeError.value      = ''
   try {
     const res = await api.post(`/admin/students/${codeData.value.studentUid}/code/generate`)
+    codeData.value = normalizeCodeData(res.data)
+  } catch (err: any) {
+    codeError.value = err?.response?.data?.error?.message ?? err?.response?.data?.message ?? 'สร้าง Code ไม่สำเร็จ'
+  } finally {
+    generatingCode.value = false
+  }
+}
+
+async function generateCodeForSlot(slotIdx: number) {
+  if (!codeData.value || generatingCode.value) return
+  generatingCode.value = true
+  codeError.value      = ''
+  try {
+    const res = await api.post(`/admin/students/${codeData.value.studentUid}/code/generate`, { slot: slotIdx })
     codeData.value = normalizeCodeData(res.data)
   } catch (err: any) {
     codeError.value = err?.response?.data?.error?.message ?? err?.response?.data?.message ?? 'สร้าง Code ไม่สำเร็จ'
