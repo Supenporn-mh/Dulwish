@@ -561,35 +561,17 @@
             </div>
             <div v-else class="code-student-name" style="color:#AEAEB2">กำลังโหลด...</div>
 
-            <!-- Code box -->
-            <div class="code-box-wrap">
-              <div v-if="codeData?.code" class="code-box">
-                <span class="code-text">{{ codeData.code }}</span>
-                <button class="code-copy-btn" :title="copied ? 'คัดลอกแล้ว' : 'คัดลอก'" @click="copyCode">
-                  <PhCheckCircle v-if="copied" :size="16" weight="fill" style="color:#059669" />
-                  <PhCopy v-else :size="16" />
-                </button>
-              </div>
-              <div v-else class="code-box code-box-empty">
-                <span style="color:#AEAEB2;font-size:13px">ยังไม่มี Code — กด "สร้าง Code" ด้านล่าง</span>
-              </div>
+            <!-- Summary row -->
+            <div v-if="codeData" class="code-summary-row">
+              <PhUsers :size="13" style="flex-shrink:0" />
+              <span>ผู้ปกครองลิงก์แล้ว {{ codeData.parentCount ?? 0 }}/2</span>
+              <template v-if="codeData.pendingCodes?.length">
+                <span style="color:#D1D5DB">·</span>
+                <span>Code รอใช้งาน {{ codeData.pendingCodes.length }} อัน</span>
+              </template>
             </div>
 
-            <!-- Expiry / status -->
-            <div v-if="codeData?.code" class="code-expiry-row">
-              <span v-if="codeData.used" class="code-status code-status-used">ใช้งานแล้ว</span>
-              <span v-else-if="codeData.expired" class="code-status code-status-expired">หมดอายุ</span>
-              <span v-else class="code-status code-status-active">ใช้งานได้</span>
-              <span class="code-expiry-text">หมดอายุ {{ formatExpiry(codeData.expiresAt) }}</span>
-            </div>
-
-            <!-- Warning if used/expired -->
-            <div v-if="codeData?.code && (codeData.used || codeData.expired)" class="code-warn">
-              <PhWarning :size="14" weight="fill" style="flex-shrink:0" />
-              <span>{{ codeData.used ? 'Code นี้ถูกใช้งานไปแล้ว กรุณาสร้าง Code ใหม่' : 'Code หมดอายุแล้ว กรุณาสร้าง Code ใหม่' }}</span>
-            </div>
-
-            <!-- Linked parent slots (filled) -->
+            <!-- Linked parent slots -->
             <div v-if="codeData?.parentCount" class="code-linked-slots">
               <div v-for="n in codeData.parentCount" :key="n" class="code-linked-row">
                 <PhCheckCircle :size="14" weight="fill" style="color:#059669;flex-shrink:0" />
@@ -606,6 +588,31 @@
                 </button>
               </div>
             </div>
+
+            <!-- Pending codes per parent slot -->
+            <div v-if="codeData?.pendingCodes?.length" style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+              <div v-for="(entry, idx) in codeData.pendingCodes" :key="idx">
+                <div style="font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">
+                  CODE ผู้ปกครองคนที่ {{ (codeData.parentCount ?? 0) + idx + 1 }}
+                </div>
+                <div class="code-box">
+                  <span class="code-text">{{ entry.code }}</span>
+                  <button class="code-copy-btn" :title="copied === entry.code ? 'คัดลอกแล้ว' : 'คัดลอก'" @click="copyCodeEntry(entry.code)">
+                    <PhCheckCircle v-if="copied === entry.code" :size="16" weight="fill" style="color:#059669" />
+                    <PhCopy v-else :size="16" />
+                  </button>
+                </div>
+                <div style="font-size:11px;color:#6B7280;margin-top:4px;display:flex;align-items:center;gap:6px">
+                  <span class="code-status code-status-active" style="font-size:10px;padding:1px 6px">ใช้งานได้</span>
+                  <span>หมดอายุ {{ formatExpiry(entry.expiresAt) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Empty state -->
+            <div v-if="codeData && !codeData.pendingCodes?.length && !(codeData.parentCount)" class="code-box code-box-empty" style="margin-top:8px">
+              <span style="color:#AEAEB2;font-size:13px">ยังไม่มี Code — กด "สร้าง Code" ด้านล่าง</span>
+            </div>
           </div>
 
           <div class="promo-divider" />
@@ -615,13 +622,16 @@
             <div v-if="codeError" style="width:100%;font-size:13px;color:var(--color-danger);text-align:center;margin-bottom:4px">{{ codeError }}</div>
             <button
               class="code-generate-btn"
-              :disabled="generatingCode"
+              :disabled="generatingCode || (codeData?.parentCount ?? 0) >= 2"
               @click="generateCode"
             >
               <PhArrowClockwise :size="15" :class="{ 'spin': generatingCode }" />
-              {{ generatingCode ? 'กำลังสร้าง...' : 'สร้าง Code ใหม่' }}
+              <span v-if="generatingCode">กำลังสร้าง...</span>
+              <span v-else-if="codeData?.pendingCodes?.length">สร้าง Code ใหม่ (แทน Code เดิม)</span>
+              <span v-else>สร้าง Code ใหม่</span>
             </button>
-            <p class="code-footer-note">Code มีอายุ 14 วัน นับจากวันที่สร้าง</p>
+            <p v-if="(codeData?.parentCount ?? 0) >= 2" class="code-footer-note" style="color:#059669">นักเรียนมีผู้ปกครองครบ 2 คนแล้ว</p>
+            <p v-else class="code-footer-note">Code มีอายุ 14 วัน นับจากวันที่สร้าง</p>
           </div>
 
         </div>
@@ -824,7 +834,7 @@ import {
   PhX, PhCloudArrowUp, PhFileXls,
   PhArrowCircleUp, PhMagnifyingGlass, PhCaretRight, PhArrowRight,
   PhGraduationCap, PhWarning, PhKey, PhCopy, PhCheckCircle, PhArrowClockwise,
-  PhStudent, PhSmiley, PhSmileySad, PhHandWaving,
+  PhStudent, PhSmiley, PhSmileySad, PhHandWaving, PhUsers,
 } from '@phosphor-icons/vue'
 import * as XLSX from 'xlsx'
 import api from '@/api/axios'
@@ -1080,7 +1090,7 @@ async function toggleStatus(s: Student) {
 const showCodeModal   = ref(false)
 const codeData        = ref<any>(null)
 const generatingCode  = ref(false)
-const copied          = ref(false)
+const copied          = ref<string | false>(false)
 let   copiedTimer: ReturnType<typeof setTimeout> | null = null
 
 function normalizeCodeData(data: any) {
@@ -1146,10 +1156,10 @@ async function generateCode() {
   }
 }
 
-function copyCode() {
-  if (!codeData.value?.code) return
-  navigator.clipboard.writeText(codeData.value.code).then(() => {
-    copied.value = true
+function copyCodeEntry(code: string) {
+  if (!code) return
+  navigator.clipboard.writeText(code).then(() => {
+    copied.value = code
     if (copiedTimer) clearTimeout(copiedTimer)
     copiedTimer = setTimeout(() => { copied.value = false }, 2000)
   })
@@ -1896,6 +1906,12 @@ onMounted(async () => {
 .code-student-name {
   font-size: 18px; font-weight: 500; color: #1C1C1E;
   display: flex; align-items: center; gap: 8px;
+}
+.code-summary-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: #6B7280;
+  background: #F9FAFB; border: 1px solid #E5E7EB;
+  border-radius: 8px; padding: 7px 10px;
 }
 .code-grade-badge {
   font-size: 11px; font-weight: 500; color: var(--color-primary);
