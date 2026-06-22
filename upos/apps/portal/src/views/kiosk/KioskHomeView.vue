@@ -11,8 +11,7 @@ const store  = useKioskStore()
 const user   = computed(() => store.currentUser)
 const wallet = computed(() => store.wallet)
 
-const grade     = computed(() => user.value?.grade     ?? undefined)
-const className = computed(() => user.value?.classRoom ?? undefined)
+const grade = computed(() => user.value?.grade ?? undefined)
 
 function logout() {
   store.clearSession()
@@ -35,7 +34,6 @@ if (!user.value) {
         :role="user?.role ?? 'student'"
         :balance="wallet?.balance"
         :grade="grade"
-        :class-name="className"
         :updated-at="new Date()"
       />
     </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useLocaleStore } from '@/stores/locale'
 import api from '@/api/axios'
 import { useParentStore } from '@/stores/parent'
 import UserProfileCard from '@/components/UserProfileCard.vue'
@@ -12,6 +13,7 @@ import {
 
 const router      = useRouter()
 const parentStore = useParentStore()
+const locale      = useLocaleStore()
 
 // ── Child data from store (locked — can only change on dashboard) ─────────
 const activeChild  = computed(() => parentStore.selectedChild)
@@ -46,17 +48,18 @@ const qrMM      = computed(() => Math.floor(qrCountdown.value / 60))
 const qrSS      = computed(() => String(qrCountdown.value % 60).padStart(2, '0'))
 const qrExpired = computed(() => qrCountdown.value <= 0)
 
-const METHOD_META: Record<Method, { label: string; sub: string; iconBg: string; iconColor: string }> = {
-  promptpay:   { label: 'PromptPay',        sub: 'สแกน QR จ่ายได้เลย',           iconBg: '#E0FAF3', iconColor: '#03BA81' },
-  credit_card: { label: 'บัตรเครดิต/เดบิต', sub: 'Visa / Mastercard',             iconBg: '#EAF1FD', iconColor: '#1264E3' },
-  alipay:      { label: 'Alipay',            sub: 'สำหรับลูกค้าที่ใช้ Alipay',     iconBg: '#E8F4FF', iconColor: '#1677FF' },
-  wechat:      { label: 'WeChat Pay',        sub: 'สำหรับลูกค้าที่ใช้ WeChat Pay', iconBg: '#E8F8EC', iconColor: '#07C160' },
+const METHOD_META: Record<Method, { label: string; subTh: string; subEn: string; iconBg: string; iconColor: string }> = {
+  promptpay:   { label: 'PromptPay',         subTh: 'สแกน QR จ่ายได้เลย',            subEn: 'Scan QR to pay',          iconBg: '#E0FAF3', iconColor: '#03BA81' },
+  credit_card: { label: 'Credit/Debit Card', subTh: 'บัตรเครดิต/เดบิต',              subEn: 'Visa / Mastercard',        iconBg: '#EAF1FD', iconColor: '#1264E3' },
+  alipay:      { label: 'Alipay',            subTh: 'สำหรับลูกค้าที่ใช้ Alipay',     subEn: 'For Alipay users',         iconBg: '#E8F4FF', iconColor: '#1677FF' },
+  wechat:      { label: 'WeChat Pay',        subTh: 'สำหรับลูกค้าที่ใช้ WeChat Pay', subEn: 'For WeChat Pay users',     iconBg: '#E8F8EC', iconColor: '#07C160' },
 }
 const methodLabel = computed(() => METHOD_META[selectedMethod.value]?.label ?? selectedMethod.value)
 
 const formattedSuccess = computed(() => {
   if (!successAt.value) return ''
-  return successAt.value.toLocaleString('th-TH', {
+  const loc = locale.lang === 'th' ? 'th-TH' : 'en-GB'
+  return successAt.value.toLocaleString(loc, {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
@@ -152,18 +155,17 @@ onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })
         role="student"
         :balance="childBalance"
         :grade="activeChild?.grade"
-        :class-name="activeChild?.className"
         :updated-at="new Date()"
       />
       <p class="text-[11px] mt-1.5 text-center"
          style="color: var(--color-text-tertiary)">
-        กลับหน้าหลักเพื่อเปลี่ยนนักเรียน
+        {{ locale.t('กลับหน้าหลักเพื่อเปลี่ยนนักเรียน', 'Go back to change student') }}
       </p>
     </div>
 
     <!-- ══ METHOD ══════════════════════════════════════════════════════ -->
     <div v-if="phase === 'method'" class="flex-1 px-4 pb-8">
-      <h2 class="text-[22px] font-medium mb-4" style="color: var(--color-text-primary)">เลือกวิธีการเติมเงิน</h2>
+      <h2 class="text-[22px] font-medium mb-4" style="color: var(--color-text-primary)">{{ locale.t('เลือกวิธีการเติมเงิน', 'Select Top-Up Method') }}</h2>
 
       <div class="flex flex-col gap-3">
         <button
@@ -187,7 +189,7 @@ onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })
           </div>
           <div class="flex-1">
             <p class="text-[16px] font-medium" style="color: var(--color-text-primary)">{{ meta.label }}</p>
-            <p class="text-[12px]" style="color: var(--color-text-secondary)">{{ meta.sub }}</p>
+            <p class="text-[12px]" style="color: var(--color-text-secondary)">{{ locale.lang === 'th' ? meta.subTh : meta.subEn }}</p>
           </div>
           <PhCaretRight :size="16" weight="bold" style="color: var(--color-border-secondary)" />
         </button>
@@ -205,7 +207,7 @@ onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })
         <span class="text-[22px] font-medium" style="color: var(--color-text-tertiary)">฿</span>
       </div>
       <p class="px-4 text-[12px] mb-3" style="color: var(--color-text-tertiary)">
-        เติมเงินสูงสุด 5,000 บาท / ครั้ง
+        {{ locale.t('เติมเงินสูงสุด 5,000 บาท / ครั้ง', 'Maximum ฿5,000 per transaction') }}
       </p>
 
       <!-- Quick chips -->
@@ -250,7 +252,7 @@ onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })
           style="color: var(--color-primary); background: none; border: none; cursor: pointer;"
         >
           <PhArrowLeft :size="16" weight="bold" />
-          กลับ
+          {{ locale.t('กลับ', 'Back') }}
         </button>
         <button
           @click="confirmAmount"
@@ -259,7 +261,7 @@ onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })
           :style="canConfirm
             ? 'background: var(--color-primary); color: #fff; border: none; cursor: pointer;'
             : 'background: var(--color-bg-secondary); color: var(--color-text-tertiary); border: none; cursor: not-allowed;'"
-        >ยืนยัน</button>
+        >{{ locale.t('ยืนยัน', 'Confirm') }}</button>
       </div>
     </div>
 
@@ -273,21 +275,21 @@ onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })
           <!-- Test mode label — payment is simulated, not real -->
           <span class="text-[10px] font-medium px-2 py-0.5 rounded-full"
                 style="background: var(--color-warning-bg); color: var(--color-warning)">
-            โหมดทดสอบ
+            {{ locale.t('โหมดทดสอบ', 'Test Mode') }}
           </span>
         </div>
 
         <div class="text-center">
-          <p class="text-[13px]" style="color: var(--color-text-secondary)">จำนวนเงิน</p>
+          <p class="text-[13px]" style="color: var(--color-text-secondary)">{{ locale.t('จำนวนเงิน', 'Amount') }}</p>
           <p class="text-[38px] font-medium" style="color: var(--color-primary)">
             ฿{{ numericAmount.toLocaleString() }}.00
           </p>
           <p class="text-[12px] mt-1 flex items-center justify-center gap-1">
             <template v-if="!qrExpired">
               <PhArrowsClockwise :size="12" weight="bold" style="color: var(--color-text-tertiary)" />
-              <span style="color: var(--color-text-tertiary)">หมดอายุใน {{ qrMM }}:{{ qrSS }}</span>
+              <span style="color: var(--color-text-tertiary)">{{ locale.t('หมดอายุใน', 'Expires in') }} {{ qrMM }}:{{ qrSS }}</span>
             </template>
-            <span v-else class="font-medium" style="color: var(--color-danger)">QR หมดอายุ — กลับเลือกใหม่</span>
+            <span v-else class="font-medium" style="color: var(--color-danger)">{{ locale.t('QR หมดอายุ — กลับเลือกใหม่', 'QR expired — go back to retry') }}</span>
           </p>
         </div>
       </div>
@@ -300,14 +302,14 @@ onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })
       >
         <span v-if="submitting" class="flex items-center gap-2">
           <span class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-          กำลังดำเนินการ...
+          {{ locale.t('กำลังดำเนินการ...', 'Processing...') }}
         </span>
-        <span v-else>จำลองการชำระเงิน</span>
+        <span v-else>{{ locale.t('จำลองการชำระเงิน', 'Simulate Payment') }}</span>
       </button>
 
       <button @click="goBack" class="text-[14px] font-medium text-center"
               style="color: var(--color-primary); background: none; border: none; cursor: pointer;">
-        ← กลับ
+        {{ locale.t('← กลับ', '← Back') }}
       </button>
     </div>
 
@@ -317,20 +319,20 @@ onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })
         <PhCheckCircle :size="72" weight="fill" style="color: var(--color-success)" />
 
         <h2 class="text-heading-xl font-medium text-center" style="color: var(--color-text-primary)">
-          เติมเงินสำเร็จ
+          {{ locale.t('เติมเงินสำเร็จ', 'Top-Up Successful') }}
         </h2>
 
         <div class="w-full mt-2 space-y-2">
           <div class="flex justify-between items-baseline">
-            <span class="text-body-sm" style="color: var(--color-text-secondary)">วันที่และเวลาที่ทำรายการ:</span>
+            <span class="text-body-sm" style="color: var(--color-text-secondary)">{{ locale.t('วันที่และเวลาที่ทำรายการ:', 'Date & Time:') }}</span>
             <span class="text-body-sm font-medium" style="color: var(--color-text-primary)">{{ formattedSuccess }}</span>
           </div>
           <div class="flex justify-between items-baseline">
-            <span class="text-body-sm" style="color: var(--color-text-secondary)">วิธีการเติมเงิน:</span>
+            <span class="text-body-sm" style="color: var(--color-text-secondary)">{{ locale.t('วิธีการเติมเงิน:', 'Method:') }}</span>
             <span class="text-body-sm font-medium" style="color: var(--color-text-primary)">{{ methodLabel }}</span>
           </div>
           <div class="flex justify-between items-baseline">
-            <span class="text-body-sm" style="color: var(--color-text-secondary)">เข้าบัญชีของ:</span>
+            <span class="text-body-sm" style="color: var(--color-text-secondary)">{{ locale.t('เข้าบัญชีของ:', 'Credited to:') }}</span>
             <span class="text-body-sm font-medium" style="color: var(--color-text-primary)">{{ activeChild?.name }}</span>
           </div>
         </div>
@@ -345,7 +347,7 @@ onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })
         class="w-full h-[52px] rounded-full text-[16px] font-medium"
         style="background: var(--color-primary); color: #fff; border: none; cursor: pointer;"
       >
-        กลับไปหน้าหลัก
+        {{ locale.t('กลับไปหน้าหลัก', 'Back to Home') }}
       </button>
     </div>
 
@@ -364,35 +366,35 @@ onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })
             <PhWarningCircle :size="36" weight="fill" style="color: var(--color-danger)" />
           </div>
 
-          <h2 class="text-heading-lg font-medium" style="color: var(--color-text-primary)">เกิดข้อผิดพลาด</h2>
+          <h2 class="text-heading-lg font-medium" style="color: var(--color-text-primary)">{{ locale.t('เกิดข้อผิดพลาด', 'An Error Occurred') }}</h2>
 
           <template v-if="errorType === 'service'">
             <p class="text-body-md font-medium" style="color: var(--color-danger)">503 Service Unavailable</p>
             <p class="text-body-sm" style="color: var(--color-text-secondary)">
-              กรุณารับเงินคืน และติดต่อผู้ดูแลระบบ
+              {{ locale.t('กรุณารับเงินคืน และติดต่อผู้ดูแลระบบ', 'Please request a refund and contact the administrator') }}
             </p>
             <button @click="dismissError"
               class="w-full h-[48px] rounded-full text-[15px] font-medium mt-1"
               style="border: 1.5px solid var(--color-primary); color: var(--color-primary); background: transparent; cursor: pointer;">
-              ปิด
+              {{ locale.t('ปิด', 'Close') }}
             </button>
           </template>
 
           <template v-else-if="errorType === 'network'">
-            <p class="text-body-md font-medium" style="color: var(--color-danger)">ไม่สามารถเชื่อมต่ออินเทอร์เน็ตได้</p>
+            <p class="text-body-md font-medium" style="color: var(--color-danger)">{{ locale.t('ไม่สามารถเชื่อมต่ออินเทอร์เน็ตได้', 'Unable to connect to the internet') }}</p>
             <p class="text-body-sm" style="color: var(--color-text-secondary)">
-              กรุณาลองทำรายการใหม่อีกครั้ง
+              {{ locale.t('กรุณาลองทำรายการใหม่อีกครั้ง', 'Please try again') }}
             </p>
             <div class="flex flex-col gap-2 w-full mt-1">
               <button @click="retryPayment"
                 class="w-full h-[48px] rounded-full text-[15px] font-medium"
                 style="background: var(--color-primary); color: #fff; border: none; cursor: pointer;">
-                ลองอีกครั้ง
+                {{ locale.t('ลองอีกครั้ง', 'Try Again') }}
               </button>
               <button @click="dismissError"
                 class="w-full h-[48px] rounded-full text-[15px] font-medium"
                 style="border: 1.5px solid var(--color-primary); color: var(--color-primary); background: transparent; cursor: pointer;">
-                ปิด
+                {{ locale.t('ปิด', 'Close') }}
               </button>
             </div>
           </template>

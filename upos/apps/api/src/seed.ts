@@ -133,17 +133,17 @@ const uParent2 = await User.create({
 const uStudent1 = await User.create({
   uid: 'STU-001', role: 'student', email: 'nirun@dulwich.ac.th',
   firstName: 'นิรันดร์', lastName: 'ศรีวิไล', status: 'active',
-  studentProfile: { gradeLevel: 'M3', className: 'M3/2', dob: new Date('2012-04-12'), guardianEmail: 'ruttana@gmail.com' },
+  studentProfile: { gradeLevel: 'M3', dob: new Date('2012-04-12'), guardianEmail: 'ruttana@gmail.com' },
 })
 const uStudent2 = await User.create({
   uid: 'STU-002', role: 'student', email: 'pimjai@dulwich.ac.th',
   firstName: 'พิมพ์ใจ', lastName: 'ศรีวิไล', status: 'active',
-  studentProfile: { gradeLevel: 'M1', className: 'M1/1', dob: new Date('2014-08-25'), guardianEmail: 'ruttana@gmail.com' },
+  studentProfile: { gradeLevel: 'M1', dob: new Date('2014-08-25'), guardianEmail: 'ruttana@gmail.com' },
 })
 const uStudent3 = await User.create({
   uid: 'STU-003', role: 'student', email: 'tossapol@dulwich.ac.th',
   firstName: 'ทศพล', lastName: 'อ่วมเอี่ยม', status: 'active',
-  studentProfile: { gradeLevel: 'M4', className: 'M4/3', dob: new Date('2011-01-30'), guardianEmail: 'prasit@gmail.com' },
+  studentProfile: { gradeLevel: 'M4', dob: new Date('2011-01-30'), guardianEmail: 'prasit@gmail.com' },
 })
 // Member (staff role)
 const uMember = await User.create({
@@ -166,7 +166,7 @@ const uVisitor = await User.create({
 await User.create({
   uid: 'STU-999', role: 'student', email: 'suspended@dulwich.ac.th',
   firstName: 'ทดสอบ', lastName: 'ระงับ', status: 'suspended',
-  studentProfile: { gradeLevel: 'M2', className: 'M2/4' },
+  studentProfile: { gradeLevel: 'M2' },
 })
 console.log('[Seed] Users created (all roles)')
 

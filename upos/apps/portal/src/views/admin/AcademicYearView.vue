@@ -1,8 +1,8 @@
 <template>
   <div style="background:#fff;border-radius:12px;border:1px solid #EBEBEB;overflow:hidden">
 
-    <!-- Tab bar -->
-    <div class="ay-tabs">
+    <!-- Tab bar (hidden when only one tab) -->
+    <div v-if="tabs.length > 1" class="ay-tabs">
       <button
         v-for="tab in tabs"
         :key="tab.key"
@@ -342,10 +342,12 @@
     </div>
 
     </template>
-    <!-- Tab: ระดับชั้น -->
-    <GradeLevelTab v-else-if="activeTab === 'grades'" />
-    <!-- Tab: ลงทะเบียนระหว่างปี -->
-    <MidYearEnrollTab v-else-if="activeTab === 'mid-year-enroll'" />
+
+    <!-- Tab: ชั้นเรียน -->
+    <template v-if="activeTab === 'gradeLevels'">
+      <GradeLevelTab />
+    </template>
+
     </div><!-- /ay-content -->
 
   </div>
@@ -366,13 +368,10 @@ import {
   deleteAcademicYear,
 } from '@/api/settings'
 import GradeLevelTab from './GradeLevelTab.vue'
-import MidYearEnrollTab from './MidYearEnrollTab.vue'
-
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 const tabs = [
-  { key: 'semesters',       label: 'ภาคเรียน'           },
-  { key: 'grades',          label: 'ระดับชั้น'           },
-  { key: 'mid-year-enroll', label: 'ลงทะเบียนระหว่างปี' },
+  { key: 'semesters',   label: 'ภาคเรียน' },
+  { key: 'gradeLevels', label: 'ชั้นเรียน' },
 ] as const
 type TabKey = typeof tabs[number]['key']
 const activeTab = ref<TabKey>('semesters')

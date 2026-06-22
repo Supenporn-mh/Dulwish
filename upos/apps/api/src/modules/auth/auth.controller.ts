@@ -18,14 +18,16 @@ function generateOtp(): string {
 export const authController = new Elysia({ prefix: '/auth' })
   .post('/login', async ({ body, set, request }) => {
     const { email, password } = body
-    const user = await User.findOne({
-      email: email.toLowerCase(),
-      status: 'active',
-    }).lean()
+    const user = await User.findOne({ email: email.toLowerCase() }).lean()
 
     if (!user || !user.passwordHash) {
       set.status = 401
       return { error: { code: 'AUTH_001', message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' } }
+    }
+
+    if (user.status !== 'active') {
+      set.status = 401
+      return { error: { code: 'AUTH_003', message: 'บัญชีนี้ถูกปิดการใช้งาน กรุณาติดต่อผู้ดูแลระบบ' } }
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash)
@@ -111,7 +113,6 @@ export const authController = new Elysia({ prefix: '/auth' })
           firstName:  student.firstName,
           lastName:   student.lastName,
           gradeLevel: student.studentProfile?.gradeLevel ?? null,
-          className:  student.studentProfile?.className  ?? null,
         },
       }
     }
@@ -366,7 +367,6 @@ export const authController = new Elysia({ prefix: '/auth' })
         firstName: student.firstName,
         lastName:  student.lastName,
         grade:     student.studentProfile?.gradeLevel ?? null,
-        className: student.studentProfile?.className  ?? null,
       },
     }
   }, {

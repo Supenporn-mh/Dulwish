@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+// routes
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -34,7 +35,6 @@ const router = createRouter({
         { path: 'banners',      component: () => import('@/views/admin/BannerView.vue') },
         { path: 'devices',      component: () => import('@/views/admin/DevicesView.vue') },
         { path: 'students',     component: () => import('@/views/admin/StudentsView.vue') },
-        { path: 'menu',         component: () => import('@/views/admin/MenuView.vue') },
         { path: 'transactions', component: () => import('@/views/admin/TransactionsView.vue') },
         { path: 'transactions/:id/tax-invoice', component: () => import('@/views/admin/TaxInvoiceView.vue') },
         { path: 'reports',      component: () => import('@/views/admin/ReportsView.vue') },
@@ -47,6 +47,7 @@ const router = createRouter({
         { path: 'buffet/pricing',     component: () => import('@/views/admin/buffet/BuffetPricingView.vue') },
         { path: 'buffet/history',     component: () => import('@/views/admin/buffet/BuffetHistoryView.vue') },
         { path: 'buffet/categories',  component: () => import('@/views/admin/buffet/BuffetCategoryView.vue') },
+        { path: 'visitors',                  component: () => import('@/views/admin/VisitorsView.vue') },
         { path: 'alumni',                    component: () => import('@/views/admin/AlumniView.vue') },
         { path: 'alumni/manage',             component: () => import('@/views/admin/AlumniManageView.vue') },
         { path: 'booking/time-settings',     component: () => import('@/views/admin/booking/TimeSettingsView.vue') },
@@ -111,7 +112,14 @@ router.beforeEach((to, _from, next) => {
   const roles = to.meta.roles as string[] | undefined
 
   if (!roles) return next()
-  if (!token || !user) return next({ name: 'login', query: { redirect: to.fullPath } })
+  if (!token || !user) {
+    const loginRole = roles.includes('admin') || roles.includes('supervisor')
+      ? 'admin'
+      : roles.includes('cashier')
+        ? 'cashier'
+        : 'parent'
+    return next({ name: 'login', query: { redirect: to.fullPath, role: loginRole } })
+  }
   if (!roles.includes(user.role)) return next('/')
   next()
 })

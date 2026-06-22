@@ -235,7 +235,6 @@ export const usersController = new Elysia({ prefix: '/users' })
         firstName:  student.firstName,
         lastName:   student.lastName,
         gradeLevel: student.studentProfile?.gradeLevel ?? null,
-        className:  student.studentProfile?.className  ?? null,
       },
     }
   }, {

@@ -2,6 +2,7 @@
 import { ref, computed, nextTick, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api/axios'
+import { useLocaleStore } from '@/stores/locale'
 import {
   PhUsersThree, PhIdentificationCard,
   PhArrowLeft, PhCheck, PhKey, PhDeviceMobileSpeaker, PhUser, PhLockSimple,
@@ -16,6 +17,7 @@ const vClickOutside = {
 }
 
 const router = useRouter()
+const locale = useLocaleStore()
 const step = ref<1 | 2 | 3>(1)
 
 // ── Step 1: PDPA ──────────────────────────────────────────────────────────────
@@ -81,8 +83,8 @@ const contactType = computed(() => detectContactType(contact.value.trim()))
 const contactError = computed(() => {
   const v = contact.value.trim()
   if (!v) return ''
-  if (contactType.value === 'phone') return /^0[0-9]{9}$/.test(v) ? '' : 'เบอร์มือถือต้องเริ่มด้วย 0 และมี 10 หลัก'
-  if (contactType.value === 'email') return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? '' : 'รูปแบบอีเมลไม่ถูกต้อง'
+  if (contactType.value === 'phone') return /^0[0-9]{9}$/.test(v) ? '' : locale.t('เบอร์มือถือต้องเริ่มด้วย 0 และมี 10 หลัก', 'Mobile number must start with 0 and be 10 digits')
+  if (contactType.value === 'email') return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? '' : locale.t('รูปแบบอีเมลไม่ถูกต้อง', 'Invalid email format')
   return ''
 })
 
@@ -102,15 +104,20 @@ const roleLabelTh: Record<string, string> = {
   parent: 'สมาชิก', member: 'สมาชิก', cashier: 'สมาชิก',
   teacher: 'สมาชิก', staff: 'สมาชิก', supervisor: 'สมาชิก', admin: 'สมาชิก',
 }
+const roleLabelEn: Record<string, string> = {
+  student: 'Student',
+  parent: 'Member', member: 'Member', cashier: 'Member',
+  teacher: 'Member', staff: 'Member', supervisor: 'Member', admin: 'Member',
+}
 const loginPathMap: Record<string, string> = {
   parent: '/login?role=parent', admin: '/login?role=admin',
   supervisor: '/login?role=supervisor', cashier: '/login?role=cashier',
 }
 
 const nextLabel = computed(() => {
-  if (step.value === 1) return otpSending.value ? 'กำลังส่ง...' : 'ส่ง OTP'
-  if (step.value === 2) return 'ยืนยัน OTP'
-  return registerLoading.value ? 'กำลังลงทะเบียน...' : 'ลงทะเบียน'
+  if (step.value === 1) return otpSending.value ? locale.t('กำลังส่ง...', 'Sending...') : locale.t('ส่ง OTP', 'Send OTP')
+  if (step.value === 2) return locale.t('ยืนยัน OTP', 'Verify OTP')
+  return registerLoading.value ? locale.t('กำลังลงทะเบียน...', 'Registering...') : locale.t('ลงทะเบียน', 'Register')
 })
 const isNextLoading = computed(() => otpSending.value || registerLoading.value)
 const canNext = computed(() => {
@@ -158,11 +165,11 @@ async function searchCode() {
       code: enrollmentCode.value.trim().toUpperCase(),
     })
     if (selectedRole.value === 'parent' && res.data.type !== 'student') {
-      searchError.value = 'รหัสนี้ไม่ใช่ Enrollment Code ของนักเรียน'
+      searchError.value = locale.t('รหัสนี้ไม่ใช่ Enrollment Code ของนักเรียน', 'This is not a student Enrollment Code')
       return
     }
     if (selectedRole.value === 'member' && res.data.type !== 'member') {
-      searchError.value = 'รหัสนี้ไม่ใช่ Enrollment Code ของสมาชิก'
+      searchError.value = locale.t('รหัสนี้ไม่ใช่ Enrollment Code ของสมาชิก', 'This is not a member Enrollment Code')
       return
     }
     if (res.data.type === 'student') {
@@ -172,7 +179,7 @@ async function searchCode() {
       contact.value = res.data.member.email ?? res.data.member.phone ?? ''
     }
   } catch (e: any) {
-    searchError.value = e?.response?.data?.error?.message ?? 'ไม่พบรหัสลงทะเบียน'
+    searchError.value = e?.response?.data?.error?.message ?? locale.t('ไม่พบรหัสลงทะเบียน', 'Enrollment code not found')
   } finally { searchLoading.value = false }
 }
 
@@ -191,7 +198,7 @@ async function sendOtp() {
     await nextTick()
     document.querySelector<HTMLInputElement>('.otp-digit')?.focus()
   } catch (e: any) {
-    sendOtpError.value = e?.response?.data?.error?.message ?? 'ส่ง OTP ไม่สำเร็จ'
+    sendOtpError.value = e?.response?.data?.error?.message ?? locale.t('ส่ง OTP ไม่สำเร็จ', 'Failed to send OTP')
   } finally { otpSending.value = false }
 }
 
@@ -215,7 +222,7 @@ function handleOtpKeydown(index: number, event: KeyboardEvent) {
 function verifyOtp() {
   otpError.value = ''
   if (enteredOtpFull.value !== demoOtp.value) {
-    otpError.value = 'รหัส OTP ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง'
+    otpError.value = locale.t('รหัส OTP ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง', 'Invalid OTP. Please try again.')
     return
   }
   if (foundMember.value) {
@@ -223,6 +230,26 @@ function verifyOtp() {
     lastName.value  = foundMember.value.lastName  ?? ''
   }
   step.value = 3
+}
+
+// ── Result modal ─────────────────────────────────────────────────────────────
+type ResultType = 'success' | 'network' | 'conflict' | 'server' | 'unknown'
+const showResultModal = ref(false)
+const resultType      = ref<ResultType>('success')
+const resultMessage   = ref('')
+let   successRedirect = ''
+
+function classifyError(e: any): ResultType {
+  if (!e?.response) return 'network'
+  const s = e.response.status
+  if (s === 409) return 'conflict'
+  if (s >= 500)  return 'server'
+  return 'unknown'
+}
+
+function dismissResult() {
+  showResultModal.value = false
+  if (resultType.value === 'success') router.push(successRedirect)
 }
 
 // ── Step 4 ────────────────────────────────────────────────────────────────────
@@ -244,7 +271,7 @@ async function handleRegister() {
       if (ctType === 'phone') body.phone = ctVal
       else body.email = ctVal.toLowerCase()
       await api.post('/auth/parent-register', body)
-      router.push('/login?role=parent&registered=1')
+      successRedirect = '/login?role=parent&registered=1'
     } else {
       const body: Record<string, string> = {
         enrollmentCode: enrollmentCode.value.trim().toUpperCase(),
@@ -255,10 +282,15 @@ async function handleRegister() {
       else body.email = ctVal.toLowerCase()
       await api.post('/auth/member-register', body)
       const role = foundMember.value?.role ?? 'admin'
-      router.push((loginPathMap[role] ?? '/login?role=admin') + '&registered=1')
+      successRedirect = (loginPathMap[role] ?? '/login?role=admin') + '&registered=1'
     }
+    resultType.value    = 'success'
+    resultMessage.value = ''
+    showResultModal.value = true
   } catch (e: any) {
-    step4Error.value = e?.response?.data?.error?.message ?? 'ลงทะเบียนไม่สำเร็จ กรุณาลองใหม่'
+    resultType.value    = classifyError(e)
+    resultMessage.value = e?.response?.data?.error?.message ?? ''
+    showResultModal.value = true
   } finally { registerLoading.value = false }
 }
 </script>
@@ -271,9 +303,9 @@ async function handleRegister() {
       <button @click="goBack" class="flex items-center gap-1.5 text-[14px] font-medium"
         style="color: var(--color-primary); background: none; border: none; cursor: pointer;">
         <PhArrowLeft :size="18" weight="bold" />
-        กลับ
+        {{ locale.t('กลับ', 'Back') }}
       </button>
-      <span class="navbar-title">ลงทะเบียนเข้าใช้งาน</span>
+      <span class="navbar-title">{{ locale.t('ลงทะเบียนเข้าใช้งาน', 'Register') }}</span>
       <div class="w-14" />
     </div>
 
@@ -289,7 +321,7 @@ async function handleRegister() {
           <PhKey   v-else-if="step === 1" :size="15" weight="bold" />
           <span v-else class="step-num">1</span>
         </div>
-        <span class="step-lbl" :class="step >= 1 ? 'step-lbl-on' : ''">รหัส</span>
+        <span class="step-lbl" :class="step >= 1 ? 'step-lbl-on' : ''">{{ locale.t('รหัส', 'Code') }}</span>
       </div>
       <div class="step-conn" :class="step > 1 ? 'step-conn-done' : ''" />
       <!-- Step 2 -->
@@ -308,7 +340,7 @@ async function handleRegister() {
           <PhUser v-if="step === 3" :size="15" weight="bold" />
           <span v-else class="step-num">3</span>
         </div>
-        <span class="step-lbl" :class="step >= 3 ? 'step-lbl-on' : ''">บัญชี</span>
+        <span class="step-lbl" :class="step >= 3 ? 'step-lbl-on' : ''">{{ locale.t('บัญชี', 'Account') }}</span>
       </div>
     </div>
 
@@ -317,20 +349,20 @@ async function handleRegister() {
 
       <!-- ═══ Step 1: ระบุรหัสประจำตัว ══════════════════════════════════════ -->
       <div v-if="step === 1">
-        <h2 class="page-title">ระบุรหัสประจำตัว</h2>
-        <p class="page-subtitle">กรอกข้อมูลเพื่อยืนยันตัวตนผ่าน OTP</p>
+        <h2 class="page-title">{{ locale.t('ระบุรหัสประจำตัว', 'Verify Identity') }}</h2>
+        <p class="page-subtitle">{{ locale.t('กรอกข้อมูลเพื่อยืนยันตัวตนผ่าน OTP', 'Enter your details to verify via OTP') }}</p>
 
         <!-- Form card -->
         <div class="card mb-4">
 
           <!-- ประเภท dropdown -->
           <div class="card-body" :style="selectedRole ? 'border-bottom: 0.5px solid var(--color-border-tertiary)' : ''">
-            <label class="field-label">ประเภท <span style="color: var(--color-danger)">*</span></label>
+            <label class="field-label">{{ locale.t('ประเภท', 'Type') }} <span style="color: var(--color-danger)">*</span></label>
             <div class="cdd-wrap" v-click-outside="() => showRoleDropdown = false">
               <button ref="roleDropdownAnchorRef" type="button" @click="openRoleDropdown"
                 class="cdd-trigger" :class="showRoleDropdown ? 'cdd-open' : ''">
                 <span :style="selectedRole ? 'color: var(--color-text-primary)' : 'color: var(--color-text-tertiary)'">
-                  {{ selectedRole ? roleLabel[selectedRole] : '- เลือกประเภท -' }}
+                  {{ selectedRole ? (selectedRole === 'parent' ? locale.t('ผู้ปกครอง', 'Parent') : locale.t('สมาชิก / พนักงาน', 'Member / Staff')) : locale.t('- เลือกประเภท -', '- Select Type -') }}
                 </span>
                 <i class="ti ti-chevron-down cdd-arrow" :class="showRoleDropdown ? 'cdd-arrow-up' : ''" />
               </button>
@@ -339,8 +371,8 @@ async function handleRegister() {
                   :class="selectedRole === 'parent' ? 'cdd-item-active' : ''">
                   <PhUsersThree :size="22" weight="duotone" style="color: var(--color-success); flex-shrink:0" />
                   <div class="flex-1">
-                    <p class="cdd-name">ผู้ปกครอง</p>
-                    <p class="cdd-hint">Enrollment Code ของนักเรียน</p>
+                    <p class="cdd-name">{{ locale.t('ผู้ปกครอง', 'Parent') }}</p>
+                    <p class="cdd-hint">{{ locale.t('Enrollment Code ของนักเรียน', 'Student Enrollment Code') }}</p>
                   </div>
                   <i v-if="selectedRole === 'parent'" class="ti ti-check" style="color: var(--color-primary); font-size: 16px;" />
                 </button>
@@ -349,8 +381,8 @@ async function handleRegister() {
                   :class="selectedRole === 'member' ? 'cdd-item-active' : ''">
                   <PhIdentificationCard :size="22" weight="duotone" style="color: var(--color-primary); flex-shrink:0" />
                   <div class="flex-1">
-                    <p class="cdd-name">สมาชิก / พนักงาน</p>
-                    <p class="cdd-hint">Enrollment Code ของสมาชิก</p>
+                    <p class="cdd-name">{{ locale.t('สมาชิก / พนักงาน', 'Member / Staff') }}</p>
+                    <p class="cdd-hint">{{ locale.t('Enrollment Code ของสมาชิก', 'Member Enrollment Code') }}</p>
                   </div>
                   <i v-if="selectedRole === 'member'" class="ti ti-check" style="color: var(--color-primary); font-size: 16px;" />
                 </button>
@@ -362,7 +394,7 @@ async function handleRegister() {
           <template v-if="selectedRole">
             <div class="card-body">
               <label class="field-label">
-                {{ selectedRole === 'parent' ? 'Enrollment Code นักเรียน' : 'Enrollment Code สมาชิก' }}
+                {{ selectedRole === 'parent' ? locale.t('Enrollment Code นักเรียน', 'Student Enrollment Code') : locale.t('Enrollment Code สมาชิก', 'Member Enrollment Code') }}
                 <span style="color: var(--color-danger)">*</span>
               </label>
               <!-- Inline input + button -->
@@ -379,7 +411,7 @@ async function handleRegister() {
                 <button @click="searchCode" :disabled="searchLoading || !enrollmentCode.trim()"
                   class="verify-btn">
                   <span v-if="searchLoading" class="w-3.5 h-3.5 border-2 border-current/40 border-t-current rounded-full animate-spin" />
-                  <span v-else>ตรวจสอบ</span>
+                  <span v-else>{{ locale.t('ตรวจสอบ', 'Verify') }}</span>
                 </button>
               </div>
             </div>
@@ -398,9 +430,9 @@ async function handleRegister() {
             <i class="ti ti-school" style="color: #fff; font-size: 18px;" />
           </div>
           <div>
-            <p class="found-sub">พบนักเรียน</p>
+            <p class="found-sub">{{ locale.t('พบนักเรียน', 'Student Found') }}</p>
             <p class="found-name">{{ foundStudent.firstName }} {{ foundStudent.lastName }}</p>
-            <p class="found-meta">{{ foundStudent.gradeLevel }} · {{ foundStudent.className }}</p>
+            <p class="found-meta">{{ foundStudent.gradeLevel }}</p>
           </div>
         </div>
 
@@ -410,9 +442,9 @@ async function handleRegister() {
             <i class="ti ti-user-check" style="color: #fff; font-size: 18px;" />
           </div>
           <div>
-            <p class="found-sub">พบบัญชีสมาชิก</p>
+            <p class="found-sub">{{ locale.t('พบบัญชีสมาชิก', 'Member Account Found') }}</p>
             <p class="found-name">{{ foundMember.firstName }} {{ foundMember.lastName }}</p>
-            <p class="found-meta">{{ roleLabelTh[foundMember.role] ?? foundMember.role }}</p>
+            <p class="found-meta">{{ (locale.lang === 'th' ? roleLabelTh : roleLabelEn)[foundMember.role] ?? foundMember.role }}</p>
           </div>
         </div>
 
@@ -422,18 +454,18 @@ async function handleRegister() {
             <div class="card-body">
               <div class="flex items-center justify-between mb-1">
                 <label class="field-label mb-0">
-                  อีเมล หรือ เบอร์มือถือ <span style="color: var(--color-danger)">*</span>
+                  {{ locale.t('อีเมล หรือ เบอร์มือถือ', 'Email or Mobile') }} <span style="color: var(--color-danger)">*</span>
                 </label>
                 <span v-if="contactType === 'email'" class="contact-pill contact-pill-email">
-                  <i class="ti ti-mail" style="font-size: 10px" /> อีเมล
+                  <i class="ti ti-mail" style="font-size: 10px" /> {{ locale.t('อีเมล', 'Email') }}
                 </span>
                 <span v-else-if="contactType === 'phone'" class="contact-pill contact-pill-phone">
-                  <i class="ti ti-device-mobile" style="font-size: 10px" /> มือถือ
+                  <i class="ti ti-device-mobile" style="font-size: 10px" /> {{ locale.t('มือถือ', 'Mobile') }}
                 </span>
               </div>
               <input v-model="contact" type="text"
                 :inputmode="contactType === 'phone' ? 'tel' : 'email'"
-                placeholder="example@email.com หรือ 08xxxxxxxx"
+                :placeholder="locale.t('example@email.com หรือ 08xxxxxxxx', 'example@email.com or 08xxxxxxxx')"
                 class="field-input mt-1" />
               <p v-if="contactError" class="field-error">{{ contactError }}</p>
             </div>
@@ -442,7 +474,7 @@ async function handleRegister() {
           <!-- Info box -->
           <div class="info-box mb-3">
             <i class="ti ti-info-circle" style="font-size: 15px; flex-shrink: 0; margin-top: 1px;" />
-            <p>ระบุอีเมลหรือเบอร์มือถือที่ใช้ได้จริง เพื่อรับรหัส OTP ยืนยันการลงทะเบียน</p>
+            <p>{{ locale.t('ระบุอีเมลหรือเบอร์มือถือที่ใช้ได้จริง เพื่อรับรหัส OTP ยืนยันการลงทะเบียน', 'Enter a valid email or mobile number to receive the OTP verification code') }}</p>
           </div>
 
           <!-- PDPA consent -->
@@ -457,9 +489,9 @@ async function handleRegister() {
               </div>
             </div>
             <p class="text-body-sm leading-relaxed" style="color: var(--color-text-primary)">
-              ฉันได้อ่านและยอมรับ
-              <span style="color: var(--color-primary); font-weight: 500">นโยบายความเป็นส่วนตัว</span>
-              และยินยอมให้โรงเรียนเก็บรวบรวมและใช้ข้อมูลของฉันตามที่ระบุไว้
+              {{ locale.t('ฉันได้อ่านและยอมรับ', 'I have read and accepted the') }}
+              <span style="color: var(--color-primary); font-weight: 500">{{ locale.t('นโยบายความเป็นส่วนตัว', 'Privacy Policy') }}</span>
+              {{ locale.t('และยินยอมให้โรงเรียนเก็บรวบรวมและใช้ข้อมูลของฉันตามที่ระบุไว้', 'and consent to the school collecting and using my data as specified') }}
             </p>
           </label>
         </template>
@@ -473,11 +505,11 @@ async function handleRegister() {
 
       <!-- ═══ Step 2: ยืนยัน OTP ════════════════════════════════════════════ -->
       <div v-if="step === 2">
-        <h2 class="page-title">ยืนยัน OTP</h2>
+        <h2 class="page-title">{{ locale.t('ยืนยัน OTP', 'Verify OTP') }}</h2>
         <p class="page-subtitle">
-          กรอกรหัส OTP 6 หลัก ที่ส่งไปยัง
+          {{ locale.t('กรอกรหัส OTP 6 หลัก ที่ส่งไปยัง', 'Enter the 6-digit OTP sent to') }}
           <span style="color: var(--color-primary); font-weight: 500">{{ contact }}</span>
-          <span style="color: var(--color-text-tertiary)"> (มีอายุ 15 นาที)</span>
+          <span style="color: var(--color-text-tertiary)"> {{ locale.t('(มีอายุ 15 นาที)', '(valid for 15 minutes)') }}</span>
         </p>
 
         <!-- Demo OTP -->
@@ -490,7 +522,7 @@ async function handleRegister() {
         <div class="card mb-5">
           <div class="card-body">
             <label class="text-caption mb-3 block text-center" style="color: var(--color-text-secondary)">
-              รหัส OTP (6 หลัก)
+              {{ locale.t('รหัส OTP (6 หลัก)', 'OTP Code (6 digits)') }}
             </label>
             <div class="flex justify-center gap-2">
               <input
@@ -513,23 +545,23 @@ async function handleRegister() {
 
         <!-- Resend -->
         <p class="text-center text-[13px]" style="color: var(--color-text-secondary)">
-          ไม่ได้รับ OTP?
+          {{ locale.t('ไม่ได้รับ OTP?', "Didn't receive OTP?") }}
           <button
             @click="resendCooldown === 0 && (step = 1, otpDigits = ['','','','','',''])"
             :disabled="resendCooldown > 0"
             :style="resendCooldown > 0
               ? 'background:none;border:none;cursor:not-allowed;color:var(--color-text-tertiary);font-size:13px;font-weight:500'
               : 'background:none;border:none;cursor:pointer;color:var(--color-primary);font-weight:500;font-size:13px'">
-            <template v-if="resendCooldown > 0">ส่งใหม่ได้ใน {{ resendCooldown }} วินาที</template>
-            <template v-else>ส่งใหม่อีกครั้ง</template>
+            <template v-if="resendCooldown > 0">{{ locale.t('ส่งใหม่ได้ใน', 'Resend in') }} {{ resendCooldown }} {{ locale.t('วินาที', 'seconds') }}</template>
+            <template v-else>{{ locale.t('ส่งใหม่อีกครั้ง', 'Resend') }}</template>
           </button>
         </p>
       </div>
 
       <!-- ═══ Step 3: ข้อมูลบัญชี ══════════════════════════════════════════ -->
       <div v-if="step === 3">
-        <h2 class="page-title">กรอกชื่อและตั้งรหัสผ่าน</h2>
-        <p class="page-subtitle">สำหรับเข้าสู่ระบบ</p>
+        <h2 class="page-title">{{ locale.t('กรอกชื่อและตั้งรหัสผ่าน', 'Enter Name & Set Password') }}</h2>
+        <p class="page-subtitle">{{ locale.t('สำหรับเข้าสู่ระบบ', 'For signing in') }}</p>
 
         <!-- Summary chip -->
         <div class="found-chip mb-5" :class="foundStudent ? 'found-student' : 'found-member'">
@@ -544,7 +576,7 @@ async function handleRegister() {
             </p>
             <p class="found-meta">
               <template v-if="foundStudent">{{ foundStudent.gradeLevel }}</template>
-              <template v-else-if="foundMember">{{ roleLabelTh[foundMember.role] ?? foundMember.role }}</template>
+              <template v-else-if="foundMember">{{ (locale.lang === 'th' ? roleLabelTh : roleLabelEn)[foundMember.role] ?? foundMember.role }}</template>
             </p>
           </div>
         </div>
@@ -552,19 +584,19 @@ async function handleRegister() {
         <div class="card mb-4">
           <!-- ชื่อ -->
           <div class="card-body" style="border-bottom: 0.5px solid var(--color-border-tertiary); padding-bottom: 14px;">
-            <label class="field-label">ชื่อ <span style="color: var(--color-danger)">*</span></label>
-            <input v-model="firstName" type="text" placeholder="ชื่อจริง" class="field-input mt-1" />
+            <label class="field-label">{{ locale.t('ชื่อ', 'First Name') }} <span style="color: var(--color-danger)">*</span></label>
+            <input v-model="firstName" type="text" :placeholder="locale.t('ชื่อจริง', 'First name')" class="field-input mt-1" />
           </div>
           <!-- นามสกุล -->
           <div class="card-body" style="border-bottom: 0.5px solid var(--color-border-tertiary); padding-bottom: 14px;">
-            <label class="field-label">นามสกุล <span style="color: var(--color-danger)">*</span></label>
-            <input v-model="lastName" type="text" placeholder="นามสกุล" class="field-input mt-1" />
+            <label class="field-label">{{ locale.t('นามสกุล', 'Last Name') }} <span style="color: var(--color-danger)">*</span></label>
+            <input v-model="lastName" type="text" :placeholder="locale.t('นามสกุล', 'Last name')" class="field-input mt-1" />
           </div>
           <!-- รหัสผ่าน -->
           <div class="card-body" style="border-bottom: 0.5px solid var(--color-border-tertiary); padding-bottom: 14px;">
-            <label class="field-label">รหัสผ่าน (อย่างน้อย 8 ตัวอักษร) <span style="color: var(--color-danger)">*</span></label>
+            <label class="field-label">{{ locale.t('รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)', 'Password (at least 8 characters)') }} <span style="color: var(--color-danger)">*</span></label>
             <div class="field-input flex items-center gap-2 overflow-hidden mt-1" style="padding:0">
-              <input v-model="password" :type="showPw ? 'text' : 'password'" placeholder="รหัสผ่าน"
+              <input v-model="password" :type="showPw ? 'text' : 'password'" :placeholder="locale.t('รหัสผ่าน', 'Password')"
                 class="flex-1 px-[14px] py-[12px] bg-transparent outline-none text-[15px]"
                 style="color: var(--color-text-primary); border: none;" />
               <button type="button" @click="showPw = !showPw"
@@ -576,16 +608,12 @@ async function handleRegister() {
           </div>
           <!-- ยืนยันรหัสผ่าน -->
           <div class="card-body">
-            <label class="field-label">ยืนยันรหัสผ่าน <span style="color: var(--color-danger)">*</span></label>
-            <input v-model="confirmPw" :type="showPw ? 'text' : 'password'" placeholder="ยืนยันรหัสผ่าน" class="field-input mt-1" />
-            <p v-if="pwMismatch" class="field-error mt-1">รหัสผ่านไม่ตรงกัน</p>
+            <label class="field-label">{{ locale.t('ยืนยันรหัสผ่าน', 'Confirm Password') }} <span style="color: var(--color-danger)">*</span></label>
+            <input v-model="confirmPw" :type="showPw ? 'text' : 'password'" :placeholder="locale.t('ยืนยันรหัสผ่าน', 'Confirm password')" class="field-input mt-1" />
+            <p v-if="pwMismatch" class="field-error mt-1">{{ locale.t('รหัสผ่านไม่ตรงกัน', 'Passwords do not match') }}</p>
           </div>
         </div>
 
-        <div v-if="step4Error" class="notif notif-danger mb-4">
-          <div class="notif-icon"><i class="ti ti-alert-triangle" /></div>
-          <div class="notif-content"><p class="notif-desc">{{ step4Error }}</p></div>
-        </div>
       </div>
 
     </div><!-- /content-area -->
@@ -595,7 +623,7 @@ async function handleRegister() {
 
     <!-- ── Bottom nav (full-width) ──────────────────────────────────────────── -->
     <div class="bottom-nav">
-      <button @click="goBack" class="btn-back">ย้อนกลับ</button>
+      <button @click="goBack" class="btn-back">{{ locale.t('ย้อนกลับ', 'Back') }}</button>
       <button @click="handleNext" :disabled="!canNext"
         class="btn-forward" :class="canNext ? 'btn-forward-active' : 'btn-forward-disabled'">
         <span v-if="isNextLoading" class="flex items-center gap-2 justify-center">
@@ -607,6 +635,87 @@ async function handleRegister() {
     </div>
 
   </div>
+
+  <!-- ── Result Modal ────────────────────────────────────────────────────── -->
+  <Teleport to="body">
+    <Transition name="modal-fade">
+      <div
+        v-if="showResultModal"
+        class="reg-modal-backdrop"
+        @click.self="resultType !== 'success' && dismissResult()"
+      >
+        <div class="reg-modal-card">
+
+          <!-- SUCCESS -->
+          <template v-if="resultType === 'success'">
+            <div class="reg-modal-icon reg-icon-success">
+              <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+                <path d="M8 19l7 7L28 11" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <h2 class="reg-modal-title">{{ locale.t('ลงทะเบียนสำเร็จ!', 'Registration Successful!') }}</h2>
+            <p class="reg-modal-body">
+              {{ locale.t('ยินดีต้อนรับ', 'Welcome') }},
+              <strong>{{ firstName }}</strong>!
+              {{ locale.t('บัญชีของคุณถูกสร้างเรียบร้อยแล้ว', 'Your account has been created successfully.') }}
+            </p>
+            <button class="reg-modal-btn reg-btn-primary" @click="dismissResult">
+              {{ locale.t('เข้าสู่ระบบเลย', 'Sign In Now') }}
+            </button>
+          </template>
+
+          <!-- NETWORK ERROR -->
+          <template v-else-if="resultType === 'network'">
+            <div class="reg-modal-icon reg-icon-error">
+              <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+                <path d="M18 12v8M18 24v1" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h2 class="reg-modal-title">{{ locale.t('ไม่มีการเชื่อมต่ออินเทอร์เน็ต', 'No Internet Connection') }}</h2>
+            <p class="reg-modal-body">{{ locale.t('กรุณาตรวจสอบการเชื่อมต่อและลองใหม่อีกครั้ง', 'Please check your connection and try again.') }}</p>
+            <div class="reg-modal-actions">
+              <button class="reg-modal-btn reg-btn-primary" @click="dismissResult">{{ locale.t('ลองอีกครั้ง', 'Try Again') }}</button>
+            </div>
+          </template>
+
+          <!-- CONFLICT (account already exists) -->
+          <template v-else-if="resultType === 'conflict'">
+            <div class="reg-modal-icon reg-icon-warning">
+              <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+                <path d="M18 12v8M18 24v1" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h2 class="reg-modal-title">{{ locale.t('บัญชีนี้มีอยู่แล้ว', 'Account Already Exists') }}</h2>
+            <p class="reg-modal-body">
+              {{ resultMessage || locale.t('อีเมลหรือเบอร์มือถือนี้ถูกใช้งานแล้ว กรุณาใช้ข้อมูลอื่น', 'This email or mobile number is already registered. Please use different details.') }}
+            </p>
+            <div class="reg-modal-actions">
+              <button class="reg-modal-btn reg-btn-outline" @click="dismissResult">{{ locale.t('แก้ไขข้อมูล', 'Edit Details') }}</button>
+              <button class="reg-modal-btn reg-btn-ghost" @click="router.push('/login?role=parent')">{{ locale.t('เข้าสู่ระบบ', 'Sign In') }}</button>
+            </div>
+          </template>
+
+          <!-- SERVER / UNKNOWN ERROR -->
+          <template v-else>
+            <div class="reg-modal-icon reg-icon-error">
+              <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+                <path d="M18 12v8M18 24v1" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h2 class="reg-modal-title">{{ locale.t('ลงทะเบียนไม่สำเร็จ', 'Registration Failed') }}</h2>
+            <p class="reg-modal-body">
+              {{ resultMessage || locale.t('เกิดข้อผิดพลาดบางอย่าง กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ', 'Something went wrong. Please try again or contact your administrator.') }}
+            </p>
+            <div class="reg-modal-actions">
+              <button class="reg-modal-btn reg-btn-primary" @click="dismissResult">{{ locale.t('ลองอีกครั้ง', 'Try Again') }}</button>
+            </div>
+          </template>
+
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+
 </template>
 
 <style scoped>
@@ -806,6 +915,69 @@ async function handleRegister() {
 .otp-empty  { background: var(--color-bg-secondary); color: var(--color-text-primary); border: 2px solid var(--color-border-tertiary); }
 .otp-filled { background: var(--color-primary-tint); color: var(--color-primary); border: 2px solid var(--color-primary); }
 .otp-digit:focus { border-color: var(--color-primary) !important; background: var(--color-primary-tint) !important; }
+
+/* ── Result Modal ────────────────────────────────────────────────────────── */
+.reg-modal-backdrop {
+  position: fixed; inset: 0; z-index: 600;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  background: rgba(0,0,0,0.48);
+  backdrop-filter: blur(4px);
+}
+.reg-modal-card {
+  background: var(--color-bg-surface);
+  border-radius: 24px;
+  padding: 36px 28px 28px;
+  width: 100%; max-width: 340px;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 12px; text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+.reg-modal-icon {
+  width: 72px; height: 72px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 4px;
+}
+.reg-icon-success { background: var(--color-success); }
+.reg-icon-error   { background: var(--color-danger);  }
+.reg-icon-warning { background: var(--color-warning);  }
+
+.reg-modal-title {
+  font-size: 20px; font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+.reg-modal-body {
+  font-size: 14px; line-height: 1.6;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+.reg-modal-actions {
+  display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 4px;
+}
+.reg-modal-btn {
+  width: 100%; height: 50px; border-radius: var(--radius-md);
+  font-size: 15px; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: opacity 0.15s;
+}
+.reg-btn-primary {
+  background: var(--color-primary); color: #fff; border: none;
+  margin-top: 4px; width: 100%;
+}
+.reg-btn-outline {
+  background: transparent; color: var(--color-primary);
+  border: 1.5px solid var(--color-primary);
+}
+.reg-btn-ghost {
+  background: transparent; color: var(--color-text-secondary);
+  border: 1.5px solid var(--color-border-secondary);
+}
+.reg-btn-primary:hover { opacity: 0.88; }
+.reg-btn-outline:hover { background: var(--color-primary-tint); }
+
+/* Transition */
+.modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.2s ease; }
+.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
 
 /* ── Bottom nav ──────────────────────────────────────────────────────────── */
 .bottom-nav {

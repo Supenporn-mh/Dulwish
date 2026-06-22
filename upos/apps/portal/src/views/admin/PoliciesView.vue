@@ -1,6 +1,6 @@
 <template>
   <div class="policies-view">
-    <div class="ios-section-header">นโยบายระบบ</div>
+    <div class="ios-section-header">ตั้งค่าระบบ</div>
 
     <!-- Loading skeleton -->
     <div v-if="loading" class="policies-grid">
@@ -14,7 +14,7 @@
 
     <!-- Empty -->
     <div v-else-if="policies.length === 0" style="padding:40px;text-align:center;color:#AEAEB2;font-size:13px">
-      ไม่มีข้อมูลนโยบาย
+      ไม่มีข้อมูลการตั้งค่า
     </div>
 
     <!-- Policy cards -->
@@ -27,7 +27,7 @@
         <div class="policy-card-inner">
           <!-- Left: content -->
           <div class="policy-content">
-            <p class="policy-key">{{ p.key }}</p>
+            <p class="policy-key">{{ policyLabel(p.key) }}</p>
 
             <!-- View mode -->
             <template v-if="editing !== p.key">
@@ -88,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '@/api/axios'
 
@@ -98,9 +98,33 @@ interface Policy {
   description: string
 }
 
+// Thai labels for known policy keys — fallback to formatted key
+const POLICY_LABEL_TH: Record<string, string> = {
+  topup_min:            'ยอดเติมเงินขั้นต่ำ',
+  topup_max:            'ยอดเติมเงินสูงสุด / ครั้ง',
+  topup_limit:          'วงเงินเติมเงินต่อวัน',
+  wallet_balance_limit: 'ยอดเงินสูงสุดในกระเป๋า',
+  balance_limit:        'ยอดเงินสูงสุดในกระเป๋า',
+  low_balance_alert:    'แจ้งเตือนยอดเงินต่ำ',
+  preorder_max_days:    'จองล่วงหน้าได้สูงสุด (วัน)',
+  preorder_cutoff_min:  'ตัดยอดจองก่อนเวลา (นาที)',
+  max_items_per_order:  'จำนวนรายการสูงสุดต่อออร์เดอร์',
+}
+
+// Keys to hide from the settings view
+const HIDDEN_KEYS = ['pdpa_version', 'otp_expire', 'otp_length', 'otp_max_attempts', 'otp_resend_cooldown']
+
+function policyLabel(key: string): string {
+  const lower = key.toLowerCase()
+  return POLICY_LABEL_TH[lower] ?? key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
 const loading = ref(false)
 const loadError = ref<string | null>(null)
-const policies = ref<Policy[]>([])
+const allPolicies = ref<Policy[]>([])
+const policies = computed(() =>
+  allPolicies.value.filter(p => !HIDDEN_KEYS.includes(p.key.toLowerCase()))
+)
 const editing = ref<string | null>(null)
 const editVal = ref('')
 const saving = ref<string | null>(null)
@@ -142,10 +166,10 @@ onMounted(async () => {
   loadError.value = null
   try {
     const { data } = await api.get('/admin/policies')
-    policies.value = data.policies ?? []
+    allPolicies.value = data.policies ?? []
   } catch (e: unknown) {
     loadError.value = e instanceof Error ? e.message : 'โหลดนโยบายไม่สำเร็จ'
-    policies.value = []
+    allPolicies.value = []
   } finally {
     loading.value = false
   }

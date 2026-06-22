@@ -281,11 +281,6 @@
                   <span class="txd-plain-val" :style="{ color: orderStatusColor(detailTx), fontWeight: 500 }">{{ orderStatusLabel(detailTx) }}</span>
                 </div>
                 <template v-if="detailTx.walletId?.userId">
-                  <div v-if="detailTx.walletId.userId.studentProfile?.className" class="txd-plain-row">
-                    <span class="txd-plain-key">ชั้นเรียน</span>
-                    <span class="txd-plain-sep">:</span>
-                    <span class="txd-plain-val">{{ detailTx.walletId.userId.studentProfile.className }}</span>
-                  </div>
                   <div class="txd-plain-row">
                     <span class="txd-plain-key">เลขประจำตัว</span>
                     <span class="txd-plain-sep">:</span>

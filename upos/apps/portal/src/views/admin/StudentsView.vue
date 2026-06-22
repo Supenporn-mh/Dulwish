@@ -488,6 +488,43 @@
               </div>
             </div>
           </div>
+
+          <!-- ── ผู้ปกครอง + ครอบครัว ── -->
+          <div class="promo-divider" style="margin:0" />
+          <div style="padding:16px 24px;display:flex;flex-direction:column;gap:12px;background:#FAFAFA">
+            <div>
+              <div style="font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">ผู้ปกครองที่ลิงก์แล้ว</div>
+              <div v-if="editParentsLoading" style="font-size:12px;color:#AEAEB2">กำลังโหลด...</div>
+              <div v-else-if="editParents.length === 0" style="font-size:12px;color:#AEAEB2">ยังไม่มีผู้ปกครอง</div>
+              <div v-for="(p, idx) in editParents" :key="p.linkId" class="edit-info-row">
+                <div class="edit-info-avatar" style="background:#D1FAE5;color:#065F46">{{ p.firstName?.[0] ?? '?' }}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;font-weight:500;color:#1C1C1E">ผู้ปกครองคนที่ {{ idx + 1 }} — {{ p.firstName }} {{ p.lastName }}</div>
+                  <div style="font-size:11px;color:#8E8E93">{{ p.email || p.phone || '—' }}</div>
+                </div>
+                <span v-if="p.isPrimary" style="font-size:10px;background:#D1FAE5;color:#065F46;padding:2px 7px;border-radius:4px;flex-shrink:0">หลัก</span>
+              </div>
+            </div>
+            <template v-if="editTarget?.familyCode">
+              <div style="height:1px;background:#E5E7EB" />
+              <div>
+                <div style="font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">กลุ่มครอบครัว {{ editTarget.familyCode }}</div>
+                <div v-if="editFamilyLoading" style="font-size:12px;color:#AEAEB2">กำลังโหลด...</div>
+                <template v-else>
+                  <div v-for="s in editFamilyStudents" :key="s.uid" class="edit-info-row">
+                    <div class="edit-info-avatar" style="background:var(--color-primary-tint);color:var(--color-primary)">{{ s.firstName?.[0] ?? '?' }}</div>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:13px;font-weight:500;color:#1C1C1E">{{ s.firstName }} {{ s.lastName }}</div>
+                      <div style="font-size:11px;color:#8E8E93">{{ s.gradeLevel }}</div>
+                    </div>
+                    <span style="font-size:10px;background:#EEF2FF;color:#3730A3;padding:2px 7px;border-radius:4px;flex-shrink:0">นักเรียน</span>
+                  </div>
+                  <div v-if="editFamilyStudents.length === 0" style="font-size:12px;color:#AEAEB2">ไม่พบนักเรียนในกลุ่ม</div>
+                </template>
+              </div>
+            </template>
+          </div>
+
           <div v-if="editError" style="padding:0 24px 12px;font-size:13px;color:var(--color-danger)">{{ editError }}</div>
           <div class="imp-footer">
             <button class="imp-btn-cancel" @click="showEditModal = false">ยกเลิก</button>
@@ -551,6 +588,24 @@
               <PhWarning :size="14" weight="fill" style="flex-shrink:0" />
               <span>{{ codeData.used ? 'Code นี้ถูกใช้งานไปแล้ว กรุณาสร้าง Code ใหม่' : 'Code หมดอายุแล้ว กรุณาสร้าง Code ใหม่' }}</span>
             </div>
+
+            <!-- Linked parent slots (filled) -->
+            <div v-if="codeData?.parentCount" class="code-linked-slots">
+              <div v-for="n in codeData.parentCount" :key="n" class="code-linked-row">
+                <PhCheckCircle :size="14" weight="fill" style="color:#059669;flex-shrink:0" />
+                <span style="flex:1">ผู้ปกครองคนที่ {{ n }} — ลิงก์แล้ว</span>
+                <button
+                  v-if="n === 1"
+                  class="code-replace-btn"
+                  :disabled="replacingParent1"
+                  :title="'สร้าง Code ใหม่ (เอาผู้ปกครองคนที่ 1 ออก)'"
+                  @click="replaceParent1"
+                >
+                  <PhArrowClockwise :size="12" :class="{ spin: replacingParent1 }" />
+                  <span>สร้าง Code ใหม่</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <div class="promo-divider" />
@@ -569,6 +624,37 @@
             <p class="code-footer-note">Code มีอายุ 14 วัน นับจากวันที่สร้าง</p>
           </div>
 
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- ── Replace Parent 1 Confirm ──────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="modal-bg">
+        <div v-if="showReplaceConfirm" class="modal-backdrop" @click="showReplaceConfirm = false" />
+      </Transition>
+      <Transition name="modal-up">
+        <div v-if="showReplaceConfirm" class="modal-box" style="max-width:380px;padding:24px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <div style="width:36px;height:36px;border-radius:50%;background:var(--color-danger-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <PhWarning :size="18" weight="fill" style="color:var(--color-danger)" />
+            </div>
+            <h3 style="font-size:15px;font-weight:600;color:var(--color-text-primary)">ยืนยันการลบผู้ปกครองคนที่ 1</h3>
+          </div>
+          <p style="font-size:13px;color:var(--color-text-secondary);line-height:1.6;margin-bottom:20px">
+            ผู้ปกครองคนที่ 1 จะถูก<strong>ยกเลิกการลิงก์ทันที</strong> และระบบจะสร้าง Enrollment Code ใหม่สำหรับผูกผู้ปกครองคนใหม่
+          </p>
+          <div style="display:flex;gap:10px">
+            <button
+              class="btn-ghost"
+              style="flex:1;height:40px;border-radius:8px;font-size:14px"
+              @click="showReplaceConfirm = false"
+            >ยกเลิก</button>
+            <button
+              style="flex:1;height:40px;border-radius:8px;font-size:14px;font-weight:500;background:var(--color-danger);color:#fff;border:none;cursor:pointer"
+              @click="doReplaceParent1"
+            >ตกลง ลบและสร้าง Code</button>
+          </div>
         </div>
       </Transition>
     </Teleport>
@@ -758,9 +844,37 @@ interface Student {
   balance:       number
   lowThreshold:  number
   parentCount:   number
+  familyCode?:   string
   canPreorder:   boolean
   buffetGroup:   'primary' | 'secondary'
   status:        'active' | 'inactive' | 'suspended'
+}
+
+interface ParentLink {
+  linkId:       string
+  parentId:     string
+  firstName:    string
+  lastName:     string
+  email:        string
+  phone:        string
+  relationship: string
+  isPrimary:    boolean
+  boundAt:      string
+}
+interface FamilyMember {
+  uid:        string
+  firstName:  string
+  lastName:   string
+  gradeLevel: string
+  status:     string
+}
+interface FamilyParent {
+  parentId:  string
+  uid:       string
+  firstName: string
+  lastName:  string
+  email:     string
+  phone:     string
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -884,15 +998,44 @@ async function downloadEnrollmentCodes() {
 }
 
 // Edit modal state
-const showEditModal = ref(false)
-const editTarget    = ref<Student | null>(null)
-const editSaving    = ref(false)
-const editError     = ref('')
+const showEditModal      = ref(false)
+const editTarget         = ref<Student | null>(null)
+const editSaving         = ref(false)
+const editError          = ref('')
+const editParentsLoading = ref(false)
+const editParents        = ref<ParentLink[]>([])
+const editFamilyLoading  = ref(false)
+const editFamilyStudents = ref<FamilyMember[]>([])
+const editFamilyParents  = ref<FamilyParent[]>([])
 
 function openEditModal(s: Student) {
-  editTarget.value    = { ...s }
-  editError.value     = ''
-  showEditModal.value = true
+  editTarget.value         = { ...s }
+  editError.value          = ''
+  editParents.value        = []
+  editFamilyStudents.value = []
+  editFamilyParents.value  = []
+  showEditModal.value      = true
+  fetchEditParents(s.uid)
+  if (s.familyCode) fetchEditFamily(s.familyCode)
+}
+
+async function fetchEditParents(uid: string) {
+  editParentsLoading.value = true
+  try {
+    const res = await api.get(`/admin/students/${uid}/parents`)
+    editParents.value = res.data?.parents ?? []
+  } catch { /* non-critical */ }
+  finally { editParentsLoading.value = false }
+}
+
+async function fetchEditFamily(code: string) {
+  editFamilyLoading.value = true
+  try {
+    const res = await api.get(`/admin/families/${code}`)
+    editFamilyStudents.value = res.data?.students ?? []
+    editFamilyParents.value  = res.data?.parents  ?? []
+  } catch { /* non-critical */ }
+  finally { editFamilyLoading.value = false }
 }
 async function saveEdit() {
   if (!editTarget.value || editSaving.value) return
@@ -960,7 +1103,29 @@ async function openCodeModal(student: Student) {
   }
 }
 
-const codeError = ref('')
+const codeError           = ref('')
+const replacingParent1    = ref(false)
+const showReplaceConfirm  = ref(false)
+
+function replaceParent1() {
+  if (!codeData.value || replacingParent1.value) return
+  showReplaceConfirm.value = true
+}
+
+async function doReplaceParent1() {
+  if (!codeData.value) return
+  showReplaceConfirm.value = false
+  replacingParent1.value   = true
+  codeError.value          = ''
+  try {
+    const res = await api.post(`/admin/students/${codeData.value.studentUid}/code/replace-parent1`)
+    codeData.value = res.data
+  } catch (err: any) {
+    codeError.value = err?.response?.data?.error?.message ?? 'สร้าง Code ไม่สำเร็จ'
+  } finally {
+    replacingParent1.value = false
+  }
+}
 
 async function generateCode() {
   if (!codeData.value || generatingCode.value) return
@@ -1406,11 +1571,11 @@ onMounted(async () => {
 
 /* Modal */
 .modal-backdrop {
-  position: fixed; inset: 0; z-index: 50;
+  position: fixed; inset: 0; z-index: 200;
   background: rgba(0,0,0,0.4);
 }
 .modal-box {
-  position: fixed; top: 50%; left: 50%; z-index: 51;
+  position: fixed; top: 50%; left: 50%; z-index: 201;
   transform: translate(-50%,-50%);
   background: #fff; border-radius: 12px;
   width: calc(100% - 48px); max-width: 440px;
@@ -1429,7 +1594,7 @@ onMounted(async () => {
 
 /* ── Import modal ──────────────────────────────────────────────────── */
 .imp-modal {
-  position: fixed; top: 50%; left: 50%; z-index: 51;
+  position: fixed; top: 50%; left: 50%; z-index: 201;
   transform: translate(-50%,-50%);
   background: #fff; border-radius: 16px;
   width: calc(100vw - 48px); max-width: 560px;
@@ -1530,7 +1695,7 @@ onMounted(async () => {
 
 /* ── Promote modal ──────────────────────────────────────────────────── */
 .promo-modal {
-  position: fixed; top: 50%; left: 50%; z-index: 51;
+  position: fixed; top: 50%; left: 50%; z-index: 201;
   transform: translate(-50%,-50%);
   background: #fff; border-radius: 16px;
   width: calc(100vw - 48px); max-width: 520px;
@@ -1709,7 +1874,7 @@ onMounted(async () => {
 
 /* ── Enrollment Code modal ──────────────────────────────────────────── */
 .code-modal {
-  position: fixed; top: 50%; left: 50%; z-index: 51;
+  position: fixed; top: 50%; left: 50%; z-index: 201;
   transform: translate(-50%,-50%);
   background: #fff; border-radius: 16px;
   width: calc(100vw - 48px); max-width: 400px;
@@ -1794,6 +1959,23 @@ onMounted(async () => {
 .code-footer-note {
   font-size: 12px; color: #AEAEB2;
 }
+.code-linked-slots { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.code-linked-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: #059669;
+  background: #F0FDF4; border: 1px solid #BBF7D0;
+  border-radius: 6px; padding: 6px 10px;
+}
+.code-replace-btn {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 5px;
+  background: transparent; border: 1px solid #6B7280;
+  color: #6B7280; font-size: 11px; font-family: inherit;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: border-color 0.15s, color 0.15s;
+}
+.code-replace-btn:hover:not(:disabled) { border-color: var(--color-danger); color: var(--color-danger); }
+.code-replace-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 0.8s linear infinite; }
 
@@ -1841,6 +2023,9 @@ onMounted(async () => {
 /* ── Edit / RFID fields ─────────────────────────────────────────────── */
 .edit-field-row { display: flex; gap: 12px; }
 .edit-field     { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.edit-info-row  { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #F0F0F0; }
+.edit-info-row:last-child { border-bottom: none; }
+.edit-info-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
 .edit-input {
   height: 38px; padding: 0 12px; border-radius: 8px;
   border: 1px solid #E8E8E8; font-size: 14px; color: #1C1C1E;

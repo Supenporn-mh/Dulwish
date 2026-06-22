@@ -31,12 +31,19 @@ const now = ref(new Date())
 const clockTick = setInterval(() => { now.value = new Date() }, 60_000)
 onUnmounted(() => clearInterval(clockTick))
 
-// Thai labels by code — fallback to period.name if code unknown
-const CODE_TO_TH: Record<string, string> = {
-  BREAKFAST: 'เช้า',
-  BREAK:     'เช้า',
-  LUNCH:     'กลางวัน',
-  DINNER:    'เย็น',
+// English labels by code — fallback to period.name if code unknown
+const CODE_TO_EN: Record<string, string> = {
+  BREAKFAST: 'Breakfast',
+  BREAK:     'Snack Break',
+  LUNCH:     'Lunch',
+  DINNER:    'Dinner',
+}
+// Short Thai subtitle by session key (used below session title card)
+const TH_SUB: Record<string, string> = {
+  breakfast: 'เช้า',
+  snackbreak: 'เช้า',
+  lunch: 'กลางวัน',
+  dinner: 'เย็น',
 }
 
 // Parse 'HH:MM' → total minutes from midnight
@@ -57,7 +64,8 @@ const sessions = computed((): MealSession[] => {
 
   return mealPeriods.value.map(p => {
     const key      = CODE_TO_KEY[p.code] ?? p.code.toLowerCase()
-    const th       = CODE_TO_TH[p.code]  ?? p.name
+    const th       = p.name
+    const en       = CODE_TO_EN[p.code]  ?? p.name
     const timeRange = `${p.startTime} – ${p.endTime}`
     const startMins = parseHHMM(p.startTime)
     const cutoff    = p.cutoffMinutes ?? 0
@@ -79,7 +87,7 @@ const sessions = computed((): MealSession[] => {
 
     return {
       key,
-      en:         p.name,
+      en,
       th,
       timeRange,
       time:       timeRange,
@@ -190,7 +198,7 @@ async function loadInitialData() {
     }
     periodIdByKey.value = map
   } catch (e: any) {
-    loadError.value = e?.response?.data?.message ?? e?.message ?? 'โหลดข้อมูลไม่สำเร็จ'
+    loadError.value = e?.response?.data?.message ?? e?.message ?? locale.t('โหลดข้อมูลไม่สำเร็จ', 'Failed to load data')
   } finally {
     loadingInit.value = false
   }
@@ -214,11 +222,13 @@ const menuSession = ref<MealSession | null>(null)
 
 // selectedQtys: menu_item_id → qty (0 = not selected)
 const selectedQtys = ref<Record<string, number>>({})
+const orderNote    = ref<string>('')
 
 // Reset selection when opening menu for a new session
 function openMenu(s: MealSession) {
   selectedQtys.value = {}
-  menuSession.value = s
+  orderNote.value    = ''
+  menuSession.value  = s
 }
 
 function incQty(itemId: string) {
@@ -365,7 +375,7 @@ async function confirmCancel() {
     cancelSuccess.value = true
     setTimeout(() => { cancelSuccess.value = false; cancelledKey.value = null }, 3000)
   } catch (e: any) {
-    cancelError.value = e?.response?.data?.message ?? e?.message ?? 'ยกเลิกไม่สำเร็จ'
+    cancelError.value = e?.response?.data?.message ?? e?.message ?? locale.t('ยกเลิกไม่สำเร็จ', 'Cancellation failed')
   } finally {
     cancelLoading.value = false
   }
@@ -386,7 +396,7 @@ async function submitBooking() {
   const items    = selectedItems.value
 
   if (!child || !periodId || !shopId || items.length === 0) {
-    bookingError.value = 'ข้อมูลไม่ครบ — กรุณาเลือกเมนูก่อน'
+    bookingError.value = locale.t('ข้อมูลไม่ครบ — กรุณาเลือกเมนูก่อน', 'Incomplete data — please select a menu item first')
     return
   }
 
@@ -398,6 +408,7 @@ async function submitBooking() {
       shop_id:         shopId,
       meal_period_id:  periodId,
       serve_date:      selectedISO.value,
+      note:            orderNote.value.trim() || undefined,
       items,
     })
     const order = res.data.order
@@ -446,15 +457,15 @@ async function submitBooking() {
         })),
     })
   } catch (e: any) {
-    bookingError.value = e?.response?.data?.message ?? e?.message ?? 'จองไม่สำเร็จ กรุณาลองใหม่'
+    bookingError.value = e?.response?.data?.message ?? e?.message ?? locale.t('จองไม่สำเร็จ กรุณาลองใหม่', 'Booking failed, please try again')
   } finally {
     bookingLoading.value = false
   }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function sessionTitle(s: MealSession)  { return s.en }
-function sessionSub(s: MealSession)    { return s.th }
+function sessionTitle(s: MealSession)  { return locale.lang === 'th' ? s.th : s.en }
+function sessionSub(s: MealSession)    { return locale.lang === 'th' ? (TH_SUB[s.key] ?? '') : '' }
 function remaining(s: MealSession)     { return s.quota - s.booked }
 
 function statusLabel(s: MealSession) {
@@ -667,8 +678,22 @@ function statusLabel(s: MealSession) {
           </div>
         </div>
 
+        <!-- Note field -->
+        <div class="px-5 pt-4">
+          <label class="text-[13px] font-medium block mb-1.5" style="color: var(--color-text-secondary)">
+            {{ locale.t('หมายเหตุ (ไม่บังคับ)', 'Note (optional)') }}
+          </label>
+          <textarea
+            v-model="orderNote"
+            rows="2"
+            maxlength="200"
+            class="note-textarea"
+            :placeholder="locale.t('เช่น ไม่ใส่พริก, แพ้ถั่ว', 'e.g. no chili, nut allergy')"
+          />
+        </div>
+
         <!-- Confirm button -->
-        <div class="px-5 pt-4 pb-8">
+        <div class="px-5 pt-3 pb-8">
           <button
             class="btn-confirm w-full"
             :class="!hasSelection ? 'btn-confirm-disabled' : ''"
@@ -820,6 +845,14 @@ function statusLabel(s: MealSession) {
                 ฿{{ ((menuItems.find(m => m._id === sel.menu_item_id)?.price ?? 0) * sel.qty).toLocaleString() }}
               </span>
             </div>
+          </div>
+
+          <!-- Note preview (if provided) -->
+          <div v-if="orderNote.trim()" class="card px-4 py-3 flex items-start gap-2">
+            <span class="text-[12px] font-medium flex-shrink-0 mt-0.5" style="color: var(--color-text-secondary)">
+              {{ locale.t('หมายเหตุ', 'Note') }}
+            </span>
+            <span class="text-[13px]" style="color: var(--color-text-primary)">{{ orderNote.trim() }}</span>
           </div>
 
           <!-- Booking error -->
@@ -1067,6 +1100,25 @@ function statusLabel(s: MealSession) {
   text-align: center;
   box-shadow: var(--shadow-modal);
 }
+
+/* Note textarea */
+.note-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--color-border-secondary);
+  background: var(--color-bg-page);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.note-textarea:focus { border-color: var(--color-primary); }
+.note-textarea::placeholder { color: var(--color-text-tertiary); }
 
 /* Qty stepper buttons */
 .qty-btn {

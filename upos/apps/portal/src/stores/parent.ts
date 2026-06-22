@@ -8,7 +8,6 @@ export interface ParentChild {
   lastName?:   string
   studentCode: string
   grade?:      string
-  className?:  string
   walletId?:   string
   balance:     number
 }

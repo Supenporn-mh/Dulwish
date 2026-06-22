@@ -96,7 +96,6 @@ export async function deleteGradeLevel(id: string): Promise<{ ok: true }> {
 export async function midYearEnroll(payload: {
   studentId: string
   gradeLevel: string
-  className?: string
 }): Promise<any> {
   const { data } = await api.post('/settings/mid-year-enroll', payload)
   return data.student

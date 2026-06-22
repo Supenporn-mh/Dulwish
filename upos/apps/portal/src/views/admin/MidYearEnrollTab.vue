@@ -83,11 +83,6 @@
             </select>
           </div>
 
-          <!-- Class name (optional) -->
-          <div class="me-field">
-            <label class="me-label">ชั้นเรียน (ไม่บังคับ)</label>
-            <input v-model="newClass" class="me-input" placeholder="เช่น P3-A, S1-B" />
-          </div>
         </div>
       </div>
     </Transition>
@@ -134,7 +129,6 @@ const searching     = ref(false)
 const searchResults = ref<any[]>([])
 const selectedStudent = ref<any | null>(null)
 const newGrade      = ref('')
-const newClass      = ref('')
 const saving        = ref(false)
 const successMsg    = ref('')
 
@@ -158,7 +152,6 @@ async function doSearch() {
 function selectStudent(s: any) {
   selectedStudent.value = s
   newGrade.value = s.studentProfile?.gradeLevel ?? ''
-  newClass.value = s.studentProfile?.className ?? ''
   successMsg.value = ''
 }
 
@@ -170,14 +163,12 @@ async function submit() {
     await midYearEnroll({
       studentId:  selectedStudent.value._id,
       gradeLevel: newGrade.value,
-      className:  newClass.value || undefined,
     })
     successMsg.value = `${selectedStudent.value.firstName} ${selectedStudent.value.lastName} ถูกกำหนดให้ระดับชั้น ${newGrade.value} แล้ว`
     selectedStudent.value = null
     searchQ.value = ''
     searchResults.value = []
     newGrade.value = ''
-    newClass.value = ''
   } catch (e: any) {
     pageError.value = e?.response?.data?.error?.message ?? 'บันทึกไม่สำเร็จ'
   } finally {

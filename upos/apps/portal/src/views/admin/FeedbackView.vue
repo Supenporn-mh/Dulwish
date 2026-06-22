@@ -75,13 +75,27 @@
           </tr>
         </tbody>
       </table>
-    </div>
 
-    <!-- Pagination -->
-    <div v-if="totalPages > 1" class="fb-pagination">
-      <button class="fb-page-btn" :disabled="page <= 1" @click="changePage(page - 1)">‹</button>
-      <span class="fb-page-info">{{ page }} / {{ totalPages }}</span>
-      <button class="fb-page-btn" :disabled="page >= totalPages" @click="changePage(page + 1)">›</button>
+      <!-- Pagination -->
+      <div v-if="total > 0" class="adm-pagination">
+        <div class="adm-pagination-left">
+          <span>ทั้งหมด {{ total }} รายการ</span>
+          <span class="adm-pagination-sep">|</span>
+          <span>แสดงผล</span>
+          <select v-model="limit" class="adm-page-size" @change="onFilter">
+            <option :value="10">10 รายการ</option>
+            <option :value="25">25 รายการ</option>
+            <option :value="50">50 รายการ</option>
+          </select>
+        </div>
+        <div class="adm-page-btns">
+          <button class="adm-page-btn" :disabled="page === 1" @click="changePage(page - 1)">‹</button>
+          <button v-for="p in totalPages" :key="p"
+            :class="['adm-page-btn', page === p ? 'active' : '']"
+            @click="changePage(p)">{{ p }}</button>
+          <button class="adm-page-btn" :disabled="page === totalPages" @click="changePage(page + 1)">›</button>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -95,7 +109,7 @@ import { getAdminFeedback } from '@/api/feedback'
 const items        = ref<FeedbackAdminItem[]>([])
 const total        = ref(0)
 const page         = ref(1)
-const limit        = ref(20)
+const limit        = ref(25)
 const loading      = ref(false)
 const error        = ref('')
 
@@ -205,22 +219,4 @@ onMounted(load)
 .fb-badge-kiosk  { background: #EEF3FF; color: #1264E3; }
 .fb-badge-mobile { background: #F0FDF4; color: #16A34A; }
 .fb-stars { font-size: 15px; letter-spacing: 1px; }
-.fb-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-.fb-page-btn {
-  width: 32px; height: 32px;
-  border-radius: 8px;
-  border: 1px solid #E8E8E8;
-  background: #fff;
-  font-size: 16px;
-  color: #3C3C43;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-}
-.fb-page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.fb-page-info { font-size: 13px; color: #8E8E93; }
 </style>

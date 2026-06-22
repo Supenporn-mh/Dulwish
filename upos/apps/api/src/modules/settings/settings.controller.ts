@@ -178,7 +178,6 @@ export const settingsController = new Elysia({ prefix: '/settings' })
     student.studentProfile = {
       ...student.studentProfile,
       gradeLevel: body.gradeLevel,
-      className:  body.className ?? student.studentProfile?.className,
     } as any
     await student.save()
     const { passwordHash: _, ...safe } = student.toObject() as any
@@ -187,7 +186,6 @@ export const settingsController = new Elysia({ prefix: '/settings' })
     body: t.Object({
       studentId:  t.String(),
       gradeLevel: t.String(),
-      className:  t.Optional(t.String()),
     }),
   })
 

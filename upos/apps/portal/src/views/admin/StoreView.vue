@@ -399,14 +399,14 @@ async function confirmDeleteBranch(b: Branch) {
 .store-dropzone--has { border-color: var(--color-success); background: var(--color-success-bg); }
 
 .store-modal {
-  position: fixed; top: 50%; left: 50%; z-index: 51;
+  position: fixed; top: 50%; left: 50%; z-index: 501;
   transform: translate(-50%, -50%);
   background: #fff; border-radius: 14px;
   width: calc(100vw - 48px); max-width: 400px;
   padding: 24px; box-shadow: 0 16px 48px rgba(0,0,0,0.14);
 }
 .modal-backdrop-store {
-  position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,0.4);
+  position: fixed; inset: 0; z-index: 500; background: rgba(0,0,0,0.4);
 }
 .promo-close-btn {
   background: none; border: none; cursor: pointer; color: #8E8E93;

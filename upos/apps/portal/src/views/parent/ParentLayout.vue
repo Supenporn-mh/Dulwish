@@ -141,7 +141,14 @@ async function submitChangePw() {
     })
     changePwDone.value = true
   } catch (e: any) {
-    changePwError.value = e?.response?.data?.error?.message ?? 'เกิดข้อผิดพลาด'
+    const _msg = e?.response?.data?.error?.message
+    const PW_ERROR_MAP: Record<string, string> = {
+      'รหัสผ่านปัจจุบันไม่ถูกต้อง': 'Current password is incorrect',
+      'เกิดข้อผิดพลาด':             'An error occurred',
+    }
+    changePwError.value = _msg
+      ? (locale.lang === 'en' ? (PW_ERROR_MAP[_msg] ?? _msg) : _msg)
+      : locale.t('เกิดข้อผิดพลาด', 'An error occurred')
   } finally { changePwLoading.value = false }
 }
 </script>
@@ -253,7 +260,7 @@ async function submitChangePw() {
               <PhUserCircle :size="52" weight="fill" style="color: var(--color-primary)" />
             </div>
             <p class="text-[18px] font-medium" style="color: var(--color-text-primary)">
-              {{ userName || 'ผู้ปกครอง' }}
+              {{ userName || locale.t('ผู้ปกครอง', 'Parent') }}
             </p>
           </div>
 

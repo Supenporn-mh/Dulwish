@@ -201,13 +201,26 @@ function txIconBg(type: Transaction['type']): string {
   return 'bg-[#EAF1FD]'
 }
 function txAmountClass(a: number): string { return a >= 0 ? 'text-[#03BA81]' : 'text-[#FF5252]' }
+const TX_LABEL: Record<Transaction['type'], { th: string; en: string }> = {
+  topup:   { th: 'เติมเงิน',  en: 'Top Up' },
+  purchase:{ th: 'ชำระเงิน', en: 'Paid'   },
+  buffet:  { th: 'บุฟเฟต์',  en: 'Buffet' },
+}
+function txDisplayLabel(tx: Transaction): string {
+  if (!tx.description || tx.description === tx.type) {
+    const entry = TX_LABEL[tx.type]
+    return entry ? (locale.lang === 'th' ? entry.th : entry.en) : tx.description
+  }
+  return tx.description
+}
 function formatAmount(a: number): string {
   return `${a >= 0 ? '+' : ''}฿${Math.abs(a).toFixed(2)}`
 }
 function formatDate(iso: string): string {
   const d = new Date(iso)
-  return d.toLocaleDateString('th-TH', { day: '2-digit', month: 'short' }) +
-         ' · ' + d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+  const loc = locale.lang === 'th' ? 'th-TH' : 'en-GB'
+  return d.toLocaleDateString(loc, { day: '2-digit', month: 'short' }) +
+         ' · ' + d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' })
 }
 
 // ── Mount ─────────────────────────────────────────────────────────────────
@@ -229,7 +242,6 @@ onMounted(async () => {
       name:        c.name ?? `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim(),
       studentCode: c.studentCode ?? c.uid ?? '',
       grade:       c.grade ?? c.gradeLevel,
-      className:   c.className,
       walletId:    c.wallet?._id ?? c.walletId,
       balance:     c.wallet?.balance ?? c.balance ?? 0,
     }))
@@ -252,7 +264,7 @@ onMounted(async () => {
     <!-- Section 1: Greeting -->
     <div class="px-4 pt-4 pb-3">
       <h1 class="text-[22px] font-medium" style="color: var(--color-text-primary)">
-        {{ userName || 'ผู้ปกครอง' }}
+        {{ userName || locale.t('ผู้ปกครอง', 'Parent') }}
       </h1>
       <p class="text-[14px] mt-0.5" style="color: var(--color-text-secondary)">{{ todayLabel }}</p>
     </div>
@@ -276,7 +288,6 @@ onMounted(async () => {
           role="student"
           :balance="child.id === selectedChildId ? balance : child.balance"
           :grade="child.grade"
-          :class-name="child.className"
           :updated-at="new Date()"
           @click="parentStore.selectChild(child.id)"
         />
@@ -286,7 +297,7 @@ onMounted(async () => {
             <div class="add-icon-ring">
               <PhUserPlus :size="26" weight="bold" color="white" />
             </div>
-            <span class="add-card-label">เพิ่มนักเรียน</span>
+            <span class="add-card-label">{{ locale.t('เพิ่มนักเรียน', 'Add Student') }}</span>
           </div>
         </button>
 
@@ -315,7 +326,7 @@ onMounted(async () => {
     </div>
 
     <!-- Section 3: Quick actions ────────────────────────────────────── -->
-    <p class="ios-section-header">การดำเนินการ</p>
+    <p class="ios-section-header">{{ locale.t('การดำเนินการ', 'Quick Actions') }}</p>
     <div class="px-4">
       <div class="grid grid-cols-2 gap-3">
         <button
@@ -421,7 +432,7 @@ onMounted(async () => {
         @click="router.push('/parent/history')"
         class="text-[14px] font-medium"
         style="color: var(--color-primary); background: none; border: none; cursor: pointer;"
-      >ดูทั้งหมด</button>
+      >{{ locale.t('ดูทั้งหมด', 'View All') }}</button>
     </div>
 
     <div class="px-4 pb-8">
@@ -451,7 +462,7 @@ onMounted(async () => {
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-[15px] truncate font-medium" style="color: var(--color-text-primary)">
-              {{ tx.description }}
+              {{ txDisplayLabel(tx) }}
             </p>
             <p class="text-[12px] mt-0.5" style="color: var(--color-text-secondary)">
               {{ formatDate(tx.createdAt) }}
@@ -466,7 +477,7 @@ onMounted(async () => {
       <!-- Empty -->
       <div v-else class="card flex flex-col items-center py-10" style="color: var(--color-text-tertiary)">
         <PhReceipt :size="40" weight="thin" />
-        <p class="text-[14px] mt-2">ยังไม่มีรายการ</p>
+        <p class="text-[14px] mt-2">{{ locale.t('ยังไม่มีรายการ', 'No transactions yet') }}</p>
       </div>
     </div>
 

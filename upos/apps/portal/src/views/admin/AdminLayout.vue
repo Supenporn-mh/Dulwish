@@ -109,6 +109,7 @@ import {
   PhClock, PhCalendarPlus, PhClockCounterClockwise,
   PhCookingPot, PhTag, PhRuler, PhShoppingBag,
   PhChatDots, PhMonitor, PhImage, PhLayout,
+  PhIdentificationBadge,
 } from '@phosphor-icons/vue'
 
 const route  = useRoute()
@@ -154,6 +155,7 @@ const navItems: any[] = [
       { to: '/admin/permissions/members', icon: PhIdentificationCard, label: 'รายชื่อสมาชิก' },
     ],
   },
+  { type: 'link', to: '/admin/visitors', icon: PhIdentificationBadge, label: 'จัดการ Visitor' },
   {
     type: 'group',
     label: 'จัดการข้อมูลสินค้า',
@@ -190,13 +192,12 @@ const navItems: any[] = [
       { to: '/admin/buffet/history',   icon: PhClockCounterClockwise,  label: 'ประวัติการใช้งาน'    },
     ],
   },
-  { type: 'link', to: '/admin/menu',          icon: PhForkKnife,     label: 'เมนูอาหาร'      },
   { type: 'link', to: '/admin/feedback',      icon: PhChatDots,      label: 'Feedback'        },
   { type: 'link', to: '/admin/sale-screens',  icon: PhLayout,        label: 'หน้าจอขาย'      },
   { type: 'link', to: '/admin/transactions',  icon: PhReceipt,       label: 'รายการ'          },
   { type: 'link', to: '/admin/reports',      icon: PhChartLine,     label: 'รายงาน'          },
   { type: 'link', to: '/admin/audit',        icon: PhClipboardText, label: 'Audit'           },
-  { type: 'link', to: '/admin/policies',     icon: PhGear,          label: 'นโยบาย'          },
+  { type: 'link', to: '/admin/policies',     icon: PhGear,          label: 'ตั้งค่า'          },
   { type: 'link', to: '/admin/academic-year', icon: PhCalendarDots, label: 'ตั้งค่าภาคเรียน' },
 ]
 
@@ -213,7 +214,6 @@ const pageTitles: Record<string, string> = {
   '/admin/products/units':        'หน่วยนับ',
   '/admin/products':              'สินค้า',
   '/admin/products/new':         'เพิ่มสินค้า',
-  '/admin/menu':                  'เมนู',
   '/admin/booking/schedule':      'ตั้งค่าประจำสัปดาห์',
   '/admin/booking/time-settings': 'ตั้งค่าช่วงเวลา',
   '/admin/booking/menu':          'เมนูการจอง',
@@ -221,7 +221,7 @@ const pageTitles: Record<string, string> = {
   '/admin/transactions':          'รายการ',
   '/admin/reports':               'รายงาน',
   '/admin/audit':                 'Audit Log',
-  '/admin/policies':              'นโยบาย',
+  '/admin/policies':              'ตั้งค่า',
   '/admin/academic-year':         'ตั้งค่าภาคเรียน',
   '/admin/buffet/categories':     'ประเภทอาหาร Buffet',
   '/admin/buffet/rounds':         'ตั้งค่าช่วงเวลา Buffet',
@@ -232,6 +232,7 @@ const pageTitles: Record<string, string> = {
   '/admin/permissions/wallet':   'ตั้งค่า Wallet',   // standalone link
   '/admin/permissions/groups':   'กลุ่มสมาชิก',
   '/admin/permissions/members':  'รายชื่อสมาชิก',
+  '/admin/visitors':             'จัดการ Visitor',
   '/admin/feedback':             'Feedback',
   '/admin/banners':              'แบนเนอร์',
   '/admin/sale-screens':         'หน้าจอขาย',

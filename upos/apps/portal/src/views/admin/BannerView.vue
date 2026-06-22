@@ -34,7 +34,7 @@
             <td class="num center">{{ (currentPage - 1) * pageSize + i + 1 }}</td>
             <td style="font-weight:500;color:var(--color-text-primary)">{{ b.name }}</td>
             <td class="center">
-              <img v-if="b.imageBase64" :src="b.imageBase64" class="bnr-thumb" />
+              <img v-if="b.imageBase64" :src="b.imageBase64" class="bnr-thumb bnr-thumb-click" title="คลิกดูรูปขนาดใหญ่" @click="previewSrc = b.imageBase64" />
               <span v-else style="color:var(--color-text-tertiary);font-size:12px">ไม่มีรูป</span>
             </td>
             <td class="center">
@@ -158,6 +158,19 @@
       </Transition>
     </Teleport>
 
+    <!-- Image lightbox -->
+    <Teleport to="body">
+      <Transition name="modal-bg">
+        <div v-if="previewSrc" class="bnr-lightbox-backdrop" @click="previewSrc = ''" />
+      </Transition>
+      <Transition name="modal-up">
+        <div v-if="previewSrc" class="bnr-lightbox" @click="previewSrc = ''">
+          <img :src="previewSrc" class="bnr-lightbox-img" @click.stop />
+          <button class="bnr-lightbox-close" @click="previewSrc = ''">✕</button>
+        </div>
+      </Transition>
+    </Teleport>
+
   </div>
 </template>
 
@@ -178,7 +191,8 @@ const deleteTarget = ref<Banner | null>(null)
 const isDragging   = ref(false)
 const fileInput    = ref<HTMLInputElement | null>(null)
 
-const form = ref({ name: '', imageBase64: '', isVisible: true })
+const form       = ref({ name: '', imageBase64: '', isVisible: true })
+const previewSrc = ref('')
 
 const totalPages = computed(() => Math.max(1, Math.ceil(banners.value.length / pageSize.value)))
 const paginated  = computed(() =>
@@ -261,6 +275,34 @@ function onDrop(e: DragEvent) {
 
 <style scoped>
 .bnr-thumb { height:40px;width:auto;max-width:120px;border-radius:4px;object-fit:cover; }
+.bnr-thumb-click { cursor:zoom-in; transition: opacity 0.15s; }
+.bnr-thumb-click:hover { opacity: 0.8; }
+.bnr-lightbox-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.75);
+  z-index: 9998;
+}
+.bnr-lightbox {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;
+  padding: 24px;
+}
+.bnr-lightbox-img {
+  max-width: min(90vw, 900px);
+  max-height: 85vh;
+  border-radius: 8px;
+  object-fit: contain;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+}
+.bnr-lightbox-close {
+  position: fixed; top: 16px; right: 20px;
+  background: rgba(255,255,255,0.15);
+  border: none; color: #fff; font-size: 18px; line-height: 1;
+  width: 36px; height: 36px; border-radius: 50%;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.bnr-lightbox-close:hover { background: rgba(255,255,255,0.25); }
 
 .bnr-toggle { width:44px;height:24px;border-radius:100px;border:none;cursor:pointer;background:#D1D1D6;position:relative;padding:0;transition:background 0.2s;flex-shrink:0; }
 .bnr-toggle-on { background:var(--color-primary); }

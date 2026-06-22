@@ -276,8 +276,8 @@ export const adminController = new Elysia({ prefix: '/admin' })
         firstName:     s.firstName,
         lastName:      s.lastName,
         gradeLevel:    s.studentProfile?.gradeLevel ?? '',
-        className:     s.studentProfile?.className  ?? '',
         guardianEmail: s.studentProfile?.guardianEmail ?? '',
+        familyCode:    s.studentProfile?.familyCode    ?? '',
         cardUid:       card?.cardUid    ?? null,
         cardStatus:    card?.status     ?? null,
         balance:       wallet?.balance       ?? 0,
@@ -300,9 +300,9 @@ export const adminController = new Elysia({ prefix: '/admin' })
         lastName:  (body as any).lastName,
         status:    'active',
         studentProfile: {
-          gradeLevel:    (body as any).gradeLevel   ?? '',
-          className:     (body as any).className    ?? '',
+          gradeLevel:    (body as any).gradeLevel    ?? '',
           guardianEmail: (body as any).guardianEmail ?? '',
+          familyCode:    (body as any).familyCode    ?? '',
         },
       })
       await Wallet.create({ userId: student._id, balance: 0 })
@@ -316,8 +316,8 @@ export const adminController = new Elysia({ prefix: '/admin' })
       firstName:     t.String(),
       lastName:      t.String(),
       gradeLevel:    t.Optional(t.String()),
-      className:     t.Optional(t.String()),
       guardianEmail: t.Optional(t.String()),
+      familyCode:    t.Optional(t.String()),
       uid:           t.Optional(t.String()),
     }),
   })
@@ -330,8 +330,8 @@ export const adminController = new Elysia({ prefix: '/admin' })
     if (b.lastName      !== undefined) update.lastName                         = b.lastName
     if (b.status        !== undefined) update.status                           = b.status
     if (b.gradeLevel    !== undefined) update['studentProfile.gradeLevel']     = b.gradeLevel
-    if (b.className     !== undefined) update['studentProfile.className']      = b.className
     if (b.guardianEmail !== undefined) update['studentProfile.guardianEmail']  = b.guardianEmail
+    if (b.familyCode    !== undefined) update['studentProfile.familyCode']     = b.familyCode
 
     const student = await User.findOneAndUpdate(
       { uid: params.uid, role: 'student' },
@@ -345,8 +345,8 @@ export const adminController = new Elysia({ prefix: '/admin' })
       firstName:     t.Optional(t.String()),
       lastName:      t.Optional(t.String()),
       gradeLevel:    t.Optional(t.String()),
-      className:     t.Optional(t.String()),
       guardianEmail: t.Optional(t.String()),
+      familyCode:    t.Optional(t.String()),
       status:        t.Optional(t.String()),
     }),
   })
@@ -386,7 +386,6 @@ export const adminController = new Elysia({ prefix: '/admin' })
         firstName:       s.firstName,
         lastName:        s.lastName,
         gradeLevel:      s.studentProfile?.gradeLevel ?? '',
-        className:       s.studentProfile?.className  ?? '',
         guardianContact: s.studentProfile?.guardianEmail ?? '',
         code:            entry.code,
         expiresAt:       entry.expiresAt,
@@ -400,37 +399,58 @@ export const adminController = new Elysia({ prefix: '/admin' })
     return { students: rows }
   })
 
-  // 5. Get enrollment code for a single student
+  // 5. Get enrollment code for a single student (returns all pending codes + parentCount)
   .get('/students/:uid/code', async ({ params, set }) => {
     const s = await User.findOne({ uid: params.uid, role: 'student' }).lean()
     if (!s) { set.status = 404; return { error: { code: 'STD_404', message: 'ไม่พบนักเรียน' } } }
 
-    const entry = await EnrollmentCode.findOne({ studentUserId: s._id })
-      .sort({ createdAt: -1 })
-      .lean()
+    const now = new Date()
+    const parentCount = await ParentStudent.countDocuments({ studentUserId: s._id })
+    const pendingEntries = await EnrollmentCode.find({
+      studentUserId: s._id,
+      used: false,
+      expiresAt: { $gt: now },
+    }).sort({ createdAt: 1 }).lean()
 
     return {
-      studentUid: s.uid,
-      firstName:  s.firstName,
-      lastName:   s.lastName,
-      gradeLevel: s.studentProfile?.gradeLevel ?? '',
-      code:       entry?.code      ?? null,
-      expiresAt:  entry?.expiresAt ?? null,
-      used:       entry?.used      ?? false,
-      expired:    entry ? entry.expiresAt < new Date() : false,
+      studentUid:   s.uid,
+      firstName:    s.firstName,
+      lastName:     s.lastName,
+      gradeLevel:   s.studentProfile?.gradeLevel ?? '',
+      parentCount,
+      pendingCodes: pendingEntries.map(e => ({
+        code:      e.code,
+        expiresAt: e.expiresAt,
+      })),
     }
   })
 
-  // 6. Generate a new enrollment code (invalidate old)
+  // 6. Generate a new enrollment code (max 2 pending + linked combined)
   .post('/students/:uid/code/generate', async ({ params, currentUser, set }) => {
     const s = await User.findOne({ uid: params.uid, role: 'student' }).lean()
     if (!s) { set.status = 404; return { error: { code: 'STD_404', message: 'ไม่พบนักเรียน' } } }
 
-    // invalidate existing active codes
-    await EnrollmentCode.updateMany(
-      { studentUserId: s._id, used: false },
-      { $set: { used: true, usedAt: new Date() } },
-    )
+    const now = new Date()
+    const parentCount  = await ParentStudent.countDocuments({ studentUserId: s._id })
+    const pendingCount = await EnrollmentCode.countDocuments({
+      studentUserId: s._id,
+      used:      false,
+      expiresAt: { $gt: now },
+    })
+
+    if (parentCount >= 2) {
+      set.status = 400
+      return { error: { code: 'CODE_MAX', message: 'นักเรียนมีผู้ปกครองครบ 2 คนแล้ว' } }
+    }
+
+    const remainingSlots = 2 - parentCount
+    if (pendingCount >= remainingSlots) {
+      await EnrollmentCode.findOneAndUpdate(
+        { studentUserId: s._id, used: false, expiresAt: { $gt: now } },
+        { $set: { used: true, usedAt: now } },
+        { sort: { createdAt: 1 } },
+      )
+    }
 
     let code = generateEnrollmentCode()
     let attempts = 0
@@ -441,7 +461,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
       attempts++
     }
     const exp   = codeExpiresAt()
-    const entry = await EnrollmentCode.create({
+    await EnrollmentCode.create({
       code,
       studentUserId: s._id,
       used:      false,
@@ -449,22 +469,210 @@ export const adminController = new Elysia({ prefix: '/admin' })
       createdBy: currentUser._id,
     })
 
+    const updatedPending = await EnrollmentCode.find({
+      studentUserId: s._id,
+      used: false,
+      expiresAt: { $gt: now },
+    }).sort({ createdAt: 1 }).lean()
+
     return {
-      studentUid: s.uid,
-      firstName:  s.firstName,
-      lastName:   s.lastName,
-      gradeLevel: s.studentProfile?.gradeLevel ?? '',
-      code:       entry.code,
-      expiresAt:  entry.expiresAt,
-      used:       false,
-      expired:    false,
+      studentUid:   s.uid,
+      firstName:    s.firstName,
+      lastName:     s.lastName,
+      gradeLevel:   s.studentProfile?.gradeLevel ?? '',
+      parentCount,
+      pendingCodes: updatedPending.map(e => ({
+        code:      e.code,
+        expiresAt: e.expiresAt,
+      })),
     }
+  })
+
+  // 6b. Replace parent-1: unlink oldest parent, generate new code
+  .post('/students/:uid/code/replace-parent1', async ({ params, currentUser, set }) => {
+    const s = await User.findOne({ uid: params.uid, role: 'student' }).lean()
+    if (!s) { set.status = 404; return { error: { code: 'STD_404', message: 'ไม่พบนักเรียน' } } }
+
+    const now   = new Date()
+    const links = await ParentStudent.find({ studentUserId: s._id }).sort({ boundAt: 1 }).lean()
+    if (!links.length) { set.status = 400; return { error: { code: 'NO_PARENT', message: 'ยังไม่มีผู้ปกครองที่ลิงก์ไว้' } } }
+
+    // Remove oldest (parent 1)
+    await ParentStudent.deleteOne({ _id: links[0]._id })
+
+    // Expire all pending codes for this student
+    await EnrollmentCode.updateMany(
+      { studentUserId: s._id, used: false, expiresAt: { $gt: now } },
+      { $set: { used: true, usedAt: now } },
+    )
+
+    // Generate fresh code
+    let code = generateEnrollmentCode()
+    let attempts = 0
+    while (attempts < 5) {
+      const exists = await EnrollmentCode.findOne({ code }).lean()
+      if (!exists) break
+      code = generateEnrollmentCode()
+      attempts++
+    }
+    await EnrollmentCode.create({
+      code,
+      studentUserId: s._id,
+      used:      false,
+      expiresAt: codeExpiresAt(),
+      createdBy: currentUser._id,
+    })
+
+    const parentCount    = await ParentStudent.countDocuments({ studentUserId: s._id })
+    const updatedPending = await EnrollmentCode.find({
+      studentUserId: s._id,
+      used: false,
+      expiresAt: { $gt: now },
+    }).sort({ createdAt: 1 }).lean()
+
+    return {
+      studentUid:   s.uid,
+      firstName:    s.firstName,
+      lastName:     s.lastName,
+      gradeLevel:   s.studentProfile?.gradeLevel ?? '',
+      parentCount,
+      pendingCodes: updatedPending.map(e => ({ code: e.code, expiresAt: e.expiresAt })),
+    }
+  })
+
+  // 7. List parents linked to a student
+  .get('/students/:uid/parents', async ({ params, set }) => {
+    const student = await User.findOne({ uid: params.uid, role: 'student' }).lean()
+    if (!student) { set.status = 404; return { error: { code: 'STD_404', message: 'ไม่พบนักเรียน' } } }
+
+    const links = await ParentStudent.find({ studentUserId: student._id })
+      .populate<{ parentUserId: any }>('parentUserId', 'firstName lastName email phone')
+      .lean()
+
+    return {
+      parents: links.map((l: any) => ({
+        linkId:       String(l._id),
+        parentId:     String(l.parentUserId?._id ?? ''),
+        firstName:    l.parentUserId?.firstName ?? '',
+        lastName:     l.parentUserId?.lastName  ?? '',
+        email:        l.parentUserId?.email     ?? '',
+        phone:        l.parentUserId?.phone     ?? '',
+        relationship: l.relationship ?? 'parent',
+        isPrimary:    l.isPrimary    ?? false,
+        boundAt:      l.boundAt,
+      })),
+    }
+  }, {
+    params: t.Object({ uid: t.String() }),
+  })
+
+  // 8. Unlink a parent from a student
+  .delete('/students/:uid/parents/:linkId', async ({ params, currentUser, set }) => {
+    const student = await User.findOne({ uid: params.uid, role: 'student' }).lean()
+    if (!student) { set.status = 404; return { error: { code: 'STD_404', message: 'ไม่พบนักเรียน' } } }
+
+    const link = await ParentStudent.findOneAndDelete({
+      _id:           params.linkId,
+      studentUserId: student._id,
+    }).lean()
+    if (!link) { set.status = 404; return { error: { code: 'LINK_404', message: 'ไม่พบการเชื่อมโยง' } } }
+
+    await AuditLog.create({
+      actorUserId: currentUser._id,
+      actorRole:   currentUser.role,
+      action:      'parent_unlink',
+      entityType:  'ParentStudent',
+      entityId:    String(link._id),
+      afterData:   { studentUid: params.uid, parentId: String(link.parentUserId) },
+    })
+
+    return { ok: true }
+  }, {
+    params: t.Object({ uid: t.String(), linkId: t.String() }),
+  })
+
+  // 9. Family detail — all students + unique parents sharing a familyCode
+  .get('/families/:code', async ({ params, set }) => {
+    const code = params.code.toUpperCase().trim()
+    if (!code) { set.status = 400; return { error: { code: 'FAM_001', message: 'ระบุ family code' } } }
+
+    const students = await User.find({ role: 'student', 'studentProfile.familyCode': code }).lean()
+    if (students.length === 0) {
+      set.status = 404
+      return { error: { code: 'FAM_404', message: `ไม่พบครอบครัว ${code}` } }
+    }
+
+    const studentIds = students.map(s => s._id)
+    const links = await ParentStudent.find({ studentUserId: { $in: studentIds } })
+      .populate<{ parentUserId: any }>('parentUserId', 'firstName lastName email phone uid')
+      .lean()
+
+    // unique parents by parentUserId
+    const parentMap = new Map<string, any>()
+    for (const l of links as any[]) {
+      const pid = String(l.parentUserId?._id ?? '')
+      if (pid && !parentMap.has(pid)) {
+        parentMap.set(pid, {
+          parentId:  pid,
+          uid:       l.parentUserId?.uid       ?? '',
+          firstName: l.parentUserId?.firstName ?? '',
+          lastName:  l.parentUserId?.lastName  ?? '',
+          email:     l.parentUserId?.email     ?? '',
+          phone:     l.parentUserId?.phone     ?? '',
+        })
+      }
+    }
+
+    return {
+      familyCode: code,
+      students: students.map(s => ({
+        uid:        s.uid,
+        firstName:  s.firstName,
+        lastName:   s.lastName,
+        gradeLevel: s.studentProfile?.gradeLevel ?? '',
+        status:     s.status,
+      })),
+      parents: [...parentMap.values()],
+    }
+  }, {
+    params: t.Object({ code: t.String() }),
+  })
+
+  // ── Member → Linked Students ─────────────────────────────────────────────
+
+  .get('/members/:uid/linked-students', async ({ params, set }) => {
+    const MEMBER_ROLES = ['admin', 'supervisor', 'cashier', 'staff', 'teacher', 'parent']
+    const m = await User.findOne({ uid: params.uid, role: { $in: MEMBER_ROLES } }).lean()
+    if (!m) { set.status = 404; return { error: { code: 'MEM_404', message: 'ไม่พบสมาชิก' } } }
+
+    const links = await ParentStudent.find({ parentUserId: m._id })
+      .populate<{ studentUserId: any }>('studentUserId', 'uid firstName lastName studentProfile cardUid cardStatus')
+      .lean()
+
+    const students = links.map(l => {
+      const s = l.studentUserId as any
+      return {
+        linkId:       (l._id as any).toString(),
+        studentUid:   s?.uid ?? '',
+        firstName:    s?.firstName ?? '',
+        lastName:     s?.lastName ?? '',
+        gradeLevel:   s?.studentProfile?.gradeLevel ?? '',
+        familyCode:   s?.studentProfile?.familyCode ?? '',
+        cardUid:      s?.cardUid ?? null,
+        cardStatus:   s?.cardStatus ?? null,
+        isPrimary:    l.isPrimary ?? false,
+        relationship: l.relationship ?? 'parent',
+        boundAt:      l.createdAt,
+      }
+    })
+
+    return { students }
   })
 
   // ── Member enrollment codes ───────────────────────────────────────────────
 
   .get('/members/:uid/code', async ({ params, set }) => {
-    const MEMBER_ROLES = ['admin', 'supervisor', 'cashier', 'teacher', 'staff']
+    const MEMBER_ROLES = ['admin', 'supervisor', 'cashier', 'staff', 'teacher', 'parent']
     const m = await User.findOne({ uid: params.uid, role: { $in: MEMBER_ROLES } }).lean()
     if (!m) { set.status = 404; return { error: { code: 'MEM_404', message: 'ไม่พบสมาชิก' } } }
 
@@ -485,7 +693,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
   })
 
   .post('/members/:uid/code/generate', async ({ params, currentUser, set }) => {
-    const MEMBER_ROLES = ['admin', 'supervisor', 'cashier', 'teacher', 'staff']
+    const MEMBER_ROLES = ['admin', 'supervisor', 'cashier', 'staff', 'teacher', 'parent']
     const m = await User.findOne({ uid: params.uid, role: { $in: MEMBER_ROLES } }).lean()
     if (!m) { set.status = 404; return { error: { code: 'MEM_404', message: 'ไม่พบสมาชิก' } } }
 
@@ -701,7 +909,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
 
   // ── AD1: Create a staff member (admin/supervisor) ────────────────────────────
   .post('/staff', async ({ body, currentUser, set }) => {
-    const STAFF_ROLES = ['cashier', 'supervisor', 'admin', 'teacher', 'staff']
+    const STAFF_ROLES = ['cashier', 'supervisor', 'admin']
     if (!STAFF_ROLES.includes(body.role)) {
       set.status = 400
       return { error: { code: 'STAFF_ROLE_001', message: `บทบาทไม่ถูกต้อง: ${body.role}` } }
@@ -764,7 +972,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
 
   // ── AD2: Update a staff member by uid (admin/supervisor) ─────────────────────
   .patch('/staff/:uid', async ({ params, body, currentUser, set }) => {
-    const STAFF_ROLES = ['cashier', 'supervisor', 'admin', 'teacher', 'staff']
+    const STAFF_ROLES = ['cashier', 'supervisor', 'admin']
     const user = await User.findOne({ uid: params.uid, role: { $in: STAFF_ROLES } })
     if (!user) { set.status = 404; return { error: { code: 'STAFF_404', message: 'ไม่พบสมาชิก' } } }
 
@@ -807,4 +1015,225 @@ export const adminController = new Elysia({ prefix: '/admin' })
       status:    t.Optional(t.String()),
       cardUid:   t.Optional(t.String()),
     }),
+  })
+
+  // ── AD3: Create a non-operator member (staff / teacher / parent) ─────────────
+  .post('/members', async ({ body, currentUser, set }) => {
+    const MEMBER_ROLES = ['staff', 'teacher', 'parent']
+    if (!MEMBER_ROLES.includes(body.role)) {
+      set.status = 400
+      return { error: { code: 'MEM_ROLE_001', message: `บทบาทไม่ถูกต้อง: ${body.role}` } }
+    }
+
+    const UID_PREFIX: Record<string, string> = { staff: 'EMP', teacher: 'TCH', parent: 'PRT' }
+    const PAD: Record<string, number> = { staff: 4, teacher: 4, parent: 5 }
+
+    try {
+      const count = await User.countDocuments({ role: body.role })
+      const uid   = `${UID_PREFIX[body.role]}-${String(count + 1).padStart(PAD[body.role], '0')}`
+
+      const user = await User.create({
+        uid,
+        role:      body.role,
+        firstName: body.firstName,
+        lastName:  body.lastName,
+        email:     body.email?.trim().toLowerCase(),
+        status:    'active',
+      })
+
+      await Wallet.create({ userId: user._id, balance: 0 })
+
+      if (body.cardUid) {
+        await Card.create({
+          cardUid:  body.cardUid,
+          userId:   user._id,
+          cardType: body.role === 'staff' || body.role === 'teacher' ? 'staff' : 'student',
+          status:   'active',
+        })
+      }
+
+      await AuditLog.create({
+        actorUserId: currentUser._id,
+        actorRole: currentUser.role,
+        action: 'member_create',
+        entityType: 'User',
+        entityId: String(user._id),
+        afterData: { uid: user.uid, role: user.role },
+      })
+
+      const { passwordHash: _ph, ...safeUser } = user.toObject()
+      return { user: safeUser }
+    } catch (err: unknown) {
+      set.status = 400
+      return { error: { code: 'MEM_CREATE_001', message: err instanceof Error ? err.message : 'Create failed' } }
+    }
+  }, {
+    body: t.Object({
+      firstName: t.String(),
+      lastName:  t.String(),
+      email:     t.Optional(t.String()),
+      role:      t.String(),
+      cardUid:   t.Optional(t.String()),
+    }),
+  })
+
+  // ── AD4: Update a non-operator member by uid ─────────────────────────────────
+  .patch('/members/:uid', async ({ params, body, currentUser, set }) => {
+    const MEMBER_ROLES = ['staff', 'teacher', 'parent']
+    const user = await User.findOne({ uid: params.uid, role: { $in: MEMBER_ROLES } })
+    if (!user) { set.status = 404; return { error: { code: 'MEM_404', message: 'ไม่พบสมาชิก' } } }
+
+    const before = { firstName: user.firstName, lastName: user.lastName, email: user.email }
+
+    if (body.firstName !== undefined) user.firstName = body.firstName
+    if (body.lastName  !== undefined) user.lastName  = body.lastName
+    if (body.email     !== undefined) user.email     = body.email?.trim().toLowerCase()
+    await user.save()
+
+    if (body.cardUid !== undefined && body.cardUid) {
+      const existing = await Card.findOne({ userId: user._id })
+      if (existing) {
+        existing.cardUid = body.cardUid
+        await existing.save()
+      } else {
+        await Card.create({
+          cardUid:  body.cardUid,
+          userId:   user._id,
+          cardType: user.role === 'staff' || user.role === 'teacher' ? 'staff' : 'student',
+          status:   'active',
+        })
+      }
+    }
+
+    await AuditLog.create({
+      actorUserId: currentUser._id,
+      actorRole: currentUser.role,
+      action: 'member_update',
+      entityType: 'User',
+      entityId: String(user._id),
+      beforeData: before,
+      afterData: { firstName: user.firstName, lastName: user.lastName, email: user.email },
+    })
+
+    const { passwordHash: _ph, ...safeUser } = user.toObject()
+    return { user: safeUser }
+  }, {
+    params: t.Object({ uid: t.String() }),
+    body: t.Object({
+      firstName: t.Optional(t.String()),
+      lastName:  t.Optional(t.String()),
+      email:     t.Optional(t.String()),
+      cardUid:   t.Optional(t.String()),
+    }),
+  })
+
+  // ── Visitors ────────────────────────────────────────────────────────────────
+  .get('/visitors', async () => {
+    const visitors = await User.find({ role: 'visitor' }).lean()
+    const ids = visitors.map(v => v._id)
+    const [wallets, cards] = await Promise.all([
+      Wallet.find({ userId: { $in: ids } }).lean(),
+      Card.find({ userId: { $in: ids } }).lean(),
+    ])
+    const rows = visitors.map(v => {
+      const wallet = wallets.find(w => String(w.userId) === String(v._id))
+      const card   = cards.find(c => String(c.userId) === String(v._id))
+      const { passwordHash: _, ...safe } = v as any
+      return {
+        ...safe,
+        balance:    wallet?.balance ?? 0,
+        cardUid:    card?.cardUid  ?? null,
+        cardStatus: card?.status   ?? null,
+        cardId:     String(card?._id ?? ''),
+      }
+    })
+    return { visitors: rows, total: rows.length }
+  })
+
+  .post('/visitors', async ({ body, currentUser, set }) => {
+    const b = body as any
+    const d = new Date()
+    const datePart = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`
+    const rand = Math.floor(Math.random() * 9000 + 1000)
+    const uid  = `VIS-${datePart}-${rand}`
+
+    if (b.cardUid) {
+      const dup = await Card.findOne({ cardUid: b.cardUid }).lean()
+      if (dup) {
+        set.status = 409
+        return { error: { code: 'VIS_001', message: `Card UID "${b.cardUid}" ถูกใช้งานแล้ว` } }
+      }
+    }
+
+    const visitor = await User.create({
+      uid,
+      role:      'visitor',
+      firstName: b.firstName,
+      lastName:  b.lastName,
+      status:    'active',
+    })
+
+    const wallet = await Wallet.create({ userId: visitor._id, balance: 0 })
+
+    if (b.cardUid) {
+      await Card.create({ cardUid: b.cardUid, userId: visitor._id, cardType: 'visitor_temp', status: 'active' })
+    }
+
+    if (b.initialBalance && b.initialBalance > 0) {
+      await wallet.updateOne({ $inc: { balance: b.initialBalance } })
+      await Transaction.create({
+        refNo:         genRefNo('TOP'),
+        walletId:      wallet._id,
+        type:          'topup',
+        amount:        b.initialBalance,
+        balanceAfter:  b.initialBalance,
+        channel:       'admin',
+        paymentMethod: 'cash',
+        cashierId:     currentUser._id,
+        status:        'success',
+        note:          `เติมเงินเริ่มต้น Visitor ${uid}`,
+      })
+    }
+
+    await AuditLog.create({
+      actorUserId: currentUser._id,
+      actorRole:   currentUser.role,
+      action:      'visitor_create',
+      entityType:  'User',
+      entityId:    String(visitor._id),
+      afterData:   { uid, cardUid: b.cardUid ?? null, initialBalance: b.initialBalance ?? 0 },
+    })
+
+    const { passwordHash: _, ...safeVisitor } = visitor.toObject() as any
+    return { visitor: { ...safeVisitor, balance: b.initialBalance ?? 0, cardUid: b.cardUid ?? null } }
+  }, {
+    body: t.Object({
+      firstName:      t.String({ minLength: 1 }),
+      lastName:       t.String({ minLength: 1 }),
+      cardUid:        t.String({ minLength: 1 }),
+      initialBalance: t.Optional(t.Number()),
+    }),
+  })
+
+  .patch('/visitors/:uid/status', async ({ params, body, currentUser, set }) => {
+    const visitor = await User.findOneAndUpdate(
+      { uid: params.uid, role: 'visitor' },
+      { $set: { status: body.status } },
+      { new: true },
+    ).lean()
+    if (!visitor) { set.status = 404; return { error: { code: 'VIS_404', message: 'ไม่พบ Visitor' } } }
+
+    await AuditLog.create({
+      actorUserId: currentUser._id,
+      actorRole:   currentUser.role,
+      action:      'visitor_status_change',
+      entityType:  'User',
+      entityId:    String(visitor._id),
+      afterData:   { uid: params.uid, status: body.status },
+    })
+
+    return { ok: true, status: body.status }
+  }, {
+    params: t.Object({ uid: t.String() }),
+    body:   t.Object({ status: t.Union([t.Literal('active'), t.Literal('inactive')]) }),
   })

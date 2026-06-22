@@ -52,7 +52,6 @@ const props = defineProps<{
   role:      string
   balance?:  number
   grade?:    string
-  className?: string
   updatedAt?: string | Date
   compact?:  boolean
 }>()
@@ -94,8 +93,8 @@ const nameInitial = computed(() =>
 )
 
 const subLabel = computed(() => {
-  if (props.role === 'student' && (props.grade || props.className)) {
-    return [props.grade, props.className].filter(Boolean).join(' · ')
+  if (props.role === 'student' && props.grade) {
+    return props.grade
   }
   if (props.role === 'teacher') return 'ครู / Teacher'
   if (props.role === 'staff' || props.role === 'cashier') return 'Staff'

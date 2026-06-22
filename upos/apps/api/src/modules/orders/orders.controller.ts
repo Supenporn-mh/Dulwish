@@ -109,6 +109,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       status: 'confirmed',
       items: lineItems,
       transactionId: txn._id,
+      note: body.note ?? '',
     })
 
     return { order, transaction: txn }
@@ -118,6 +119,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       shop_id:         t.String(),
       meal_period_id:  t.String(),
       serve_date:      t.String(),
+      note:            t.Optional(t.String()),
       items: t.Array(t.Object({
         menu_item_id: t.String(),
         qty:          t.Number(),

@@ -26,7 +26,6 @@
 
       <!-- Header row -->
       <div class="gl-row gl-row-head">
-        <span class="gl-col-order">ลำดับ</span>
         <span class="gl-col-code">รหัส</span>
         <span class="gl-col-name">ชื่อระดับชั้น</span>
         <span class="gl-col-act" />
@@ -44,16 +43,6 @@
         class="gl-row"
         :style="idx > 0 ? 'border-top:1px solid #F5F5F7' : ''"
       >
-        <!-- Order buttons -->
-        <div class="gl-col-order" style="display:flex;gap:2px">
-          <button class="gl-btn-icon" :disabled="idx === 0" @click="moveUp(idx)" title="เลื่อนขึ้น">
-            <PhArrowUp :size="13" weight="bold" />
-          </button>
-          <button class="gl-btn-icon" :disabled="idx === levels.length - 1" @click="moveDown(idx)" title="เลื่อนลง">
-            <PhArrowDown :size="13" weight="bold" />
-          </button>
-        </div>
-
         <!-- Code -->
         <div class="gl-col-code">
           <span class="gl-code-badge">{{ lvl.code }}</span>
@@ -148,13 +137,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
-import { PhPlus, PhTrash, PhX, PhArrowUp, PhArrowDown } from '@phosphor-icons/vue'
+import { PhPlus, PhTrash, PhX } from '@phosphor-icons/vue'
 import type { GradeLevel } from '@/api/types'
 import {
   listGradeLevels,
   createGradeLevel,
   updateGradeLevel,
-  reorderGradeLevels,
   deleteGradeLevel,
 } from '@/api/settings'
 
@@ -198,31 +186,6 @@ async function toggleRepeat(lvl: GradeLevel) {
     const idx = levels.value.findIndex(l => l.id === lvl.id)
     if (idx !== -1) levels.value[idx] = updated
   } catch { pageError.value = 'แก้ไขไม่สำเร็จ' }
-}
-
-// ── reorder ───────────────────────────────────────────────────────────────────
-async function moveUp(idx: number) {
-  if (idx === 0) return
-  const arr = [...levels.value]
-  ;[arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]]
-  levels.value = arr
-  await saveOrder()
-}
-
-async function moveDown(idx: number) {
-  if (idx === levels.value.length - 1) return
-  const arr = [...levels.value]
-  ;[arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]]
-  levels.value = arr
-  await saveOrder()
-}
-
-async function saveOrder() {
-  try {
-    const items = levels.value.map((l, i) => ({ id: l.id, sortOrder: i }))
-    await reorderGradeLevels(items)
-    levels.value.forEach((l, i) => { l.sortOrder = i })
-  } catch { pageError.value = 'บันทึกลำดับไม่สำเร็จ' }
 }
 
 // ── add modal ─────────────────────────────────────────────────────────────────
@@ -328,7 +291,7 @@ onMounted(async () => {
 }
 .gl-row {
   display:grid;
-  grid-template-columns:56px 72px 1fr 40px;
+  grid-template-columns:72px 1fr 40px;
   align-items:center;padding:10px 16px;gap:12px;
 }
 .gl-row-head {
