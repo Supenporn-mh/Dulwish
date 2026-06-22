@@ -168,11 +168,9 @@
 
             <!-- ผู้ปกครอง -->
             <td class="center">
-              <span v-if="s.parentCount > 0" class="adm-badge adm-badge-success" style="font-size:11px;padding:3px 10px">
-                มีผู้ปกครอง
-              </span>
-              <span v-else class="adm-badge adm-badge-voided" style="font-size:11px;padding:3px 10px">
-                ยังไม่มี
+              <span class="adm-badge adm-badge-success" style="font-size:11px;padding:3px 10px;display:inline-flex;align-items:center;gap:4px">
+                <PhUsers :size="11" weight="fill" />
+                {{ s.parentCount ?? 0 }}/2
               </span>
             </td>
 
