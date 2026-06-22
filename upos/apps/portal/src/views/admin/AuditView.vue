@@ -35,6 +35,9 @@
           <tr v-if="loading">
             <td colspan="7" class="center" style="padding:32px;color:#AEAEB2">กำลังโหลด...</td>
           </tr>
+          <tr v-else-if="fetchError">
+            <td colspan="7" class="center" style="padding:32px;color:var(--color-danger)">{{ fetchError }}</td>
+          </tr>
           <tr v-else-if="pagedLogs.length === 0">
             <td colspan="7" class="center" style="padding:32px;color:#AEAEB2">ไม่มีรายการ</td>
           </tr>
@@ -122,15 +125,8 @@ interface AuditLog {
   after?: Record<string, unknown>
 }
 
-const DEMO_LOGS: AuditLog[] = [
-  { id: '1', createdAt: new Date().toISOString(), actor: 'somchai@school.ac.th', actorRole: 'admin', action: 'login', entity: 'User:U001', entityType: 'User', reason: 'Normal login' },
-  { id: '2', createdAt: new Date().toISOString(), actor: 'somchai@school.ac.th', actorRole: 'admin', action: 'topup', entity: 'Wallet:W-0002', entityType: 'Wallet', reason: 'เติมเงินให้นักเรียน', before: { balance: 250 }, after: { balance: 750 } },
-  { id: '3', createdAt: new Date().toISOString(), actor: 'wipa@school.ac.th', actorRole: 'supervisor', action: 'void_txn', entity: 'Transaction:TXN-005', entityType: 'Transaction', reason: 'รายการผิดพลาด', before: { status: 'success', amount: 45 }, after: { status: 'voided' } },
-  { id: '4', createdAt: new Date().toISOString(), actor: 'somchai@school.ac.th', actorRole: 'admin', action: 'policy_change', entity: 'Policy:low_balance_threshold', entityType: 'Policy', reason: 'ปรับ threshold', before: { value: 100 }, after: { value: 150 } },
-  { id: '5', createdAt: new Date().toISOString(), actor: 'somchai@school.ac.th', actorRole: 'admin', action: 'user_update', entity: 'User:U006', entityType: 'User', reason: 'อัปเดตสถานะ', before: { status: 'active' }, after: { status: 'inactive' } },
-]
-
 const loading = ref(false)
+const fetchError = ref<string | null>(null)
 const logs = ref<AuditLog[]>([])
 const actionFilter = ref('')
 const dateRange = ref<[Date, Date] | null>(null)
@@ -184,13 +180,15 @@ function openDetail(row: AuditLog) {
 
 async function fetchLogs() {
   loading.value = true
+  fetchError.value = null
   try {
     const params: Record<string, string> = {}
     if (actionFilter.value) params.action = actionFilter.value
     const { data } = await api.get('/admin/audit', { params })
-    logs.value = data.logs ?? DEMO_LOGS
-  } catch {
-    logs.value = DEMO_LOGS
+    logs.value = data.logs ?? []
+  } catch (e: unknown) {
+    fetchError.value = e instanceof Error ? e.message : 'โหลด Audit Log ไม่สำเร็จ'
+    logs.value = []
   } finally {
     loading.value = false
   }

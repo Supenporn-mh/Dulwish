@@ -4,7 +4,12 @@ import { User, Wallet, AuditLog, EnrollmentCode, ParentStudent } from '../../mod
 import { signAccessToken, signRefreshToken, verifyRefreshToken, authPlugin } from '../../middleware/auth'
 
 // ── In-memory OTP store (acceptable for demo; keyed by contact) ───────────────
+// NOTE: in-memory only — all pending OTPs are LOST on server restart.
+// Persisting (Redis/DB) is out of scope for this change.
 const OTP_STORE: Map<string, { otp: string; expiresAt: Date; studentId?: string }> = new Map()
+
+// In production we must never leak the OTP in the response body.
+const IS_DEV = process.env.NODE_ENV !== 'production'
 
 function generateOtp(): string {
   return String(Math.floor(100000 + Math.random() * 900000))
@@ -13,14 +18,16 @@ function generateOtp(): string {
 export const authController = new Elysia({ prefix: '/auth' })
   .post('/login', async ({ body, set, request }) => {
     const { email, password } = body
-    const user = await User.findOne({
-      email: email.toLowerCase(),
-      status: 'active',
-    }).lean()
+    const user = await User.findOne({ email: email.toLowerCase() }).lean()
 
     if (!user || !user.passwordHash) {
       set.status = 401
       return { error: { code: 'AUTH_001', message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' } }
+    }
+
+    if (user.status !== 'active') {
+      set.status = 401
+      return { error: { code: 'AUTH_003', message: 'บัญชีนี้ถูกปิดการใช้งาน กรุณาติดต่อผู้ดูแลระบบ' } }
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash)
@@ -80,6 +87,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   .post('/verify-enrollment', async ({ body, set }) => {
     const enrollment = await EnrollmentCode.findOne({ code: body.code.toUpperCase().trim() })
       .populate<{ studentUserId: any }>('studentUserId')
+      .populate<{ memberUserId: any }>('memberUserId')
       .lean()
 
     if (!enrollment) {
@@ -95,28 +103,103 @@ export const authController = new Elysia({ prefix: '/auth' })
       return { error: { code: 'ENR_003', message: 'รหัสหมดอายุแล้ว' } }
     }
 
-    const student = enrollment.studentUserId
-    return {
-      valid: true,
-      student: {
-        uid:        student.uid,
-        firstName:  student.firstName,
-        lastName:   student.lastName,
-        gradeLevel: student.studentProfile?.gradeLevel ?? null,
-        className:  student.studentProfile?.className  ?? null,
-      },
+    if (enrollment.studentUserId) {
+      const student = enrollment.studentUserId
+      return {
+        valid: true,
+        type: 'student',
+        student: {
+          uid:        student.uid,
+          firstName:  student.firstName,
+          lastName:   student.lastName,
+          gradeLevel: student.studentProfile?.gradeLevel ?? null,
+        },
+      }
     }
+
+    if (enrollment.memberUserId) {
+      const member = enrollment.memberUserId
+      return {
+        valid: true,
+        type: 'member',
+        member: {
+          uid:       member.uid,
+          firstName: member.firstName,
+          lastName:  member.lastName,
+          role:      member.role,
+          email:     member.email  ?? null,
+          phone:     member.phone  ?? null,
+        },
+      }
+    }
+
+    set.status = 400
+    return { error: { code: 'ENR_005', message: 'รหัสลงทะเบียนไม่ถูกต้อง' } }
   }, {
     body: t.Object({ code: t.String({ minLength: 1 }) }),
   })
 
+  // ── Send OTP for registration (demo: returns otp in response) ─────────────
+  .post('/send-registration-otp', async ({ body, set }) => {
+    const code    = body.enrollmentCode.toUpperCase().trim()
+    const contact = body.contact.trim().toLowerCase()
+
+    const enrollment = await EnrollmentCode.findOne({ code })
+      .populate<{ studentUserId: any }>('studentUserId')
+      .populate<{ memberUserId: any }>('memberUserId')
+      .lean()
+
+    if (!enrollment || (!enrollment.studentUserId && !enrollment.memberUserId)) {
+      set.status = 400
+      return { error: { code: 'ENR_001', message: 'ไม่พบรหัสลงทะเบียน' } }
+    }
+    if (enrollment.used) {
+      set.status = 400
+      return { error: { code: 'ENR_002', message: 'รหัสนี้ถูกใช้งานแล้ว' } }
+    }
+    if (new Date() > enrollment.expiresAt) {
+      set.status = 400
+      return { error: { code: 'ENR_003', message: 'รหัสหมดอายุแล้ว' } }
+    }
+
+    // Re-generate + re-store on every call so this endpoint also acts as RESEND (resets TTL).
+    const otp       = generateOtp()
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
+    OTP_STORE.set(`reg:${code}:${contact}`, { otp, expiresAt })
+
+    return { expiresAt: expiresAt.toISOString(), ...(IS_DEV && { demoOtp: otp }) }
+  }, {
+    body: t.Object({
+      enrollmentCode: t.String({ minLength: 1 }),
+      contact:        t.String({ minLength: 1 }),
+    }),
+  })
+
   .post('/parent-register', async ({ body, set }) => {
-    const { enrollmentCode, firstName, lastName, password } = body
+    const { enrollmentCode, firstName, lastName, password, email, phone, otp } = body
+
+    // Validate OTP
+    const contact = (phone ?? email ?? '').trim().toLowerCase()
+    const otpKey  = `reg:${enrollmentCode.toUpperCase().trim()}:${contact}`
+    const stored  = OTP_STORE.get(otpKey)
+    if (!stored || stored.otp !== otp || new Date() > stored.expiresAt) {
+      set.status = 400
+      return { error: { code: 'OTP_INVALID', message: 'รหัส OTP ไม่ถูกต้องหรือหมดอายุ' } }
+    }
+    OTP_STORE.delete(otpKey)
 
     const enrollment = await EnrollmentCode.findOne({ code: enrollmentCode.toUpperCase().trim() }).lean()
-    if (!enrollment || enrollment.used || new Date() > enrollment.expiresAt) {
+    if (!enrollment || !enrollment.studentUserId) {
       set.status = 400
-      return { error: { code: 'ENR_001', message: 'รหัสลงทะเบียนไม่ถูกต้องหรือหมดอายุ' } }
+      return { error: { code: 'ENR_001', message: 'ไม่พบรหัสลงทะเบียนนักเรียน' } }
+    }
+    if (enrollment.used) {
+      set.status = 400
+      return { error: { code: 'ENR_002', message: 'รหัสนี้ถูกใช้งานแล้ว' } }
+    }
+    if (new Date() > enrollment.expiresAt) {
+      set.status = 400
+      return { error: { code: 'ENR_003', message: 'รหัสหมดอายุแล้ว' } }
     }
 
     const existingLink = await ParentStudent.findOne({ studentUserId: enrollment.studentUserId }).lean()
@@ -129,9 +212,14 @@ export const authController = new Elysia({ prefix: '/auth' })
     const count = await User.countDocuments({ role: 'parent' })
     const uid   = `PRT-${String(count + 1).padStart(4, '0')}`
 
+    const normalizedPhone = phone?.trim() ?? undefined
+    const normalizedEmail = email?.trim().toLowerCase() ?? undefined
+    const contactField = normalizedPhone ? { phone: normalizedPhone } : normalizedEmail ? { email: normalizedEmail } : {}
+
     const parent = await User.create({
       uid, role: 'parent', firstName, lastName, passwordHash,
       status: 'active', pdpaAcceptedAt: new Date(),
+      ...contactField,
     })
 
     await Wallet.create({ userId: parent._id, balance: 0 })
@@ -159,6 +247,9 @@ export const authController = new Elysia({ prefix: '/auth' })
       enrollmentCode: t.String({ minLength: 1 }),
       firstName:      t.String({ minLength: 1 }),
       lastName:       t.String({ minLength: 1 }),
+      email:          t.Optional(t.String()),
+      phone:          t.Optional(t.String()),
+      otp:            t.String({ minLength: 6, maxLength: 6 }),
       password:       t.String({ minLength: 8 }),
     }),
   })
@@ -276,7 +367,6 @@ export const authController = new Elysia({ prefix: '/auth' })
         firstName: student.firstName,
         lastName:  student.lastName,
         grade:     student.studentProfile?.gradeLevel ?? null,
-        className: student.studentProfile?.className  ?? null,
       },
     }
   }, {
@@ -300,11 +390,12 @@ export const authController = new Elysia({ prefix: '/auth' })
       set.status = 409
       return { error: { code: 'ALREADY_REGISTERED', message: 'อีเมล/เบอร์นี้ลงทะเบียนแล้ว' } }
     }
+    // Re-generate + re-store on every call so this endpoint also acts as RESEND (resets TTL).
     const otp       = generateOtp()
     const expiresAt = new Date(Date.now() + 14 * 24 * 3600 * 1000) // 14 days (same as mock)
     OTP_STORE.set(contact, { otp, expiresAt, studentId })
-    console.log(`[OTP] ${contact} → ${otp}`)
-    return { sent: true, otp, expiresAt: expiresAt.toISOString(), _demo: `OTP: ${otp}` }
+    if (IS_DEV) console.log(`[OTP] ${contact} → ${otp}`)
+    return { sent: true, expiresAt: expiresAt.toISOString(), ...(IS_DEV && { otp, _demo: `OTP: ${otp}` }) }
   }, {
     body: t.Object({
       studentId: t.String({ minLength: 1 }),
@@ -383,6 +474,67 @@ export const authController = new Elysia({ prefix: '/auth' })
     }),
   })
 
+  // ── Member registration via enrollment code ───────────────────────────────
+
+  .post('/member-register', async ({ body, set }) => {
+    // Validate OTP
+    const contact = (body.phone ?? body.email ?? '').trim().toLowerCase()
+    const otpKey  = `reg:${body.enrollmentCode.toUpperCase().trim()}:${contact}`
+    const stored  = OTP_STORE.get(otpKey)
+    if (!stored || stored.otp !== body.otp || new Date() > stored.expiresAt) {
+      set.status = 400
+      return { error: { code: 'OTP_INVALID', message: 'รหัส OTP ไม่ถูกต้องหรือหมดอายุ' } }
+    }
+    OTP_STORE.delete(otpKey)
+
+    const enrollment = await EnrollmentCode.findOne({ code: body.enrollmentCode.toUpperCase().trim() })
+      .populate<{ memberUserId: any }>('memberUserId')
+      .lean()
+
+    if (!enrollment || !enrollment.memberUserId) {
+      set.status = 400
+      return { error: { code: 'ENR_001', message: 'ไม่พบรหัสลงทะเบียนสมาชิก' } }
+    }
+    if (enrollment.used) {
+      set.status = 400
+      return { error: { code: 'ENR_002', message: 'รหัสนี้ถูกใช้งานแล้ว' } }
+    }
+    if (new Date() > enrollment.expiresAt) {
+      set.status = 400
+      return { error: { code: 'ENR_003', message: 'รหัสหมดอายุแล้ว' } }
+    }
+
+    const member = enrollment.memberUserId
+    const passwordHash = await bcrypt.hash(body.password, 10)
+
+    const updateData: Record<string, any> = { passwordHash, pdpaAcceptedAt: new Date() }
+    if (body.email) updateData.email = body.email.trim().toLowerCase()
+    if (body.phone) updateData.phone = body.phone.trim()
+
+    await User.updateOne({ _id: member._id }, updateData)
+
+    await EnrollmentCode.updateOne(
+      { _id: enrollment._id },
+      { used: true, usedAt: new Date(), usedByMemberId: member._id },
+    )
+
+    const payload = { userId: String(member._id), role: member.role, uid: member.uid }
+    const accessToken  = signAccessToken(payload as any)
+    const refreshToken = signRefreshToken(payload as any)
+
+    const updatedUser = await User.findById(member._id).lean()
+    const { passwordHash: _ph, ...safeUser } = updatedUser!
+    return { accessToken, refreshToken, user: safeUser }
+  }, {
+    body: t.Object({
+      enrollmentCode: t.String({ minLength: 1 }),
+      email:          t.Optional(t.String()),
+      phone:          t.Optional(t.String()),
+      otp:            t.String({ minLength: 6, maxLength: 6 }),
+      password:       t.String({ minLength: 8 }),
+    }),
+  })
+
   // ── Forgot password flow ──────────────────────────────────────────────────
 
   .post('/forgot-password/send', async ({ body, set }) => {
@@ -402,8 +554,8 @@ export const authController = new Elysia({ prefix: '/auth' })
     const otp       = generateOtp()
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 min
     OTP_STORE.set(`reset_${contact}`, { otp, expiresAt })
-    console.log(`[OTP reset] ${contact} → ${otp}`)
-    return { sent: true, otp, _demo: `OTP: ${otp}` }
+    if (IS_DEV) console.log(`[OTP reset] ${contact} → ${otp}`)
+    return { sent: true, ...(IS_DEV && { otp, _demo: `OTP: ${otp}` }) }
   }, {
     body: t.Object({ contact: t.String({ minLength: 1 }) }),
   })

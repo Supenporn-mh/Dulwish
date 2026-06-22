@@ -34,23 +34,27 @@
           <label class="store-label">โลโก้ร้านค้า</label>
           <div
             class="store-dropzone"
-            :class="{ 'store-dropzone--over': isDragOver, 'store-dropzone--has': !!logoFile }"
+            :class="{ 'store-dropzone--over': isDragOver, 'store-dropzone--has': !!(logoFile || (form as any).logoUrl) }"
             @dragover.prevent="isDragOver = true"
             @dragleave="isDragOver = false"
             @drop.prevent="onDrop"
             @click="logoInput?.click()"
           >
-            <div v-if="!logoFile" style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div v-if="logoFile" style="display:flex;flex-direction:column;align-items:center;gap:6px">
+              <img :src="previewUrl" style="max-height:80px;border-radius:8px;object-fit:contain" />
+              <p style="font-size:13px;font-weight:500;color:var(--color-primary)">{{ logoFile.name }}</p>
+              <p style="font-size:11px;color:#AEAEB2">คลิกเพื่อเปลี่ยน</p>
+            </div>
+            <div v-else-if="(form as any).logoUrl" style="display:flex;flex-direction:column;align-items:center;gap:6px">
+              <img :src="(form as any).logoUrl" style="max-height:80px;border-radius:8px;object-fit:contain" />
+              <p style="font-size:11px;color:#AEAEB2">คลิกเพื่อเปลี่ยน</p>
+            </div>
+            <div v-else style="display:flex;flex-direction:column;align-items:center;gap:8px">
               <PhUploadSimple :size="28" style="color:var(--color-text-tertiary)" />
               <p style="font-size:14px;color:var(--color-text-secondary)">
                 <span style="font-weight:500">Drag and drop</span> files
               </p>
               <p style="font-size:12px;color:var(--color-text-tertiary)">or click here</p>
-            </div>
-            <div v-else style="display:flex;flex-direction:column;align-items:center;gap:6px">
-              <PhImage :size="32" style="color:var(--color-primary)" />
-              <p style="font-size:13px;font-weight:500;color:var(--color-primary)">{{ logoFile.name }}</p>
-              <p style="font-size:11px;color:#AEAEB2">คลิกเพื่อเปลี่ยน</p>
             </div>
           </div>
           <input ref="logoInput" type="file" accept="image/*" style="display:none" @change="onFileChange" />
@@ -188,7 +192,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { PhUploadSimple, PhImage, PhPlus, PhGear, PhCaretUpDown, PhX, PhTrash } from '@phosphor-icons/vue'
 import {
   getStoreSettings,
@@ -208,6 +212,13 @@ const logoInput  = ref<HTMLInputElement | null>(null)
 const isDragOver = ref(false)
 const loadingStore = ref(false)
 const savingStore  = ref(false)
+
+// local object URL for previewing newly selected logo file
+const previewUrl = ref<string>('')
+watch(logoFile, (f, old) => {
+  if (old) URL.revokeObjectURL(previewUrl.value)
+  previewUrl.value = f ? URL.createObjectURL(f) : ''
+})
 
 // ── Branches ──────────────────────────────────────────────────────────────────
 
@@ -281,8 +292,20 @@ async function saveStore() {
   savingStore.value = true
   error.value = ''
   try {
-    const updated = await updateStoreSettings({ ...form.value })
-    form.value = { ...updated }
+    let logoUrl: string | undefined
+    if (logoFile.value) {
+      logoUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload  = ev => resolve(ev.target?.result as string)
+        reader.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'))
+        reader.readAsDataURL(logoFile.value!)
+      })
+    }
+    const payload: Record<string, unknown> = { ...form.value }
+    if (logoUrl !== undefined) payload.logoUrl = logoUrl
+    const updated = await updateStoreSettings(payload as any)
+    form.value    = { ...updated }
+    logoFile.value = null
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ'
   } finally {
@@ -376,14 +399,14 @@ async function confirmDeleteBranch(b: Branch) {
 .store-dropzone--has { border-color: var(--color-success); background: var(--color-success-bg); }
 
 .store-modal {
-  position: fixed; top: 50%; left: 50%; z-index: 51;
+  position: fixed; top: 50%; left: 50%; z-index: 501;
   transform: translate(-50%, -50%);
   background: #fff; border-radius: 14px;
   width: calc(100vw - 48px); max-width: 400px;
   padding: 24px; box-shadow: 0 16px 48px rgba(0,0,0,0.14);
 }
 .modal-backdrop-store {
-  position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,0.4);
+  position: fixed; inset: 0; z-index: 500; background: rgba(0,0,0,0.4);
 }
 .promo-close-btn {
   background: none; border: none; cursor: pointer; color: #8E8E93;

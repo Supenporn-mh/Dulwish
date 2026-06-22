@@ -1,7 +1,7 @@
 <template>
   <div class="users-layout">
 
-    <!-- Left: table -->
+    <!-- Table -->
     <div class="users-main">
 
       <!-- Header -->
@@ -10,6 +10,11 @@
         <button class="adm-hdr-btn adm-hdr-btn-primary" @click="openAdd">
           <PhPlus :size="14" /> เพิ่มข้อมูล
         </button>
+      </div>
+
+      <!-- Error banner -->
+      <div v-if="loadError" style="padding:10px 14px;border-radius:8px;background:var(--color-danger-bg,#FEE2E2);color:var(--color-danger,#CC3333);font-size:13px;margin-bottom:12px">
+        {{ loadError }}
       </div>
 
       <!-- Filters -->
@@ -58,13 +63,13 @@
               <td><span class="adm-code">{{ u.employeeCode }}</span></td>
               <td>
                 <div style="font-weight:500;color:var(--color-primary)">{{ u.firstName }} {{ u.lastName }}</div>
-                <div style="font-size:11px;color:var(--color-text-tertiary)">{{ u.username }}</div>
+                <div style="font-size:11px;color:var(--color-text-tertiary)">{{ u.email }}</div>
               </td>
               <td class="center">
                 <span class="u-role-badge" :class="`role-${u.role}`">{{ roleLabel(u.role) }}</span>
               </td>
               <td style="font-size:13px;color:var(--color-text-secondary)">{{ u.phone || '—' }}</td>
-              <td style="font-size:13px;color:var(--color-text-secondary)">{{ u.branch || '—' }}</td>
+              <td style="font-size:13px;color:var(--color-text-secondary)">{{ u.branchCode || '—' }}</td>
               <td class="center">
                 <span class="adm-status">
                   <span :class="['adm-dot', u.status === 'active' ? 'adm-dot-success' : 'adm-dot-gray']" />
@@ -78,8 +83,14 @@
                   <button class="adm-action-btn" title="แก้ไข" @click="openEdit(u)">
                     <PhPencilSimple :size="14" />
                   </button>
-                  <button class="adm-action-btn danger" title="ลบ" @click="deleteUser(u)">
-                    <PhTrash :size="14" />
+                  <button
+                    :class="['adm-action-btn', u.status === 'active' ? 'danger' : 'success']"
+                    :title="u.status === 'active' ? 'ปิดใช้งาน' : 'เปิดใช้งาน'"
+                    :disabled="!!togglingStatus[u.id]"
+                    @click="toggleStatus(u)"
+                  >
+                    <PhProhibit v-if="u.status === 'active'" :size="14" />
+                    <PhCheckCircle v-else :size="14" />
                   </button>
                 </div>
               </td>
@@ -108,152 +119,229 @@
       </div>
     </div>
 
-    <!-- Right: form panel -->
-    <Transition name="panel-slide">
-      <div v-if="showForm" class="users-panel">
-        <div class="panel-header">
-          <h3 class="panel-title">{{ editTarget ? 'แก้ไขข้อมูล' : 'เพิ่มข้อมูล' }}</h3>
-          <button class="panel-close" @click="closeForm"><PhX :size="18" weight="bold" /></button>
-        </div>
-        <div class="panel-body">
-
-          <!-- รหัสพนักงาน -->
-          <div class="pf-field">
-            <label class="pf-label">รหัสพนักงาน <span class="pf-req">*</span></label>
-            <input v-model="form.employeeCode" class="pf-input" placeholder="กรุณาระบุรหัสพนักงาน" />
+    <!-- Modal -->
+    <Teleport to="body">
+      <Transition name="modal-bg">
+        <div v-if="showForm" class="modal-backdrop" @click="closeForm" />
+      </Transition>
+      <Transition name="modal-up">
+        <div v-if="showForm" class="users-modal">
+          <div class="panel-header">
+            <h3 class="panel-title">{{ editTarget ? 'แก้ไขข้อมูล' : 'เพิ่มข้อมูล' }}</h3>
+            <button class="panel-close" @click="closeForm"><PhX :size="18" weight="bold" /></button>
           </div>
+          <div class="panel-body">
 
-          <!-- ชื่อ -->
-          <div class="pf-field">
-            <label class="pf-label">ชื่อ <span class="pf-req">*</span></label>
-            <input v-model="form.firstName" class="pf-input" />
-          </div>
-
-          <!-- นามสกุล -->
-          <div class="pf-field">
-            <label class="pf-label">นามสกุล <span class="pf-req">*</span></label>
-            <input v-model="form.lastName" class="pf-input" />
-          </div>
-
-          <!-- เบอร์ติดต่อ -->
-          <div class="pf-field">
-            <label class="pf-label">เบอร์ติดต่อ <span class="pf-req">*</span></label>
-            <input v-model="form.phone" class="pf-input" inputmode="tel" placeholder="0812345678" />
-          </div>
-
-          <!-- สิทธิ์การใช้งาน -->
-          <div class="pf-field">
-            <label class="pf-label">สิทธิ์การใช้งาน <span class="pf-req">*</span></label>
-            <select v-model="form.role" class="pf-input pf-select">
-              <option value="" disabled>เลือกสิทธิ์การใช้งาน</option>
-              <option value="admin">admin</option>
-              <option value="supervisor">supervisor</option>
-              <option value="cashier">cashier</option>
-            </select>
-          </div>
-
-          <!-- Select Branches -->
-          <div class="pf-field">
-            <label class="pf-label">Select Branches <span class="pf-req">*</span></label>
-            <select v-model="form.branch" class="pf-input pf-select">
-              <option value="" disabled>เลือกสาขา</option>
-              <option value="Headquarter">Headquarter (00000)</option>
-            </select>
-          </div>
-
-          <!-- Username -->
-          <div class="pf-field">
-            <label class="pf-label">Username <span class="pf-req">*</span></label>
-            <input v-model="form.username" class="pf-input" autocomplete="off" />
-          </div>
-
-          <!-- Password -->
-          <div class="pf-field">
-            <label class="pf-label">Password <span class="pf-req">*</span></label>
-            <div class="pf-pw-wrap">
-              <input
-                v-model="form.password"
-                :type="showPw ? 'text' : 'password'"
-                class="pf-input"
-                :class="{ 'pf-input-error': pwError }"
-                autocomplete="new-password"
-              />
-              <button class="pf-pw-eye" @click="showPw = !showPw" type="button">
-                <PhEye v-if="!showPw" :size="16" />
-                <PhEyeSlash v-else :size="16" />
-              </button>
+            <!-- ชื่อ + นามสกุล -->
+            <div style="display:flex;gap:12px">
+              <div class="pf-field" style="flex:1">
+                <label class="pf-label">ชื่อ <span class="pf-req">*</span></label>
+                <input v-model="form.firstName" class="pf-input" />
+              </div>
+              <div class="pf-field" style="flex:1">
+                <label class="pf-label">นามสกุล <span class="pf-req">*</span></label>
+                <input v-model="form.lastName" class="pf-input" />
+              </div>
             </div>
-            <p v-if="pwError" class="pf-error">{{ pwError }}</p>
-            <p v-else class="pf-hint">
-              Password must be a combination of lower-case, upper-case, numbers, symbols and at least 8 characters long
-            </p>
+
+            <!-- อีเมล -->
+            <div class="pf-field">
+              <label class="pf-label">อีเมล <span class="pf-req">*</span></label>
+              <input v-model="form.email" class="pf-input" type="email" placeholder="email@example.com" autocomplete="off" />
+            </div>
+
+            <!-- สิทธิ์การใช้งาน + สาขา -->
+            <div style="display:flex;gap:12px">
+              <div class="pf-field" style="flex:1">
+                <label class="pf-label">สิทธิ์การใช้งาน <span class="pf-req">*</span></label>
+                <select v-model="form.role" class="pf-input pf-select">
+                  <option value="" disabled>เลือกสิทธิ์การใช้งาน</option>
+                  <option value="admin">admin</option>
+                  <option value="supervisor">supervisor</option>
+                  <option value="cashier">cashier</option>
+                </select>
+              </div>
+              <div class="pf-field" style="flex:1">
+                <label class="pf-label">สาขา</label>
+                <select v-model="form.branchCode" class="pf-input pf-select">
+                  <option value="">ไม่ระบุสาขา</option>
+                  <option v-for="b in branches" :key="b.code" :value="b.code">{{ b.name }} ({{ b.code }})</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- รหัสบัตร RFID -->
+            <div class="pf-field">
+              <label class="pf-label">รหัสบัตร RFID</label>
+              <input v-model="form.cardUid" class="pf-input" style="font-family:monospace" placeholder="UID บัตร (ถ้ามี)" />
+            </div>
+
+            <!-- Password -->
+            <div class="pf-field">
+              <label class="pf-label">Password <span v-if="!editTarget" class="pf-req">*</span><span v-else style="font-size:11px;color:var(--color-text-tertiary)"> (เว้นว่างถ้าไม่เปลี่ยน)</span></label>
+              <div class="pf-pw-wrap">
+                <input
+                  v-model="form.password"
+                  :type="showPw ? 'text' : 'password'"
+                  class="pf-input"
+                  :class="{ 'pf-input-error': pwError }"
+                  autocomplete="new-password"
+                />
+                <button class="pf-pw-eye" @click="showPw = !showPw" type="button">
+                  <PhEye v-if="!showPw" :size="16" />
+                  <PhEyeSlash v-else :size="16" />
+                </button>
+              </div>
+              <p v-if="pwError" class="pf-error">{{ pwError }}</p>
+              <p v-else class="pf-hint">Password must be a combination of lower-case, upper-case, numbers, symbols and at least 8 characters long</p>
+            </div>
+
+            <!-- Error -->
+            <p v-if="saveError" class="pf-error">{{ saveError }}</p>
+
           </div>
 
-          <!-- แสดง toggle -->
-          <div class="pf-field pf-toggle-row">
-            <label class="pf-label">แสดง</label>
-            <button
-              :class="['pf-toggle', form.status === 'active' ? 'pf-toggle-on' : '']"
-              @click="form.status = form.status === 'active' ? 'inactive' : 'active'"
-              type="button"
-            >
-              <span class="pf-toggle-thumb" />
+          <!-- Footer -->
+          <div class="panel-footer">
+            <button class="adm-hdr-btn adm-hdr-btn-ghost" style="flex:1" @click="closeForm">ยกเลิก</button>
+            <button class="adm-hdr-btn adm-hdr-btn-primary" style="flex:1" :disabled="!canSave || saving" @click="saveUser">
+              {{ saving ? 'กำลังบันทึก...' : 'บันทึก' }}
             </button>
           </div>
-
         </div>
+      </Transition>
+    </Teleport>
 
-        <!-- Footer -->
-        <div class="panel-footer">
-          <button class="adm-hdr-btn adm-hdr-btn-ghost" style="flex:1" @click="closeForm">ยกเลิก</button>
-          <button class="adm-hdr-btn adm-hdr-btn-primary" style="flex:1" :disabled="!canSave" @click="saveUser">
-            บันทึก
-          </button>
+    <!-- Confirm deactivate modal -->
+    <Teleport to="body">
+      <Transition name="modal-bg">
+        <div v-if="showConfirm" class="modal-backdrop" @click="showConfirm = false; confirmTarget = null" />
+      </Transition>
+      <Transition name="modal-up">
+        <div v-if="showConfirm && confirmTarget" class="confirm-modal">
+          <div class="confirm-icon">
+            <PhWarning :size="32" weight="fill" style="color: var(--color-warning)" />
+          </div>
+          <h3 class="confirm-title">
+            {{ confirmTarget.status === 'active' ? 'ปิดการใช้งาน' : 'เปิดการใช้งาน' }}
+          </h3>
+          <p class="confirm-body">
+            ต้องการ{{ confirmTarget.status === 'active' ? 'ปิดการใช้งาน' : 'เปิดการใช้งาน' }}
+            <strong>{{ confirmTarget.firstName }} {{ confirmTarget.lastName }}</strong> ใช่หรือไม่?
+          </p>
+          <div class="confirm-footer">
+            <button class="adm-hdr-btn adm-hdr-btn-ghost" style="flex:1" @click="showConfirm = false; confirmTarget = null">ยกเลิก</button>
+            <button
+              class="adm-hdr-btn"
+              :class="confirmTarget.status === 'active' ? 'adm-hdr-btn-danger' : 'adm-hdr-btn-primary'"
+              style="flex:1"
+              :disabled="!!togglingStatus[confirmTarget.id]"
+              @click="confirmToggle"
+            >
+              {{ togglingStatus[confirmTarget.id] ? 'กำลังบันทึก...' : (confirmTarget.status === 'active' ? 'ปิดการใช้งาน' : 'เปิดการใช้งาน') }}
+            </button>
+          </div>
         </div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
 
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { PhPlus, PhPencilSimple, PhTrash, PhX, PhEye, PhEyeSlash } from '@phosphor-icons/vue'
+import { PhPlus, PhPencilSimple, PhX, PhEye, PhEyeSlash, PhProhibit, PhCheckCircle, PhWarning } from '@phosphor-icons/vue'
+import api from '@/api/axios'
 
-interface User {
+interface StaffUser {
+  _id:          string
   id:           string
   employeeCode: string
   firstName:    string
   lastName:     string
+  email:        string
   phone:        string
-  role:         'admin' | 'supervisor' | 'cashier'
-  branch:       string
-  username:     string
+  role:         string
+  branchCode:   string
+  cardUid:      string
   status:       'active' | 'inactive'
 }
 
-const DEMO: User[] = [
-  { id:'1', employeeCode:'EMP-001', firstName:'สมชาย',  lastName:'ใจดี',    phone:'0811111111', role:'admin',      branch:'Headquarter', username:'admin',    status:'active'   },
-  { id:'2', employeeCode:'EMP-002', firstName:'วิภา',   lastName:'รักเรียน',phone:'0822222222', role:'supervisor', branch:'Headquarter', username:'patcha',   status:'active'   },
-  { id:'3', employeeCode:'EMP-003', firstName:'หนอง',   lastName:'แคชเชียร์',phone:'0833333333',role:'cashier',    branch:'Headquarter', username:'nong',     status:'active'   },
-]
+interface Branch {
+  code: string
+  name: string
+}
 
-const users       = ref<User[]>([])
-const loading     = ref(false)
-const search      = ref('')
-const filterRole  = ref('')
-const filterStatus = ref('')
-const currentPage = ref(1)
-const pageSize    = ref(10)
+const STAFF_ROLES = ['admin', 'supervisor', 'cashier']
+
+const users         = ref<StaffUser[]>([])
+const branches      = ref<Branch[]>([])
+const loading       = ref(false)
+const loadError     = ref('')
+const search        = ref('')
+const filterRole    = ref('')
+const filterStatus  = ref('')
+const currentPage   = ref(1)
+const pageSize      = ref(10)
+const togglingStatus = ref<Record<string, boolean>>({})
 
 const showForm   = ref(false)
-const editTarget = ref<User | null>(null)
+const editTarget = ref<StaffUser | null>(null)
 const showPw     = ref(false)
+const saving     = ref(false)
+const saveError  = ref('')
 
 const form = ref({
-  employeeCode: '', firstName: '', lastName: '',
-  phone: '', role: '' as any, branch: '',
-  username: '', password: '', status: 'active' as 'active' | 'inactive',
+  firstName: '', lastName: '', email: '',
+  role: '' as string, branchCode: '', cardUid: '', password: '',
+})
+
+// ── Data loading ──────────────────────────────────────────────────────────────
+async function fetchUsers() {
+  loading.value   = true
+  loadError.value = ''
+  try {
+    const res = await api.get('/users')
+    const raw: any[] = res.data?.users ?? res.data ?? []
+    users.value = raw
+      .filter((u: any) => STAFF_ROLES.includes(u.role ?? ''))
+      .map((u: any): StaffUser => ({
+        _id:          String(u._id ?? u.id ?? ''),
+        id:           u.uid ?? u._id ?? u.id ?? '',
+        employeeCode: u.uid ?? u._id ?? u.id ?? '',
+        firstName:    u.firstName ?? u.first_name ?? '',
+        lastName:     u.lastName  ?? u.last_name  ?? '',
+        email:        u.email     ?? '',
+        phone:        u.phone     ?? '',
+        role:         u.role      ?? '',
+        branchCode:   u.branchCode ?? u.branch ?? '',
+        cardUid:      u.cardUid   ?? u.card_uid ?? '',
+        status:       u.status    ?? 'active',
+      }))
+  } catch {
+    loadError.value = 'โหลดข้อมูลผู้ใช้ไม่สำเร็จ'
+    users.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+async function fetchBranches() {
+  try {
+    const res = await api.get('/settings/branches')
+    const raw: any[] = res.data?.branches ?? res.data ?? []
+    branches.value = raw.map((b: any): Branch => ({
+      code: b.code ?? b.branchCode ?? '',
+      name: b.name ?? b.branchName ?? '',
+    }))
+  } catch {
+    branches.value = []
+  }
+}
+
+onMounted(() => {
+  fetchUsers()
+  fetchBranches()
 })
 
 // ── Computed ──────────────────────────────────────────────────────────────────
@@ -280,82 +368,132 @@ const pwError = computed(() => {
   return ''
 })
 
-const canSave = computed(() =>
-  form.value.employeeCode && form.value.firstName && form.value.lastName &&
-  form.value.phone && form.value.role && form.value.branch &&
-  form.value.username && form.value.password && !pwError.value
-)
+const canSave = computed(() => {
+  const f = form.value
+  if (!f.firstName || !f.lastName || !f.email || !f.role) return false
+  if (!editTarget.value) {
+    // create: password required
+    if (!f.password || !!pwError.value) return false
+  } else {
+    // edit: if password provided it must be valid
+    if (f.password && !!pwError.value) return false
+  }
+  return true
+})
 
 // ── Methods ───────────────────────────────────────────────────────────────────
 function roleLabel(r: string) {
-  return r === 'admin' ? 'Admin' : r === 'supervisor' ? 'Supervisor' : 'Cashier'
+  const map: Record<string, string> = {
+    admin: 'Admin', supervisor: 'Supervisor', cashier: 'Cashier',
+  }
+  return map[r] ?? r
 }
 
 function openAdd() {
   editTarget.value = null
-  form.value = { employeeCode:'', firstName:'', lastName:'', phone:'', role:'', branch:'', username:'', password:'', status:'active' }
-  showPw.value = false
-  showForm.value = true
+  form.value = { firstName: '', lastName: '', email: '', role: '', branchCode: '', cardUid: '', password: '' }
+  showPw.value  = false
+  saveError.value = ''
+  showForm.value  = true
 }
 
-function openEdit(u: User) {
+function openEdit(u: StaffUser) {
   editTarget.value = u
-  form.value = { employeeCode: u.employeeCode, firstName: u.firstName, lastName: u.lastName, phone: u.phone, role: u.role, branch: u.branch, username: u.username, password:'', status: u.status }
-  showPw.value = false
-  showForm.value = true
+  form.value = { firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role, branchCode: u.branchCode, cardUid: u.cardUid, password: '' }
+  showPw.value  = false
+  saveError.value = ''
+  showForm.value  = true
 }
 
 function closeForm() { showForm.value = false }
 
-function saveUser() {
-  if (!canSave.value) return
-  if (editTarget.value) {
-    const idx = users.value.findIndex(u => u.id === editTarget.value!.id)
-    if (idx >= 0) users.value[idx] = { ...users.value[idx], ...form.value }
-  } else {
-    users.value.unshift({
-      id: String(Date.now()),
-      employeeCode: form.value.employeeCode,
-      firstName:    form.value.firstName,
-      lastName:     form.value.lastName,
-      phone:        form.value.phone,
-      role:         form.value.role,
-      branch:       form.value.branch,
-      username:     form.value.username,
-      status:       form.value.status,
-    })
+async function saveUser() {
+  if (!canSave.value || saving.value) return
+  saving.value    = true
+  saveError.value = ''
+  try {
+    if (editTarget.value) {
+      // PATCH /admin/staff/:uid
+      const body: Record<string, any> = {
+        firstName: form.value.firstName,
+        lastName:  form.value.lastName,
+        email:     form.value.email,
+      }
+      if (form.value.cardUid) body.cardUid = form.value.cardUid
+      await api.patch(`/admin/staff/${editTarget.value.id}`, body)
+    } else {
+      // POST /admin/staff
+      const body: Record<string, any> = {
+        firstName: form.value.firstName,
+        lastName:  form.value.lastName,
+        email:     form.value.email,
+        role:      form.value.role,
+        password:  form.value.password,
+      }
+      if (form.value.branchCode) body.branchCode = form.value.branchCode
+      if (form.value.cardUid)    body.cardUid    = form.value.cardUid
+      await api.post('/admin/staff', body)
+    }
+    await fetchUsers()
+    closeForm()
+  } catch (err: any) {
+    saveError.value = err?.response?.data?.message ?? 'บันทึกไม่สำเร็จ กรุณาลองใหม่'
+  } finally {
+    saving.value = false
   }
-  closeForm()
 }
 
-function deleteUser(u: User) {
-  users.value = users.value.filter(x => x.id !== u.id)
+// Confirm modal
+const showConfirm   = ref(false)
+const confirmTarget = ref<StaffUser | null>(null)
+
+function toggleStatus(u: StaffUser) {
+  confirmTarget.value = u
+  showConfirm.value   = true
 }
 
-onMounted(() => { users.value = DEMO })
+async function confirmToggle() {
+  const u = confirmTarget.value
+  if (!u || togglingStatus.value[u.id]) return
+  const newStatus: 'active' | 'inactive' = u.status === 'active' ? 'inactive' : 'active'
+  togglingStatus.value[u.id] = true
+  showConfirm.value = false
+  try {
+    await api.patch(`/users/${u._id}/status`, { status: newStatus })
+    await fetchUsers()
+  } catch {
+    loadError.value = 'เปลี่ยนสถานะไม่สำเร็จ กรุณาลองใหม่'
+  } finally {
+    togglingStatus.value[u.id] = false
+    confirmTarget.value = null
+  }
+}
 </script>
 
 <style scoped>
 /* ── Layout ─────────────────────────────────────────────────────────────────── */
-.users-layout {
-  display: flex; gap: 20px; align-items: flex-start;
-}
-.users-main { flex: 1; min-width: 0; }
+.users-layout { display: flex; flex-direction: column; }
+.users-main   { flex: 1; min-width: 0; }
 
-/* ── Panel ──────────────────────────────────────────────────────────────────── */
-.users-panel {
-  width: 320px; flex-shrink: 0;
-  background: #fff; border-radius: 12px;
-  border: 1px solid var(--color-border-tertiary);
+/* ── Modal ──────────────────────────────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.4);
+}
+.users-modal {
+  position: fixed; top: 50%; left: 50%; z-index: 201;
+  transform: translate(-50%, -50%);
+  background: #fff; border-radius: 16px;
+  width: calc(100vw - 48px); max-width: 520px;
+  max-height: 90vh; overflow: hidden;
   display: flex; flex-direction: column;
-  max-height: calc(100vh - 100px); overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.18);
 }
 .panel-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 18px 20px 14px; border-bottom: 1px solid var(--color-border-tertiary);
+  padding: 20px 24px 16px; border-bottom: 1px solid var(--color-border-tertiary);
   flex-shrink: 0;
 }
-.panel-title { font-size: 16px; font-weight: 500; color: var(--color-text-primary); }
+.panel-title { font-size: 18px; font-weight: 500; color: var(--color-text-primary); }
 .panel-close {
   background: none; border: none; cursor: pointer; color: var(--color-text-tertiary);
   padding: 4px; border-radius: 6px; display: flex; align-items: center;
@@ -364,11 +502,11 @@ onMounted(() => { users.value = DEMO })
 
 .panel-body {
   flex: 1; overflow-y: auto;
-  padding: 16px 20px;
+  padding: 20px 24px;
   display: flex; flex-direction: column; gap: 14px;
 }
 .panel-footer {
-  padding: 14px 20px; border-top: 1px solid var(--color-border-tertiary);
+  padding: 16px 24px 20px; border-top: 1px solid var(--color-border-tertiary);
   display: flex; gap: 10px; flex-shrink: 0;
 }
 
@@ -398,20 +536,6 @@ onMounted(() => { users.value = DEMO })
 .pf-hint  { font-size: 11px; color: var(--color-text-tertiary); line-height: 1.4; }
 .pf-error { font-size: 11px; color: var(--color-danger); }
 
-.pf-toggle-row { flex-direction: row; align-items: center; gap: 10px; }
-.pf-toggle {
-  width: 40px; height: 22px; border-radius: 100px; border: none; cursor: pointer;
-  background: #D1D1D6; position: relative; transition: background 0.2s; flex-shrink: 0;
-  padding: 0;
-}
-.pf-toggle-on    { background: var(--color-primary); }
-.pf-toggle-thumb {
-  width: 18px; height: 18px; border-radius: 50%; background: #fff;
-  position: absolute; top: 2px; left: 2px;
-  transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-}
-.pf-toggle-on .pf-toggle-thumb { transform: translateX(18px); }
-
 /* ── Role badge ──────────────────────────────────────────────────────────────── */
 .u-role-badge {
   display: inline-block; padding: 3px 10px; border-radius: 100px;
@@ -420,8 +544,38 @@ onMounted(() => { users.value = DEMO })
 .role-admin      { background: var(--color-primary-tint); color: var(--color-primary); }
 .role-supervisor { background: #EDE9FE; color: #5B21B6; }
 .role-cashier    { background: var(--color-warning-bg); color: #B35900; }
+.role-teacher    { background: #ECFDF5; color: #065F46; }
+.role-staff      { background: #F3F4F6; color: #374151; }
 
-/* ── Transition ──────────────────────────────────────────────────────────────── */
-.panel-slide-enter-active, .panel-slide-leave-active { transition: opacity 0.2s, transform 0.2s; }
-.panel-slide-enter-from, .panel-slide-leave-to       { opacity: 0; transform: translateX(20px); }
+/* ── Confirm modal ───────────────────────────────────────────────────────────── */
+.confirm-modal {
+  position: fixed; top: 50%; left: 50%; z-index: 201;
+  transform: translate(-50%, -50%);
+  background: var(--color-bg-surface); border-radius: 16px;
+  width: calc(100vw - 48px); max-width: 360px;
+  padding: 28px 24px 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  box-shadow: var(--shadow-modal, 0 16px 48px rgba(0,0,0,0.18));
+  text-align: center;
+}
+.confirm-icon {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--color-warning-bg);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 4px;
+}
+.confirm-title { font-size: 17px; font-weight: 600; color: var(--color-text-primary); margin: 0; }
+.confirm-body  { font-size: 14px; color: var(--color-text-secondary); line-height: 1.5; margin: 0 0 8px; }
+.confirm-footer { display: flex; gap: 10px; width: 100%; margin-top: 4px; }
+.adm-hdr-btn-danger {
+  background: var(--color-danger, #CC3333); color: #fff; border: none;
+}
+.adm-hdr-btn-danger:hover:not(:disabled) { background: #a52828; }
+
+/* ── Transitions ─────────────────────────────────────────────────────────────── */
+.modal-bg-enter-active, .modal-bg-leave-active { transition: opacity 0.2s; }
+.modal-bg-enter-from, .modal-bg-leave-to       { opacity: 0; }
+.modal-up-enter-active, .modal-up-leave-active { transition: opacity 0.25s, transform 0.25s; }
+.modal-up-enter-from, .modal-up-leave-to       { opacity: 0; transform: translate(-50%, -48%); }
 </style>

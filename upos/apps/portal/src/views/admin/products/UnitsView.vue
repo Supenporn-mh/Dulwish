@@ -188,9 +188,9 @@ async function handleDelete(u: UnitRow) {
 </script>
 
 <style scoped>
-.k-backdrop { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,0.4); }
+.k-backdrop { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.4); }
 .k-modal {
-  position:fixed; top:50%; left:50%; z-index:51; transform:translate(-50%,-50%);
+  position:fixed; top:50%; left:50%; z-index:201; transform:translate(-50%,-50%);
   background:#fff; border-radius:14px; width:calc(100vw - 48px); max-width:400px;
   padding:24px; box-shadow:0 16px 48px rgba(0,0,0,0.14);
 }

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+// routes
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -31,18 +32,28 @@ const router = createRouter({
         { path: '',             redirect: 'dashboard' },
         { path: 'dashboard',    component: () => import('@/views/admin/DashboardView.vue') },
         { path: 'users',        component: () => import('@/views/admin/UsersView.vue') },
+        { path: 'banners',      component: () => import('@/views/admin/BannerView.vue') },
+        { path: 'devices',      component: () => import('@/views/admin/DevicesView.vue') },
         { path: 'students',     component: () => import('@/views/admin/StudentsView.vue') },
-        { path: 'menu',         component: () => import('@/views/admin/MenuView.vue') },
         { path: 'transactions', component: () => import('@/views/admin/TransactionsView.vue') },
+        { path: 'transactions/:id/tax-invoice', component: () => import('@/views/admin/TaxInvoiceView.vue') },
         { path: 'reports',      component: () => import('@/views/admin/ReportsView.vue') },
         { path: 'audit',        component: () => import('@/views/admin/AuditView.vue') },
         { path: 'policies',      component: () => import('@/views/admin/PoliciesView.vue') },
         { path: 'academic-year', component: () => import('@/views/admin/AcademicYearView.vue') },
+        { path: 'buffet',             redirect: 'buffet/rounds' },
+        { path: 'buffet/rounds',      component: () => import('@/views/admin/buffet/BuffetRoundsView.vue') },
+        { path: 'buffet/schedule',    component: () => import('@/views/admin/buffet/BuffetScheduleView.vue') },
+        { path: 'buffet/pricing',     component: () => import('@/views/admin/buffet/BuffetPricingView.vue') },
+        { path: 'buffet/history',     component: () => import('@/views/admin/buffet/BuffetHistoryView.vue') },
+        { path: 'buffet/categories',  component: () => import('@/views/admin/buffet/BuffetCategoryView.vue') },
+        { path: 'visitors',                  component: () => import('@/views/admin/VisitorsView.vue') },
         { path: 'alumni',                    component: () => import('@/views/admin/AlumniView.vue') },
         { path: 'alumni/manage',             component: () => import('@/views/admin/AlumniManageView.vue') },
         { path: 'booking/time-settings',     component: () => import('@/views/admin/booking/TimeSettingsView.vue') },
         { path: 'booking/menu',              component: () => import('@/views/admin/booking/BookingMenuView.vue') },
         { path: 'booking/history',           component: () => import('@/views/admin/booking/BookingHistoryView.vue') },
+        { path: 'booking/schedule',          component: () => import('@/views/admin/booking/BookingScheduleView.vue') },
         { path: 'student-groups',           component: () => import('@/views/admin/StudentGroupsView.vue') },
         { path: 'student-groups/:id',       component: () => import('@/views/admin/GroupDetailView.vue') },
         { path: 'student-groups/new',       component: () => import('@/views/admin/GroupDetailView.vue') },
@@ -58,6 +69,8 @@ const router = createRouter({
         { path: 'products',            component: () => import('@/views/admin/products/ProductsView.vue') },
         { path: 'products/new',        component: () => import('@/views/admin/products/ProductDetailView.vue') },
         { path: 'products/:id/edit',   component: () => import('@/views/admin/products/ProductDetailView.vue') },
+        { path: 'feedback',            component: () => import('@/views/admin/FeedbackView.vue') },
+        { path: 'sale-screens',        component: () => import('@/views/admin/SaleScreensView.vue') },
       ],
     },
 
@@ -99,7 +112,14 @@ router.beforeEach((to, _from, next) => {
   const roles = to.meta.roles as string[] | undefined
 
   if (!roles) return next()
-  if (!token || !user) return next({ name: 'login', query: { redirect: to.fullPath } })
+  if (!token || !user) {
+    const loginRole = roles.includes('admin') || roles.includes('supervisor')
+      ? 'admin'
+      : roles.includes('cashier')
+        ? 'cashier'
+        : 'parent'
+    return next({ name: 'login', query: { redirect: to.fullPath, role: loginRole } })
+  }
   if (!roles.includes(user.role)) return next('/')
   next()
 })

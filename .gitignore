@@ -30,3 +30,6 @@ Thumbs.db
 
 # Bun
 .bun/
+
+# Playwright MCP test artifacts
+.playwright-mcp/

@@ -87,6 +87,15 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       channel: 'mobile_web',
       paymentMethod: 'card_wallet',
       status: 'success',
+      items: lineItems.map((li: any) => {
+        const menu = menuItems.find(m => String(m._id) === String(li.menuItemId))
+        return {
+          name:      menu?.name ?? '',
+          qty:       li.qty,
+          unitPrice: li.unitPrice,
+          lineTotal: li.lineTotal,
+        }
+      }),
     })
 
     const order = await Order.create({
@@ -100,6 +109,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       status: 'confirmed',
       items: lineItems,
       transactionId: txn._id,
+      note: body.note ?? '',
     })
 
     return { order, transaction: txn }
@@ -109,6 +119,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       shop_id:         t.String(),
       meal_period_id:  t.String(),
       serve_date:      t.String(),
+      note:            t.Optional(t.String()),
       items: t.Array(t.Object({
         menu_item_id: t.String(),
         qty:          t.Number(),

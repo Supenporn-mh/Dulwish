@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia'
 import { authPlugin } from '../../middleware/auth'
-import { WalletPermission, AcademicYear, StoreSettings, Branch } from '../../models'
+import { WalletPermission, AcademicYear, GradeLevel, StoreSettings, Branch, User } from '../../models'
 
 export const settingsController = new Elysia({ prefix: '/settings' })
   .use(authPlugin(['admin', 'supervisor']))
@@ -91,6 +91,102 @@ export const settingsController = new Elysia({ prefix: '/settings' })
       return { error: { code: 'NOT_FOUND', message: 'Academic year not found' } }
     }
     return { ok: true }
+  })
+
+  // ── Grade Levels ─────────────────────────────────────────────────────────────
+
+  .get('/grade-levels', async () => {
+    const gradeLevels = await GradeLevel.find().sort({ sortOrder: 1 }).lean()
+    return { gradeLevels }
+  })
+
+  .post('/grade-levels', async ({ body, set }) => {
+    const existing = await GradeLevel.findOne({ code: body.code })
+    if (existing) {
+      set.status = 409
+      return { error: { code: 'CONFLICT', message: 'Grade code already exists' } }
+    }
+    const count = await GradeLevel.countDocuments()
+    const gradeLevel = await GradeLevel.create({ ...body, sortOrder: body.sortOrder ?? count })
+    return { gradeLevel }
+  }, {
+    body: t.Object({
+      code:       t.String(),
+      name:       t.String(),
+      gradeGroup: t.Union([t.Literal('primary'), t.Literal('secondary'), t.Literal('staff'), t.Literal('visitor')]),
+      canRepeat:  t.Optional(t.Boolean()),
+      sortOrder:  t.Optional(t.Number()),
+    }),
+  })
+
+  .patch('/grade-levels/reorder', async ({ body }) => {
+    await Promise.all(
+      body.items.map(({ id, sortOrder }: { id: string; sortOrder: number }) =>
+        GradeLevel.findByIdAndUpdate(id, { $set: { sortOrder } })
+      )
+    )
+    const gradeLevels = await GradeLevel.find().sort({ sortOrder: 1 }).lean()
+    return { gradeLevels }
+  }, {
+    body: t.Object({
+      items: t.Array(t.Object({ id: t.String(), sortOrder: t.Number() })),
+    }),
+  })
+
+  .patch('/grade-levels/:id', async ({ params, body, set }) => {
+    const gradeLevel = await GradeLevel.findByIdAndUpdate(
+      params.id,
+      { $set: body },
+      { new: true },
+    ).lean()
+    if (!gradeLevel) {
+      set.status = 404
+      return { error: { code: 'NOT_FOUND', message: 'Grade level not found' } }
+    }
+    return { gradeLevel }
+  }, {
+    body: t.Object({
+      code:       t.Optional(t.String()),
+      name:       t.Optional(t.String()),
+      gradeGroup: t.Optional(t.Union([t.Literal('primary'), t.Literal('secondary'), t.Literal('staff'), t.Literal('visitor')])),
+      canRepeat:  t.Optional(t.Boolean()),
+      sortOrder:  t.Optional(t.Number()),
+    }),
+  })
+
+  .delete('/grade-levels/:id', async ({ params, set }) => {
+    const result = await GradeLevel.findByIdAndDelete(params.id)
+    if (!result) {
+      set.status = 404
+      return { error: { code: 'NOT_FOUND', message: 'Grade level not found' } }
+    }
+    return { ok: true }
+  })
+
+  // ── Mid-year Enrollment ───────────────────────────────────────────────────────
+
+  .post('/mid-year-enroll', async ({ body, set }) => {
+    const student = await User.findById(body.studentId)
+    if (!student) {
+      set.status = 404
+      return { error: { code: 'NOT_FOUND', message: 'Student not found' } }
+    }
+    if (student.role !== 'student') {
+      set.status = 400
+      return { error: { code: 'INVALID_ROLE', message: 'User is not a student' } }
+    }
+    student.studentProfile = {
+      ...student.studentProfile,
+      gradeLevel: body.gradeLevel,
+    } as any
+    await student.save()
+    const { passwordHash: _, ...safe } = student.toObject() as any
+    return { student: safe }
+  }, {
+    body: t.Object({
+      studentId:  t.String(),
+      gradeLevel: t.String(),
+    }),
   })
 
   // ── Store Settings (singleton) ────────────────────────────────────────────────

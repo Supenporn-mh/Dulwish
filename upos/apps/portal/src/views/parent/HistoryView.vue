@@ -18,10 +18,16 @@ type TxType    = 'topup' | 'purchase' | 'buffet' | 'booking' | 'refund'
 type FilterKey = 'all' | TxType
 
 interface PurchaseItem { name: string; qty: number; price: number }
+
+// Structured item from API (purchase/buffet orders)
+interface ApiLineItem { name: string; qty: number; unitPrice: number; lineTotal: number }
+
 interface Transaction {
   id: string; type: TxType; description: string
   amount: number; createdAt: string
   refNo?: string; channel?: string; paymentMethod?: string
+  // structured items array from API (purchase/buffet)
+  items?: ApiLineItem[]
   // topup
   topupSource?: string
   // purchase
@@ -46,81 +52,6 @@ const RATING: Record<number, { th: string; en: string }> = {
   5: { th: 'ดีมาก',  en: 'Excellent'            },
 }
 function rLabel(n: number) { const r = RATING[n]; return r ? (locale.lang === 'th' ? r.th : r.en) : '' }
-
-// ── Demo data — ใช้ hours offset เพื่อให้ข้อมูลอยู่ในเดือนปัจจุบันเสมอ ────────
-const D = Date.now()
-const H = 3600000  // 1 hour in ms
-
-const DEMO: Transaction[] = [
-  // Top-ups (ครอบคลุมทุกช่องทาง)
-  { id:'t1',  type:'topup', description:'เติมเงินผ่าน PromptPay',
-    amount:  500, createdAt: new Date(D - H*1).toISOString(),
-    refNo:'TXN001', channel:'mobile_web', paymentMethod:'promptpay',
-    topupSource:'PromptPay' },
-  { id:'t5',  type:'topup', description:'เติมเงินผ่าน WeChat Pay',
-    amount:  300, createdAt: new Date(D - H*6).toISOString(),
-    refNo:'TXN004', channel:'mobile_web', paymentMethod:'wechat',
-    topupSource:'WeChat Pay' },
-  { id:'t10', type:'topup', description:'เติมเงินผ่าน Credit Card',
-    amount: 1000, createdAt: new Date(D - H*10).toISOString(),
-    refNo:'TXN008', channel:'mobile_web', paymentMethod:'credit_card',
-    topupSource:'Visa Credit Card' },
-  { id:'t13', type:'topup', description:'เติมเงินผ่านเจ้าหน้าที่',
-    amount:  200, createdAt: new Date(D - H*16).toISOString(),
-    refNo:'TXN011', channel:'kiosk', paymentMethod:'staff',
-    topupSource:'เจ้าหน้าที่โรงเรียน' },
-
-  // Purchases (มีรายการสินค้าชัดเจน)
-  { id:'t2',  type:'purchase', description:'ซื้อ Ham Sandwich + โค้ก',
-    amount: -110, createdAt: new Date(D - H*2).toISOString(),
-    refNo:'TXN002', channel:'kiosk', paymentMethod:'wallet',
-    purchaseItems:[{ name:'Ham Sandwich', qty:1, price:85 },{ name:'โค้ก 1 กระป๋อง', qty:1, price:25 }] },
-  { id:'t6',  type:'purchase', description:'ซื้อ Chicken Wrap + น้ำเปล่า',
-    amount: -115, createdAt: new Date(D - H*7).toISOString(),
-    refNo:'TXN005', channel:'kiosk', paymentMethod:'wallet',
-    purchaseItems:[{ name:'Chicken Wrap', qty:1, price:95 },{ name:'น้ำเปล่า 1 ขวด', qty:1, price:20 }] },
-  { id:'t11', type:'purchase', description:'ซื้อ Blueberry Muffin + Orange Juice',
-    amount: -90, createdAt: new Date(D - H*11).toISOString(),
-    refNo:'TXN009', channel:'kiosk', paymentMethod:'wallet',
-    purchaseItems:[{ name:'Blueberry Muffin', qty:2, price:45 }] },
-
-  // Buffets
-  { id:'t3', type:'buffet', description:'Buffet กลางวัน K1-A',
-    amount: -120, createdAt: new Date(D - H*3).toISOString(),
-    refNo:'TXN003', channel:'kiosk', paymentMethod:'wallet',
-    buffetSession:'lunch',
-    buffetItems:['ข้าวผัดกุ้ง','ต้มยำไก่','ไข่เจียว','น้ำส้มคั้น','ขนมปังปิ้งเนย'] },
-  { id:'t7', type:'buffet', description:'Buffet เช้า K1-A',
-    amount: -80, createdAt: new Date(D - H*8).toISOString(),
-    refNo:'TXN006', channel:'kiosk', paymentMethod:'wallet',
-    buffetSession:'breakfast',
-    buffetItems:['โจ๊กไก่','ไข่ดาว','ไส้กรอก','นมจืด','น้ำเก๊กฮวย'] },
-  { id:'t12', type:'buffet', description:'Buffet เย็น K1-A',
-    amount: -150, createdAt: new Date(D - H*14).toISOString(),
-    refNo:'TXN010', channel:'kiosk', paymentMethod:'wallet',
-    buffetSession:'dinner',
-    buffetItems:['ผัดไทย','ต้มข่าไก่','ข้าวสวย','น้ำมะนาว','ไอศกรีม'] },
-
-  // Bookings
-  { id:'t4', type:'booking', description:'จองอาหาร Breakfast',
-    amount: 0, createdAt: new Date(D - H*4).toISOString(),
-    refNo:'BKG001', channel:'mobile_web',
-    bookingMeal:'breakfast',
-    bookingStatus:'consumed',
-    bookingItems:['Ham Sandwich ×1','Orange Juice ×1'] },
-  { id:'t8', type:'booking', description:'จองอาหาร Lunch',
-    amount: 0, createdAt: new Date(D - H*9).toISOString(),
-    refNo:'BKG002', channel:'mobile_web',
-    bookingMeal:'lunch',
-    bookingStatus:'confirmed',
-    bookingItems:['Veggie Salad ×1','Blueberry Muffin ×1','Green Tea ×1'] },
-
-  // Refund
-  { id:'t9', type:'refund', description:'คืนเงินรายการที่ยกเลิก',
-    amount: 85, createdAt: new Date(D - H*13).toISOString(),
-    refNo:'TXN007', channel:'system', paymentMethod:'wallet',
-    refundFor:'TXN002' },
-]
 
 // ── Month navigation ──────────────────────────────────────────────────────────
 const today       = new Date()
@@ -179,7 +110,7 @@ function clearDate() {
 const TABS = [
   { key: 'all'      as FilterKey, th: 'ทั้งหมด',    en: 'All'      },
   { key: 'topup'    as FilterKey, th: 'เติมเงิน',   en: 'Top-up'   },
-  { key: 'purchase' as FilterKey, th: 'ซื้อสินค้า', en: 'Purchase' },
+  { key: 'purchase' as FilterKey, th: 'ซื้อสินค้า', en: 'Paid' },
   { key: 'buffet'   as FilterKey, th: 'บุฟเฟต์',   en: 'Buffet'   },
   { key: 'booking'  as FilterKey, th: 'จองอาหาร',  en: 'Booking'  },
 ]
@@ -225,7 +156,7 @@ function fmtAmt(n: number) { return `฿${n.toLocaleString('th-TH', { minimumFra
 interface Group { label: string; items: Transaction[] }
 const grouped = computed((): Group[] => {
   const todayStr = today.toDateString()
-  const yestStr  = new Date(D-86400000).toDateString()
+  const yestStr  = new Date(today.getTime() - 86400000).toDateString()
   const map: Record<string, Transaction[]> = {}
   for (const tx of typeFiltered.value) {
     const d = new Date(tx.createdAt)
@@ -284,16 +215,21 @@ function txIcon(t: TxType)      { return t==='topup' ? PhArrowUp : t==='purchase
 function txIconColor(t: TxType) { return t==='topup'?'#03BA81': t==='purchase'?'#FF9800': t==='buffet'?'#1264E3': t==='booking'?'#3C3489':'#999999' }
 function txIconBg(t: TxType)    { return t==='topup'?'#E0FAF3': t==='purchase'?'#FFF3E0': t==='buffet'?'#EAF1FD': t==='booking'?'#EEEDFE':'#F5F5F5' }
 
-// Derive purchase items from description when API data has no purchaseItems
+// Derive purchase items — prefer structured items array, fall back to purchaseItems, then description parse
 function derivePurchaseItems(tx: Transaction): PurchaseItem[] {
+  // 1. Structured items array from API (purchase/buffet transactions)
+  if (tx.items?.length) {
+    return tx.items.map(i => ({ name: i.name, qty: i.qty, price: i.unitPrice ?? (i.lineTotal / (i.qty || 1)) }))
+  }
+  // 2. Legacy purchaseItems field
   if (tx.purchaseItems?.length) return tx.purchaseItems
+  // 3. Fallback: derive from description string
   if (tx.type !== 'purchase' || !tx.amount) return []
-  // Parse "ซื้อ Ham Sandwich" or "Buy Ham Sandwich" → [{name, qty:1, price}]
   const desc = (tx.description ?? '')
     .replace(/^ซื้อ\s+/i, '')
     .replace(/^Buy\s+/i, '')
     .trim()
-  const qty  = 1
+  const qty   = 1
   const price = Math.abs(tx.amount) / qty
   return desc ? [{ name: desc, qty, price }] : [{ name: locale.t('รายการสินค้า','Item'), qty:1, price: Math.abs(tx.amount) }]
 }
@@ -330,17 +266,30 @@ function purchaseTotal(items: PurchaseItem[]) { return items.reduce((s,i)=>s+i.q
 const ratings  = reactive<Record<string,number>>({})
 const notes    = reactive<Record<string,string>>({})
 const rated    = reactive<Set<string>>(new Set())
-const reviewFor    = ref<Transaction | null>(null)
-const reviewRating = ref(0)
-const reviewNote   = ref('')
-const reviewBusy   = ref(false)
-const reviewError  = ref<string | null>(null)
+const reviewFor       = ref<Transaction | null>(null)
+const reviewRating    = ref(0)
+const reviewNote      = ref('')
+const reviewBusy      = ref(false)
+const reviewError     = ref<string | null>(null)
+const showReviewSheet = ref(false)  // แยกออกจาก reviewFor เพื่อแก้ edit bug
+const reviewStage     = ref<1 | 2>(1)  // 1=กรอกรีวิว, 2=ยืนยัน
 
 function openReview(t: Transaction) {
-  reviewFor.value    = t
-  reviewRating.value = ratings[t.id] ?? 0
-  reviewNote.value   = notes[t.id] ?? ''
-  reviewError.value  = null
+  reviewFor.value       = t
+  reviewRating.value    = ratings[t.id] ?? 0
+  reviewNote.value      = notes[t.id]   ?? ''
+  reviewError.value     = null
+  reviewStage.value     = 1
+  showReviewSheet.value = true
+}
+function closeReview() {
+  showReviewSheet.value = false
+  reviewStage.value     = 1
+  reviewError.value     = null
+}
+function goToConfirm() {
+  if (reviewRating.value === 0) return
+  reviewStage.value = 2
 }
 async function submitReview() {
   if (!reviewFor.value || reviewRating.value === 0) return
@@ -352,17 +301,16 @@ async function submitReview() {
     rating:  reviewRating.value,
     comment: reviewNote.value,
   }
-  if (t.type === 'booking') {
-    body.order_id = t.id
-  }
+  if (t.type === 'booking') body.order_id = t.id
   try {
     await api.post('/feedback', body)
     ratings[t.id] = reviewRating.value
     notes[t.id]   = reviewNote.value
     rated.add(t.id)
-    reviewFor.value = null
+    closeReview()
   } catch (err: any) {
     reviewError.value = locale.t('ส่งรีวิวไม่สำเร็จ กรุณาลองใหม่', 'Failed to submit review, please try again')
+    reviewStage.value = 2
   } finally {
     reviewBusy.value = false
   }
@@ -387,6 +335,7 @@ async function fetchHistory(childId: string) {
         ...t,
         id:          t.id ?? t._id,
         description: t.description ?? t.note ?? '',
+        items:       t.items ?? undefined,
       }))
     : []
 
@@ -394,7 +343,9 @@ async function fetchHistory(childId: string) {
     ? (ordRes.value.data?.orders ?? []).map((o: any) => ({
         id:            o.id ?? o._id,
         type:          'booking' as TxType,
-        description:   `จองอาหาร ${o.mealPeriodName ?? ''}`.trim(),
+        description:   locale.lang === 'th'
+          ? `จองอาหาร ${o.mealPeriodName ?? ''}`.trim()
+          : `Food Booking${o.mealPeriodName ? ` – ${o.mealPeriodName}` : ''}`.trim(),
         amount:        0,
         createdAt:     o.createdAt,
         refNo:         o.orderNo,
@@ -451,9 +402,19 @@ watch(() => parentStore.selectedChildId, (newId) => {
 
     <!-- ── Sub-header: subtitle + date filter + summary ──────────────── -->
     <div class="px-4 pt-3 pb-4" style="background:var(--color-bg-surface); border-bottom:0.5px solid var(--color-border-tertiary)">
-      <p class="text-[12px] mb-3" style="color:var(--color-text-secondary)">
-        {{ locale.t('ข้อมูลย้อนหลัง 12 เดือน','Spending data available past 12 months') }}
-      </p>
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-[12px]" style="color:var(--color-text-secondary)">
+          {{ locale.t('ข้อมูลย้อนหลัง 12 เดือน','Spending data available past 12 months') }}
+        </p>
+        <!-- Date range filter trigger -->
+        <button
+          @click="openDateSheet()"
+          :class="['date-filter-btn', hasDateFilter && 'active']"
+        >
+          <PhCalendarBlank :size="13" weight="bold"/>
+          {{ hasDateFilter ? dateFilterLabel : locale.t('กรอง','Filter') }}
+        </button>
+      </div>
 
       <!-- Summary cards -->
       <div class="grid grid-cols-2 gap-3 mt-3">
@@ -512,7 +473,7 @@ watch(() => parentStore.selectedChildId, (newId) => {
               <!-- Description + meta -->
               <div class="flex-1 min-w-0 text-left">
                 <p class="text-[15px] truncate font-medium" style="color:var(--color-text-primary)">
-                  {{ tx.description || txLabel(tx.type) }}
+                  {{ (tx.description && tx.description !== tx.type) ? tx.description : txLabel(tx.type) }}
                 </p>
                 <p class="text-[12px] mt-0.5" style="color:var(--color-text-secondary)">
                   {{ CHANNEL_LABEL[tx.channel??''] ?? tx.channel ?? '' }}
@@ -613,12 +574,21 @@ watch(() => parentStore.selectedChildId, (newId) => {
                     <span class="dv">{{ deriveVenue(tx) }}</span>
                   </div>
                 </div>
-                <!-- Items -->
-                <div class="detail-section" v-if="tx.buffetItems?.length">
+                <!-- Items: structured items array preferred, fall back to buffetItems strings -->
+                <div class="detail-section" v-if="tx.items?.length || tx.buffetItems?.length">
                   <p class="detail-section-title">{{ locale.t('เมนูที่กินในมื้อนี้','Consumed Items') }}</p>
-                  <div class="items-grid">
-                    <span v-for="item in tx.buffetItems" :key="item" class="item-chip">{{ item }}</span>
-                  </div>
+                  <template v-if="tx.items?.length">
+                    <div v-for="item in tx.items" :key="item.name" class="purchase-row">
+                      <span class="flex-1 text-[14px]" style="color:var(--color-text-primary)">{{ item.name }}</span>
+                      <span class="text-[13px]" style="color:var(--color-text-secondary)">×{{ item.qty }}</span>
+                      <span class="text-[14px] font-medium w-16 text-right" style="color:var(--color-text-primary)">{{ fmtAmt(item.lineTotal) }}</span>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="items-grid">
+                      <span v-for="item in tx.buffetItems" :key="item" class="item-chip">{{ item }}</span>
+                    </div>
+                  </template>
                 </div>
                 <div class="review-section">
                   <div v-if="rated.has(tx.id)" class="flex items-center justify-between">
@@ -769,13 +739,15 @@ watch(() => parentStore.selectedChildId, (newId) => {
   <!-- ── Review sheet ───────────────────────────────────────────────────────── -->
   <Teleport to="body">
     <Transition name="rs-bg">
-      <div v-if="reviewFor" class="rs-backdrop" @click="reviewFor=null"/>
+      <div v-if="showReviewSheet" class="rs-backdrop" @click="closeReview"/>
     </Transition>
     <Transition name="rs-sh">
-      <div v-if="reviewFor" class="rs-sheet">
+      <div v-if="showReviewSheet && reviewFor" class="rs-sheet">
         <div class="rs-handle"/>
-        <button class="rs-close" @click="reviewFor=null"><PhX :size="16" weight="bold"/></button>
-        <div class="px-5 pb-10 flex flex-col gap-5">
+        <button class="rs-close" @click="closeReview"><PhX :size="16" weight="bold"/></button>
+
+        <!-- ── Stage 1: กรอกรีวิว ── -->
+        <div v-if="reviewStage === 1" class="px-5 pb-10 flex flex-col gap-5">
           <div>
             <p class="text-[18px] font-medium" style="color:var(--color-text-primary)">
               {{ locale.t('รีวิวอาหาร','Rate your meal') }}
@@ -813,20 +785,61 @@ watch(() => parentStore.selectedChildId, (newId) => {
               :placeholder="locale.t('ความคิดเห็นเพิ่มเติม...','Add a comment...')"/>
           </div>
 
+          <button @click="goToConfirm" :disabled="reviewRating===0"
+            class="btn btn-primary w-full"
+            :class="{'opacity-40 cursor-not-allowed': reviewRating===0}">
+            {{ locale.t('ดำเนินการต่อ','Continue') }}
+          </button>
+        </div>
+
+        <!-- ── Stage 2: ยืนยันรีวิว ── -->
+        <div v-else class="px-5 pb-10 flex flex-col gap-5">
+          <div>
+            <p class="text-[18px] font-medium" style="color:var(--color-text-primary)">
+              {{ locale.t('ยืนยันรีวิว','Confirm Review') }}
+            </p>
+            <p class="text-[13px] mt-0.5" style="color:var(--color-text-secondary)">
+              {{ locale.t('ตรวจสอบรีวิวก่อนส่ง','Review your rating before submitting') }}
+            </p>
+          </div>
+
+          <!-- Summary card -->
+          <div class="review-confirm-card">
+            <p class="text-[12px] font-medium mb-2" style="color:var(--color-text-secondary)">{{ reviewFor.description }}</p>
+            <div class="flex items-center gap-1.5 mb-1.5">
+              <PhStar v-for="n in 5" :key="n" :size="22"
+                :weight="n<=reviewRating?'fill':'regular'"
+                :color="n<=reviewRating?'var(--color-warning)':'var(--color-border-secondary)'"/>
+              <span class="text-[13px] font-medium ml-1" style="color:var(--color-warning)">
+                {{ reviewRating }} / 5 · {{ rLabel(reviewRating) }}
+              </span>
+            </div>
+            <p v-if="reviewNote.trim()" class="text-[13px] mt-2 pt-2"
+              style="color:var(--color-text-primary); border-top:0.5px solid var(--color-border-tertiary)">
+              "{{ reviewNote.trim() }}"
+            </p>
+          </div>
+
           <p v-if="reviewError" class="text-[12px] font-medium text-center" style="color:var(--color-danger)">
             {{ reviewError }}
           </p>
 
-          <button @click="submitReview" :disabled="reviewBusy||reviewRating===0"
-            class="btn btn-primary w-full"
-            :class="{'opacity-40 cursor-not-allowed': reviewRating===0}">
-            <span v-if="reviewBusy" class="flex items-center justify-center gap-2">
-              <span class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
-              {{ locale.t('กำลังส่ง...','Submitting...') }}
-            </span>
-            <span v-else>{{ locale.t('ส่งรีวิว','Submit Review') }}</span>
-          </button>
+          <div class="flex gap-3">
+            <button @click="reviewStage=1" :disabled="reviewBusy"
+              class="btn btn-ghost flex-1">
+              {{ locale.t('แก้ไข','Edit') }}
+            </button>
+            <button @click="submitReview" :disabled="reviewBusy"
+              class="btn btn-primary flex-1">
+              <span v-if="reviewBusy" class="flex items-center justify-center gap-2">
+                <span class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
+                {{ locale.t('กำลังส่ง...','Submitting...') }}
+              </span>
+              <span v-else>{{ locale.t('ส่งรีวิว','Submit Review') }}</span>
+            </button>
+          </div>
         </div>
+
       </div>
     </Transition>
   </Teleport>
@@ -951,6 +964,7 @@ watch(() => parentStore.selectedChildId, (newId) => {
 .rating-result { font-size:15px; font-weight:500; color:var(--color-warning); background:var(--color-warning-bg); padding:6px 18px; border-radius:20px; }
 .rs-textarea { width:100%; padding:10px 12px; border-radius:var(--radius-md); border:1px solid var(--color-border-tertiary); background:var(--color-bg-page); font-size:14px; font-family:inherit; color:var(--color-text-primary); resize:none; outline:none; }
 .rs-textarea:focus { border-color:var(--color-primary); }
+.review-confirm-card { padding:16px; border-radius:var(--radius-lg); background:var(--color-bg-page); border:1px solid var(--color-border-tertiary); }
 
 /* ── Transitions ──────────────────────────────────────────────────────────── */
 .rs-bg-enter-active, .rs-bg-leave-active { transition:opacity 0.25s; }

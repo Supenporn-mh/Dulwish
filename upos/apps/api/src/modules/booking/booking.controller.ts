@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia'
 import { authPlugin } from '../../middleware/auth'
-import { Booking, BookingMenu, BookingTimeSlot } from '../../models'
+import { Booking, BookingMenu, BookingTimeSlot, BookingConfig, BookingBlackout } from '../../models'
 
 export const bookingController = new Elysia({ prefix: '/booking' })
   .use(authPlugin())
@@ -21,18 +21,20 @@ export const bookingController = new Elysia({ prefix: '/booking' })
     return { booking }
   }, {
     body: t.Object({
-      code:        t.String(),
-      name:        t.String(),
-      type:        t.Optional(t.String()),
-      bookingDate: t.Optional(t.String()),
-      slotId:      t.Optional(t.String()),
-      slot:        t.Optional(t.String()),
-      slotTime:    t.Optional(t.String()),
-      status:      t.Optional(t.String()),
-      bookedAt:    t.Optional(t.String()),
-      cancelledAt: t.Optional(t.String()),
-      cancelReason: t.Optional(t.String()),
-      adminCode:   t.Optional(t.String()),
+      code:          t.String(),
+      name:          t.String(),
+      type:          t.Optional(t.String()),
+      bookingDate:   t.Optional(t.String()),
+      slotId:        t.Optional(t.String()),
+      slot:          t.Optional(t.String()),
+      slotTime:      t.Optional(t.String()),
+      status:        t.Optional(t.String()),
+      bookedAt:      t.Optional(t.String()),
+      cancelledAt:   t.Optional(t.String()),
+      cancelReason:  t.Optional(t.String()),
+      adminCode:     t.Optional(t.String()),
+      studentUserId: t.Optional(t.String()),
+      parentUserId:  t.Optional(t.String()),
     }),
   })
 
@@ -42,19 +44,19 @@ export const bookingController = new Elysia({ prefix: '/booking' })
       return { error: { code: 'AUTH_008', message: 'Admin only' } }
     }
     const update: Record<string, unknown> = {}
-    if (body.status      !== undefined) update.status      = body.status
-    if (body.cancelReason !== undefined) update.cancelReason = body.cancelReason
-    if (body.adminCode   !== undefined) update.adminCode   = body.adminCode
-    if (body.name        !== undefined) update.name        = body.name
-    if (body.type        !== undefined) update.type        = body.type
-    if (body.bookingDate !== undefined) update.bookingDate = body.bookingDate
-    if (body.slotId      !== undefined) update.slotId      = body.slotId
-    if (body.slot        !== undefined) update.slot        = body.slot
-    if (body.slotTime    !== undefined) update.slotTime    = body.slotTime
-    if (body.bookedAt    !== undefined) update.bookedAt    = body.bookedAt
-    if (body.status === 'ยกเลิก') {
-      update.cancelledAt = new Date()
-    }
+    if (body.status        !== undefined) update.status        = body.status
+    if (body.cancelReason  !== undefined) update.cancelReason  = body.cancelReason
+    if (body.adminCode     !== undefined) update.adminCode     = body.adminCode
+    if (body.name          !== undefined) update.name          = body.name
+    if (body.type          !== undefined) update.type          = body.type
+    if (body.bookingDate   !== undefined) update.bookingDate   = body.bookingDate
+    if (body.slotId        !== undefined) update.slotId        = body.slotId
+    if (body.slot          !== undefined) update.slot          = body.slot
+    if (body.slotTime      !== undefined) update.slotTime      = body.slotTime
+    if (body.bookedAt      !== undefined) update.bookedAt      = body.bookedAt
+    if (body.studentUserId !== undefined) update.studentUserId = body.studentUserId
+    if (body.parentUserId  !== undefined) update.parentUserId  = body.parentUserId
+    if (body.status === 'ยกเลิก') update.cancelledAt = new Date()
     const booking = await Booking.findOneAndUpdate(
       { code: params.code },
       update,
@@ -67,16 +69,18 @@ export const bookingController = new Elysia({ prefix: '/booking' })
     return { booking }
   }, {
     body: t.Object({
-      status:       t.Optional(t.String()),
-      cancelReason: t.Optional(t.String()),
-      adminCode:    t.Optional(t.String()),
-      name:         t.Optional(t.String()),
-      type:         t.Optional(t.String()),
-      bookingDate:  t.Optional(t.String()),
-      slotId:       t.Optional(t.String()),
-      slot:         t.Optional(t.String()),
-      slotTime:     t.Optional(t.String()),
-      bookedAt:     t.Optional(t.String()),
+      status:        t.Optional(t.String()),
+      cancelReason:  t.Optional(t.String()),
+      adminCode:     t.Optional(t.String()),
+      name:          t.Optional(t.String()),
+      type:          t.Optional(t.String()),
+      bookingDate:   t.Optional(t.String()),
+      slotId:        t.Optional(t.String()),
+      slot:          t.Optional(t.String()),
+      slotTime:      t.Optional(t.String()),
+      bookedAt:      t.Optional(t.String()),
+      studentUserId: t.Optional(t.String()),
+      parentUserId:  t.Optional(t.String()),
     }),
   })
 
@@ -115,11 +119,7 @@ export const bookingController = new Elysia({ prefix: '/booking' })
         const enabled = row.status
           ? row.status.toLowerCase().includes('เปิด') || row.status.toLowerCase() === 'true'
           : true
-        const update: Record<string, unknown> = {
-          name: row.name,
-          timeSlot,
-          enabled,
-        }
+        const update: Record<string, unknown> = { name: row.name, timeSlot, enabled }
         if (row.startDate !== undefined) update.startDate = row.startDate
         if (row.endDate   !== undefined) update.endDate   = row.endDate
         const existing = await BookingMenu.findOne(filter)
@@ -171,11 +171,7 @@ export const bookingController = new Elysia({ prefix: '/booking' })
       set.status = 403
       return { error: { code: 'AUTH_008', message: 'Admin only' } }
     }
-    const menu = await BookingMenu.findByIdAndUpdate(
-      params.id,
-      body,
-      { new: true },
-    ).lean()
+    const menu = await BookingMenu.findByIdAndUpdate(params.id, body, { new: true }).lean()
     if (!menu) {
       set.status = 404
       return { error: { code: 'MENU_001', message: 'Booking menu not found' } }
@@ -221,14 +217,14 @@ export const bookingController = new Elysia({ prefix: '/booking' })
     return { timeSlot }
   }, {
     body: t.Object({
-      name:         t.String(),
-      meal:         t.Optional(t.String()),
-      startTime:    t.Optional(t.String()),
-      endTime:      t.Optional(t.String()),
-      capacity:     t.Optional(t.Number()),
-      cutoffHours:  t.Optional(t.Number()),
-      description:  t.Optional(t.String()),
-      enabled:      t.Optional(t.Boolean()),
+      name:        t.String(),
+      meal:        t.Optional(t.String()),
+      startTime:   t.Optional(t.String()),
+      endTime:     t.Optional(t.String()),
+      capacity:    t.Optional(t.Number()),
+      cutoffHours: t.Optional(t.Number()),
+      description: t.Optional(t.String()),
+      enabled:     t.Optional(t.Boolean()),
     }),
   })
 
@@ -237,11 +233,7 @@ export const bookingController = new Elysia({ prefix: '/booking' })
       set.status = 403
       return { error: { code: 'AUTH_008', message: 'Admin only' } }
     }
-    const timeSlot = await BookingTimeSlot.findByIdAndUpdate(
-      params.id,
-      body,
-      { new: true },
-    ).lean()
+    const timeSlot = await BookingTimeSlot.findByIdAndUpdate(params.id, body, { new: true }).lean()
     if (!timeSlot) {
       set.status = 404
       return { error: { code: 'SLOT_001', message: 'Time slot not found' } }
@@ -249,14 +241,14 @@ export const bookingController = new Elysia({ prefix: '/booking' })
     return { timeSlot }
   }, {
     body: t.Object({
-      name:         t.Optional(t.String()),
-      meal:         t.Optional(t.String()),
-      startTime:    t.Optional(t.String()),
-      endTime:      t.Optional(t.String()),
-      capacity:     t.Optional(t.Number()),
-      cutoffHours:  t.Optional(t.Number()),
-      description:  t.Optional(t.String()),
-      enabled:      t.Optional(t.Boolean()),
+      name:        t.Optional(t.String()),
+      meal:        t.Optional(t.String()),
+      startTime:   t.Optional(t.String()),
+      endTime:     t.Optional(t.String()),
+      capacity:    t.Optional(t.Number()),
+      cutoffHours: t.Optional(t.Number()),
+      description: t.Optional(t.String()),
+      enabled:     t.Optional(t.Boolean()),
     }),
   })
 
@@ -269,6 +261,85 @@ export const bookingController = new Elysia({ prefix: '/booking' })
     if (!timeSlot) {
       set.status = 404
       return { error: { code: 'SLOT_001', message: 'Time slot not found' } }
+    }
+    return { ok: true }
+  })
+
+  // ── Booking Config (/booking/config) ─────────────────────────────────────────
+
+  .get('/config', async () => {
+    const config = await BookingConfig.findOneAndUpdate(
+      { key: 'default' },
+      { $setOnInsert: { openDays: [1,2,3,4,5] } },
+      { upsert: true, new: true },
+    ).lean()
+    return { config: { key: config!.key, openDays: config!.openDays } }
+  })
+
+  .patch('/config', async ({ body, currentUser, set }) => {
+    if (!['admin', 'supervisor'].includes(currentUser.role)) {
+      set.status = 403
+      return { error: { code: 'AUTH_008', message: 'Admin only' } }
+    }
+    const config = await BookingConfig.findOneAndUpdate(
+      { key: 'default' },
+      { $set: { openDays: body.openDays } },
+      { upsert: true, new: true },
+    ).lean()
+    return { config: { key: config!.key, openDays: config!.openDays } }
+  }, {
+    body: t.Object({ openDays: t.Array(t.Number()) }),
+  })
+
+  // ── Booking Blackouts (/booking/blackouts) ────────────────────────────────────
+
+  .get('/blackouts', async () => {
+    const blackouts = await BookingBlackout.find().sort({ date: 1 }).lean()
+    return {
+      blackouts: blackouts.map(b => ({
+        id:      String(b._id),
+        date:    b.date,
+        endDate: b.endDate,
+        reason:  b.reason,
+      })),
+    }
+  })
+
+  .post('/blackouts', async ({ body, currentUser, set }) => {
+    if (!['admin', 'supervisor'].includes(currentUser.role)) {
+      set.status = 403
+      return { error: { code: 'AUTH_008', message: 'Admin only' } }
+    }
+    const blackout = await BookingBlackout.create({
+      date:    body.date,
+      endDate: body.endDate,
+      reason:  body.reason ?? '',
+    })
+    return {
+      blackout: {
+        id:      String(blackout._id),
+        date:    blackout.date,
+        endDate: blackout.endDate,
+        reason:  blackout.reason,
+      },
+    }
+  }, {
+    body: t.Object({
+      date:    t.String(),
+      endDate: t.Optional(t.String()),
+      reason:  t.Optional(t.String()),
+    }),
+  })
+
+  .delete('/blackouts/:id', async ({ params, currentUser, set }) => {
+    if (!['admin', 'supervisor'].includes(currentUser.role)) {
+      set.status = 403
+      return { error: { code: 'AUTH_008', message: 'Admin only' } }
+    }
+    const blackout = await BookingBlackout.findByIdAndDelete(params.id)
+    if (!blackout) {
+      set.status = 404
+      return { error: { code: 'BLACKOUT_001', message: 'Blackout not found' } }
     }
     return { ok: true }
   })

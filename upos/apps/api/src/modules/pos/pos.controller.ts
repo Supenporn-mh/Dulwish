@@ -3,7 +3,7 @@ import mongoose from 'mongoose'
 import { authPlugin } from '../../middleware/auth'
 import {
   Card, User, Wallet, Transaction, BuffetSession, BuffetPricing,
-  MealPeriod, MenuItem, Shop, Order, AuditLog
+  BuffetRound, MealPeriod, MenuItem, Shop, Order, AuditLog, GradeLevel
 } from '../../models'
 
 function genRefNo(prefix = 'TXN') {
@@ -17,13 +17,8 @@ function todayStr() {
   return new Date().toISOString().split('T')[0]
 }
 
-function mapGroup(role: string, gradeLevel?: string): string {
-  if (role === 'student') {
-    const primary = ['K1','K2','P1','P2','P3','P4','P5','P6']
-    return primary.includes(gradeLevel ?? '') ? 'primary' : 'secondary'
-  }
-  if (role === 'teacher' || role === 'staff') return 'staff'
-  return 'visitor'
+function mapUserType(role: string): 'member' | 'student' {
+  return role === 'student' ? 'student' : 'member'
 }
 
 export const posController = new Elysia({ prefix: '/pos' })
@@ -126,6 +121,12 @@ export const posController = new Elysia({ prefix: '/pos' })
       cashierId: currentUser._id,
       status: 'success',
       splits,
+      items: lineItems.map((li: any) => ({
+        name:      li.name,
+        qty:       li.qty,
+        unitPrice: li.unitPrice,
+        lineTotal: li.lineTotal,
+      })),
       metadata: { items: lineItems, shopId: shop_id },
     })
 
@@ -152,7 +153,7 @@ export const posController = new Elysia({ prefix: '/pos' })
 
   // ── Buffet Check-In ────────────────────────────────────────────────────────
   .post('/buffet/check-in', async ({ body, set }) => {
-    const { card_uid, meal_period_id, pay_method } = body
+    const { card_uid, buffet_round_id, pay_method } = body
 
     const card = await Card.findOne({ cardUid: card_uid, status: 'active' }).lean()
     if (!card) {
@@ -166,19 +167,20 @@ export const posController = new Elysia({ prefix: '/pos' })
       return { error: { code: 'CARD_001', message: 'User not found' } }
     }
 
-    const period = await MealPeriod.findById(meal_period_id).lean()
-    if (!period || !period.active) {
+    const round = await BuffetRound.findById(buffet_round_id).lean()
+    if (!round || !round.active) {
       set.status = 400
-      return { error: { code: 'BUFFET_002', message: 'Meal period not active' } }
+      return { error: { code: 'BUFFET_002', message: 'Buffet round not active' } }
     }
 
     const today = todayStr()
 
-    // Check if already entered
+    // Check if already entered — voided sessions do NOT block re-entry
     const existing = await BuffetSession.findOne({
       userId: user._id,
-      mealPeriodId: period._id,
+      buffetRoundId: round._id,
       entryDate: today,
+      voidedAt: null,
     }).lean()
 
     if (existing) {
@@ -191,13 +193,27 @@ export const posController = new Elysia({ prefix: '/pos' })
     }
 
     // Resolve price
-    const group = mapGroup(user.role, user.studentProfile?.gradeLevel)
-    const pricing = await BuffetPricing.findOne({
-      userGroup: group,
-      $or: [{ mealPeriodId: period._id }, { mealPeriodId: null }],
-      effectiveFrom: { $lte: new Date(today) },
-      $or: [{ effectiveTo: null }, { effectiveTo: { $gte: new Date(today) } }],
-    }).lean()
+    const userType = mapUserType(user.role)
+    let gradeLevelDoc: any = null
+    if (userType === 'student' && user.studentProfile?.gradeLevel) {
+      gradeLevelDoc = await GradeLevel.findOne({ code: user.studentProfile.gradeLevel }).lean()
+    }
+
+    const pricingQuery: any = {
+      userType,
+      $and: [
+        { $or: [{ buffetRoundId: round._id }, { buffetRoundId: null }] },
+        { effectiveFrom: { $lte: new Date(today) } },
+        { $or: [{ effectiveTo: null }, { effectiveTo: { $gte: new Date(today) } }] },
+      ],
+    }
+    if (userType === 'student') {
+      pricingQuery.gradeLevelId = gradeLevelDoc?._id ?? null
+    }
+
+    const pricing = await BuffetPricing.findOne(pricingQuery)
+      .sort({ buffetRoundId: -1 }) // prefer round-specific over null
+      .lean()
 
     if (!pricing) {
       set.status = 400
@@ -235,7 +251,7 @@ export const posController = new Elysia({ prefix: '/pos' })
 
     const buffetSessionDoc = await BuffetSession.create({
       userId: user._id,
-      mealPeriodId: period._id,
+      buffetRoundId: round._id,
       entryDate: today,
       priceCharged: price,
       payMethod: pay_method ?? 'card_wallet',
@@ -249,14 +265,14 @@ export const posController = new Elysia({ prefix: '/pos' })
       price,
       balance_after: wallet.balance,
       user: safeUser,
-      period: period.name,
+      round: round.name,
       session: buffetSessionDoc,
     }
   }, {
     body: t.Object({
-      card_uid:      t.String(),
-      meal_period_id: t.String(),
-      pay_method:    t.Optional(t.String()),
+      card_uid:        t.String(),
+      buffet_round_id: t.String(),
+      pay_method:      t.Optional(t.String()),
     }),
   })
 

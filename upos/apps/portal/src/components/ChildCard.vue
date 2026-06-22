@@ -18,7 +18,7 @@
       </div>
 
       <!-- Balance label + value -->
-      <p class="bal-label">ยอดเงินคงเหลือ (บาท)</p>
+      <p class="bal-label">{{ locale.t('ยอดเงินคงเหลือ (บาท)', 'Balance (THB)') }}</p>
       <p class="bal-value">{{ formattedBalance }}</p>
 
       <!-- Footer: uid + updated -->
@@ -39,6 +39,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { PhArrowsClockwise, PhUser } from '@phosphor-icons/vue'
+import { useLocaleStore } from '@/stores/locale'
+
+const locale = useLocaleStore()
 
 const props = defineProps<{
   name:        string
@@ -46,7 +49,6 @@ const props = defineProps<{
   role?:       string
   balance?:    number
   grade?:      string
-  className?:  string
   updatedAt?:  string | Date
 }>()
 
@@ -58,12 +60,19 @@ const GRADIENTS: Record<string, [string, string]> = {
   visitor:    ['#7E8C9A', '#566069'],
 }
 
-const ROLE_LABELS: Record<string, string> = {
+const ROLE_LABELS_TH: Record<string, string> = {
   student: 'นักเรียน',
   teacher: 'ครู',
   staff:   'เจ้าหน้าที่',
   cashier: 'แคชเชียร์',
   visitor: 'บุคคลภายนอก',
+}
+const ROLE_LABELS_EN: Record<string, string> = {
+  student: 'Student',
+  teacher: 'Teacher',
+  staff:   'Staff',
+  cashier: 'Cashier',
+  visitor: 'Visitor',
 }
 
 const [c1, c2] = GRADIENTS[props.role ?? 'student'] ?? ['#1264E3', '#0A4BAD']
@@ -76,12 +85,16 @@ const nameInitial = computed(() => (props.name ?? '').charAt(0).toUpperCase() ||
 
 const subLabel = computed(() => {
   const parts: string[] = []
-  if (props.grade)     parts.push(props.grade)
-  if (props.className) parts.push(props.className)
-  return parts.join(' - ') || (props.role === 'teacher' ? 'ครู' : '')
+  if (props.grade) parts.push(props.grade)
+  return parts.join(' - ') || (props.role === 'teacher' ? locale.t('ครู', 'Teacher') : '')
 })
 
-const roleLabel = computed(() => ROLE_LABELS[props.role ?? 'student'] ?? props.role ?? '')
+const roleLabel = computed(() => {
+  const key = props.role ?? 'student'
+  return locale.lang === 'th'
+    ? (ROLE_LABELS_TH[key] ?? props.role ?? '')
+    : (ROLE_LABELS_EN[key] ?? props.role ?? '')
+})
 
 const formattedBalance = computed(() => {
   if (props.balance === undefined) return '฿0.00'
