@@ -593,7 +593,7 @@
                 <div style="font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;display:flex;align-items:center;justify-content:space-between">
                   <span>CODE ผู้ปกครองคนที่ {{ (codeData.parentCount ?? 0) + idx + 1 }}</span>
                   <button
-                    class="code-replace-btn"
+                    class="code-slot-regen-btn"
                     :disabled="generatingCode"
                     @click="generateCodeForSlot(idx)"
                   >
@@ -2014,6 +2014,16 @@ onMounted(async () => {
   background: #F0FDF4; border: 1px solid #BBF7D0;
   border-radius: 6px; padding: 6px 10px;
 }
+.code-slot-regen-btn {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 6px;
+  background: var(--color-primary); border: none;
+  color: #fff; font-size: 11px; font-family: inherit;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.code-slot-regen-btn:hover:not(:disabled) { opacity: 0.88; }
+.code-slot-regen-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .code-replace-btn {
   display: flex; align-items: center; gap: 4px;
   padding: 3px 8px; border-radius: 5px;
