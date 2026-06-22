@@ -1083,12 +1083,17 @@ const generatingCode  = ref(false)
 const copied          = ref(false)
 let   copiedTimer: ReturnType<typeof setTimeout> | null = null
 
+function normalizeCodeData(data: any) {
+  const first = data.pendingCodes?.[0] ?? null
+  return { ...data, code: first?.code ?? null, expiresAt: first?.expiresAt ?? null, used: false, expired: false }
+}
+
 async function openCodeModal(student: Student) {
   showCodeModal.value = true
   codeData.value      = null
   try {
     const res = await api.get(`/admin/students/${student.uid}/code`)
-    codeData.value = res.data
+    codeData.value = normalizeCodeData(res.data)
   } catch {
     codeData.value = {
       studentUid: student.uid,
@@ -1119,7 +1124,7 @@ async function doReplaceParent1() {
   codeError.value          = ''
   try {
     const res = await api.post(`/admin/students/${codeData.value.studentUid}/code/replace-parent1`)
-    codeData.value = res.data
+    codeData.value = normalizeCodeData(res.data)
   } catch (err: any) {
     codeError.value = err?.response?.data?.error?.message ?? 'สร้าง Code ไม่สำเร็จ'
   } finally {
@@ -1133,9 +1138,9 @@ async function generateCode() {
   codeError.value      = ''
   try {
     const res = await api.post(`/admin/students/${codeData.value.studentUid}/code/generate`)
-    codeData.value = res.data
+    codeData.value = normalizeCodeData(res.data)
   } catch (err: any) {
-    codeError.value = err?.response?.data?.message ?? 'สร้าง Code ไม่สำเร็จ'
+    codeError.value = err?.response?.data?.error?.message ?? err?.response?.data?.message ?? 'สร้าง Code ไม่สำเร็จ'
   } finally {
     generatingCode.value = false
   }
