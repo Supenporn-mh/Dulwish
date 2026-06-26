@@ -291,6 +291,9 @@ function goToConfirm() {
   if (reviewRating.value === 0) return
   reviewStage.value = 2
 }
+function backToEdit() {
+  reviewStage.value = 1
+}
 async function submitReview() {
   if (!reviewFor.value || reviewRating.value === 0) return
   reviewBusy.value  = true
@@ -402,20 +405,6 @@ watch(() => parentStore.selectedChildId, (newId) => {
 
     <!-- ── Sub-header: subtitle + date filter + summary ──────────────── -->
     <div class="px-4 pt-3 pb-4" style="background:var(--color-bg-surface); border-bottom:0.5px solid var(--color-border-tertiary)">
-      <div class="flex items-center justify-between mb-3">
-        <p class="text-[12px]" style="color:var(--color-text-secondary)">
-          {{ locale.t('ข้อมูลย้อนหลัง 12 เดือน','Spending data available past 12 months') }}
-        </p>
-        <!-- Date range filter trigger -->
-        <button
-          @click="openDateSheet()"
-          :class="['date-filter-btn', hasDateFilter && 'active']"
-        >
-          <PhCalendarBlank :size="13" weight="bold"/>
-          {{ hasDateFilter ? dateFilterLabel : locale.t('กรอง','Filter') }}
-        </button>
-      </div>
-
       <!-- Summary cards -->
       <div class="grid grid-cols-2 gap-3 mt-3">
         <div class="sum-card sum-topup">
@@ -747,74 +736,72 @@ watch(() => parentStore.selectedChildId, (newId) => {
         <button class="rs-close" @click="closeReview"><PhX :size="16" weight="bold"/></button>
 
         <!-- ── Stage 1: กรอกรีวิว ── -->
-        <div v-if="reviewStage === 1" class="px-5 pb-10 flex flex-col gap-5">
-          <div>
-            <p class="text-[18px] font-medium" style="color:var(--color-text-primary)">
-              {{ locale.t('รีวิวอาหาร','Rate your meal') }}
-            </p>
-            <p class="text-[13px] mt-0.5" style="color:var(--color-text-secondary)">{{ reviewFor.description }}</p>
-            <div v-if="(reviewFor.buffetItems ?? reviewFor.bookingItems ?? []).length" class="flex flex-wrap gap-1 mt-2">
-              <span v-for="item in reviewFor.buffetItems ?? reviewFor.bookingItems" :key="item" class="item-chip">{{ item }}</span>
+        <div v-if="reviewStage === 1" class="rs-stage1">
+          <!-- Meal context row (KIKI-style: flat, no card border) -->
+          <div class="rs-meal-row">
+            <div class="rs-meal-avatar">
+              <PhCheckCircle :size="20" weight="fill"/>
             </div>
-          </div>
-
-          <!-- Stars -->
-          <div class="flex flex-col items-center gap-3">
-            <div class="flex gap-1.5">
-              <button v-for="n in 5" :key="n" @click="reviewRating=n"
-                class="star-btn" :class="{active: n<=reviewRating}">
-                <PhStar :size="46" :weight="n<=reviewRating?'fill':'regular'"/>
-              </button>
-            </div>
-            <div class="grid grid-cols-5 w-full text-center">
-              <div v-for="n in 5" :key="n" class="text-[11px] font-medium leading-[1.3] px-0.5"
-                :style="`color:${n===reviewRating?'var(--color-warning)':'var(--color-text-tertiary)'}`">
-                {{ n }}<br>{{ rLabel(n) }}
+            <div class="flex-1 min-w-0">
+              <span class="rs-meal-label">{{ reviewFor.type === 'booking' ? locale.t('จองอาหาร','Booking') : locale.t('บุฟเฟต์','Buffet') }}</span>
+              <p class="rs-meal-desc">{{ reviewFor.description }}</p>
+              <div v-if="(reviewFor.buffetItems ?? reviewFor.bookingItems ?? []).length" class="flex flex-wrap gap-1 mt-1.5">
+                <span v-for="item in reviewFor.buffetItems ?? reviewFor.bookingItems" :key="item" class="item-chip">{{ item }}</span>
               </div>
             </div>
-            <div v-if="reviewRating" class="rating-result">
-              {{ reviewRating }} / 5 &nbsp;·&nbsp; {{ rLabel(reviewRating) }}
+          </div>
+
+          <div class="rs-divider"/>
+
+          <!-- Heading -->
+          <h2 class="rs-main-heading">{{ locale.t('เป็นยังไงบ้าง?','How was your meal?') }}</h2>
+
+          <!-- Stars -->
+          <div class="rs-stars-block">
+            <div class="rs-stars-row">
+              <button v-for="n in 5" :key="n" @click="reviewRating=n"
+                class="star-btn" :class="{active: n<=reviewRating}">
+                <PhStar :size="52" :weight="n<=reviewRating?'fill':'regular'"/>
+              </button>
             </div>
+            <Transition name="fade-up">
+              <div v-if="reviewRating" class="rating-result mt-3">
+                {{ reviewRating }} / 5 &nbsp;·&nbsp; {{ rLabel(reviewRating) }}
+              </div>
+            </Transition>
           </div>
 
-          <div>
-            <label class="text-[12px] font-medium block mb-1.5" style="color:var(--color-text-secondary)">
-              {{ locale.t('หมายเหตุ (ไม่บังคับ)','Note (optional)') }}
-            </label>
-            <textarea v-model="reviewNote" class="rs-textarea" rows="3"
-              :placeholder="locale.t('ความคิดเห็นเพิ่มเติม...','Add a comment...')"/>
-          </div>
+          <!-- Feedback -->
+          <textarea v-model="reviewNote" class="rs-feedback-input" rows="2"
+            :placeholder="locale.t('แสดงความคิดเห็น... (ไม่บังคับ)','Share your feedback... (optional)')"/>
 
+          <!-- CTA -->
           <button @click="goToConfirm" :disabled="reviewRating===0"
-            class="btn btn-primary w-full"
+            class="rs-cta-btn"
             :class="{'opacity-40 cursor-not-allowed': reviewRating===0}">
             {{ locale.t('ดำเนินการต่อ','Continue') }}
           </button>
         </div>
 
         <!-- ── Stage 2: ยืนยันรีวิว ── -->
-        <div v-else class="px-5 pb-10 flex flex-col gap-5">
-          <div>
-            <p class="text-[18px] font-medium" style="color:var(--color-text-primary)">
-              {{ locale.t('ยืนยันรีวิว','Confirm Review') }}
-            </p>
-            <p class="text-[13px] mt-0.5" style="color:var(--color-text-secondary)">
-              {{ locale.t('ตรวจสอบรีวิวก่อนส่ง','Review your rating before submitting') }}
-            </p>
+        <div v-else class="rs-stage2">
+          <div class="rs-heading-block">
+            <h2 class="rs-main-heading" style="font-size:22px">{{ locale.t('ยืนยันรีวิว','Confirm Review') }}</h2>
+            <p class="rs-sub-heading">{{ locale.t('ตรวจสอบรีวิวก่อนส่ง','Review your rating before submitting') }}</p>
           </div>
 
           <!-- Summary card -->
           <div class="review-confirm-card">
-            <p class="text-[12px] font-medium mb-2" style="color:var(--color-text-secondary)">{{ reviewFor.description }}</p>
-            <div class="flex items-center gap-1.5 mb-1.5">
-              <PhStar v-for="n in 5" :key="n" :size="22"
+            <p class="text-[12px] font-medium mb-3" style="color:var(--color-text-secondary)">{{ reviewFor.description }}</p>
+            <div class="flex items-center gap-1 mb-1">
+              <PhStar v-for="n in 5" :key="n" :size="24"
                 :weight="n<=reviewRating?'fill':'regular'"
                 :color="n<=reviewRating?'var(--color-warning)':'var(--color-border-secondary)'"/>
-              <span class="text-[13px] font-medium ml-1" style="color:var(--color-warning)">
-                {{ reviewRating }} / 5 · {{ rLabel(reviewRating) }}
-              </span>
             </div>
-            <p v-if="reviewNote.trim()" class="text-[13px] mt-2 pt-2"
+            <p class="text-[13px] font-medium" style="color:var(--color-warning)">
+              {{ reviewRating }} / 5 · {{ rLabel(reviewRating) }}
+            </p>
+            <p v-if="reviewNote.trim()" class="text-[13px] mt-3 pt-3 italic"
               style="color:var(--color-text-primary); border-top:0.5px solid var(--color-border-tertiary)">
               "{{ reviewNote.trim() }}"
             </p>
@@ -825,12 +812,12 @@ watch(() => parentStore.selectedChildId, (newId) => {
           </p>
 
           <div class="flex gap-3">
-            <button @click="reviewStage=1" :disabled="reviewBusy"
-              class="btn btn-ghost flex-1">
+            <button @click="backToEdit" :disabled="reviewBusy"
+              class="rs-ghost-btn flex-1">
               {{ locale.t('แก้ไข','Edit') }}
             </button>
             <button @click="submitReview" :disabled="reviewBusy"
-              class="btn btn-primary flex-1">
+              class="rs-cta-btn flex-1">
               <span v-if="reviewBusy" class="flex items-center justify-center gap-2">
                 <span class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
                 {{ locale.t('กำลังส่ง...','Submitting...') }}
@@ -962,9 +949,37 @@ watch(() => parentStore.selectedChildId, (newId) => {
 .star-btn.active { color:var(--color-warning); }
 .star-btn:active { transform:scale(1.15); }
 .rating-result { font-size:15px; font-weight:500; color:var(--color-warning); background:var(--color-warning-bg); padding:6px 18px; border-radius:20px; }
-.rs-textarea { width:100%; padding:10px 12px; border-radius:var(--radius-md); border:1px solid var(--color-border-tertiary); background:var(--color-bg-page); font-size:14px; font-family:inherit; color:var(--color-text-primary); resize:none; outline:none; }
-.rs-textarea:focus { border-color:var(--color-primary); }
 .review-confirm-card { padding:16px; border-radius:var(--radius-lg); background:var(--color-bg-page); border:1px solid var(--color-border-tertiary); }
+
+/* ── Stage 1 / 2 redesign ─────────────────────────────────────────────────── */
+.rs-stage1, .rs-stage2 { display:flex; flex-direction:column; padding:8px 20px 32px; gap:20px; }
+
+.rs-meal-row { display:flex; align-items:flex-start; gap:12px; }
+.rs-meal-avatar { width:42px; height:42px; border-radius:50%; background:var(--color-primary-tint); color:var(--color-primary); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.rs-meal-label { font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:0.06em; color:var(--color-primary); display:block; margin-bottom:3px; }
+.rs-meal-desc { font-size:14px; font-weight:500; color:var(--color-text-primary); line-height:1.3; }
+
+.rs-divider { height:0.5px; background:var(--color-border-tertiary); flex-shrink:0; }
+
+.rs-main-heading { font-size:28px; font-weight:500; color:var(--color-text-primary); line-height:1.1; text-align:center; margin:0; }
+.rs-heading-block { text-align:center; }
+.rs-sub-heading { font-size:13px; color:var(--color-text-secondary); }
+
+.rs-stars-block { display:flex; flex-direction:column; align-items:center; }
+.rs-stars-row { display:flex; gap:6px; }
+
+.rs-feedback-input { width:100%; padding:12px 16px; border-radius:var(--radius-md); border:1.5px solid var(--color-border-tertiary); background:var(--color-bg-page); font-size:14px; font-family:inherit; color:var(--color-text-primary); resize:none; outline:none; transition:border-color 0.15s; }
+.rs-feedback-input:focus { border-color:var(--color-primary); }
+.rs-feedback-input::placeholder { color:var(--color-text-tertiary); }
+
+.rs-cta-btn { width:100%; padding:16px; border-radius:var(--radius-pill); background:var(--color-primary); color:#fff; font-size:16px; font-weight:500; font-family:inherit; border:none; cursor:pointer; transition:opacity 0.15s; -webkit-tap-highlight-color:transparent; }
+.rs-cta-btn:not(:disabled):active { opacity:0.85; }
+.rs-ghost-btn { padding:16px; border-radius:var(--radius-pill); background:var(--color-bg-page); color:var(--color-text-secondary); font-size:15px; font-weight:500; font-family:inherit; border:1.5px solid var(--color-border-tertiary); cursor:pointer; transition:opacity 0.15s; -webkit-tap-highlight-color:transparent; }
+.rs-ghost-btn:active { opacity:0.7; }
+
+/* fade-up for rating pill */
+.fade-up-enter-active { transition:opacity 0.2s, transform 0.2s; }
+.fade-up-enter-from { opacity:0; transform:translateY(6px); }
 
 /* ── Transitions ──────────────────────────────────────────────────────────── */
 .rs-bg-enter-active, .rs-bg-leave-active { transition:opacity 0.25s; }
