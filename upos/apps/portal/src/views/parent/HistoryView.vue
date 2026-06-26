@@ -737,17 +737,15 @@ watch(() => parentStore.selectedChildId, (newId) => {
 
         <!-- ── Stage 1: กรอกรีวิว ── -->
         <div v-if="reviewStage === 1" class="rs-stage1">
-          <!-- Meal context row (KIKI-style: flat, no card border) -->
+          <!-- Meal context (centered vertical) -->
           <div class="rs-meal-row">
             <div class="rs-meal-avatar">
-              <PhCheckCircle :size="20" weight="fill"/>
+              <PhCheckCircle :size="22" weight="fill"/>
             </div>
-            <div class="flex-1 min-w-0">
-              <span class="rs-meal-label">{{ reviewFor.type === 'booking' ? locale.t('จองอาหาร','Booking') : locale.t('บุฟเฟต์','Buffet') }}</span>
-              <p class="rs-meal-desc">{{ reviewFor.description }}</p>
-              <div v-if="(reviewFor.buffetItems ?? reviewFor.bookingItems ?? []).length" class="flex flex-wrap gap-1 mt-1.5">
-                <span v-for="item in reviewFor.buffetItems ?? reviewFor.bookingItems" :key="item" class="item-chip">{{ item }}</span>
-              </div>
+            <span class="rs-meal-label">{{ reviewFor.type === 'booking' ? locale.t('จองอาหาร','Booking') : locale.t('บุฟเฟต์','Buffet') }}</span>
+            <p class="rs-meal-desc">{{ reviewFor.description }}</p>
+            <div v-if="(reviewFor.buffetItems ?? reviewFor.bookingItems ?? []).length" class="flex flex-wrap justify-center gap-1">
+              <span v-for="item in reviewFor.buffetItems ?? reviewFor.bookingItems" :key="item" class="item-chip">{{ item }}</span>
             </div>
           </div>
 
@@ -761,7 +759,7 @@ watch(() => parentStore.selectedChildId, (newId) => {
             <div class="rs-stars-row">
               <button v-for="n in 5" :key="n" @click="reviewRating=n"
                 class="star-btn" :class="{active: n<=reviewRating}">
-                <PhStar :size="52" :weight="n<=reviewRating?'fill':'regular'"/>
+                <PhStar :size="44" :weight="n<=reviewRating?'fill':'regular'"/>
               </button>
             </div>
             <Transition name="fade-up">
@@ -786,7 +784,7 @@ watch(() => parentStore.selectedChildId, (newId) => {
         <!-- ── Stage 2: ยืนยันรีวิว ── -->
         <div v-else class="rs-stage2">
           <div class="rs-heading-block">
-            <h2 class="rs-main-heading" style="font-size:22px">{{ locale.t('ยืนยันรีวิว','Confirm Review') }}</h2>
+            <h2 class="rs-main-heading">{{ locale.t('ยืนยันรีวิว','Confirm Review') }}</h2>
             <p class="rs-sub-heading">{{ locale.t('ตรวจสอบรีวิวก่อนส่ง','Review your rating before submitting') }}</p>
           </div>
 
@@ -954,14 +952,14 @@ watch(() => parentStore.selectedChildId, (newId) => {
 /* ── Stage 1 / 2 redesign ─────────────────────────────────────────────────── */
 .rs-stage1, .rs-stage2 { display:flex; flex-direction:column; padding:8px 20px 32px; gap:20px; }
 
-.rs-meal-row { display:flex; align-items:flex-start; gap:12px; }
-.rs-meal-avatar { width:42px; height:42px; border-radius:50%; background:var(--color-primary-tint); color:var(--color-primary); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.rs-meal-label { font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:0.06em; color:var(--color-primary); display:block; margin-bottom:3px; }
-.rs-meal-desc { font-size:14px; font-weight:500; color:var(--color-text-primary); line-height:1.3; }
+.rs-meal-row { display:flex; flex-direction:column; align-items:center; gap:6px; }
+.rs-meal-avatar { width:48px; height:48px; border-radius:50%; background:var(--color-primary-tint); color:var(--color-primary); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.rs-meal-label { font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:0.06em; color:var(--color-primary); display:block; text-align:center; }
+.rs-meal-desc { font-size:14px; font-weight:400; color:var(--color-text-secondary); line-height:1.3; text-align:center; margin:0; }
 
 .rs-divider { height:0.5px; background:var(--color-border-tertiary); flex-shrink:0; }
 
-.rs-main-heading { font-size:28px; font-weight:500; color:var(--color-text-primary); line-height:1.1; text-align:center; margin:0; }
+.rs-main-heading { font-size:22px; font-weight:500; color:var(--color-text-primary); line-height:1.2; text-align:center; margin:0; }
 .rs-heading-block { text-align:center; }
 .rs-sub-heading { font-size:13px; color:var(--color-text-secondary); }
 
