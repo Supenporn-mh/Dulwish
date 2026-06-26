@@ -580,14 +580,11 @@ watch(() => parentStore.selectedChildId, (newId) => {
                   </template>
                 </div>
                 <div class="review-section">
-                  <div v-if="rated.has(tx.id)" class="flex items-center justify-between">
-                    <div class="flex items-center gap-1.5">
-                      <PhStar v-for="n in 5" :key="n" :size="16"
-                        :weight="n<=ratings[tx.id]?'fill':'regular'"
-                        :color="n<=ratings[tx.id]?'var(--color-warning)':'var(--color-border-secondary)'"/>
-                      <span class="text-[12px] font-medium ml-1" style="color:var(--color-warning)">{{ ratings[tx.id] }}/5 · {{ rLabel(ratings[tx.id]) }}</span>
-                    </div>
-                    <button @click.stop="openReview(tx)" class="edit-btn">{{ locale.t('แก้ไข','Edit') }}</button>
+                  <div v-if="rated.has(tx.id)" class="flex items-center gap-1.5">
+                    <PhStar v-for="n in 5" :key="n" :size="16"
+                      :weight="n<=ratings[tx.id]?'fill':'regular'"
+                      :color="n<=ratings[tx.id]?'var(--color-warning)':'var(--color-border-secondary)'"/>
+                    <span class="text-[12px] font-medium ml-1" style="color:var(--color-warning)">{{ ratings[tx.id] }}/5 · {{ rLabel(ratings[tx.id]) }}</span>
                   </div>
                   <button v-else @click.stop="openReview(tx)" class="rate-btn">
                     <PhStar :size="14" weight="fill"/>{{ locale.t('รีวิวบุฟเฟต์','Rate Buffet') }}
@@ -635,14 +632,11 @@ watch(() => parentStore.selectedChildId, (newId) => {
                   </div>
                 </div>
                 <div class="review-section" v-if="tx.bookingStatus==='consumed'">
-                  <div v-if="rated.has(tx.id)" class="flex items-center justify-between">
-                    <div class="flex items-center gap-1.5">
-                      <PhStar v-for="n in 5" :key="n" :size="16"
-                        :weight="n<=ratings[tx.id]?'fill':'regular'"
-                        :color="n<=ratings[tx.id]?'var(--color-warning)':'var(--color-border-secondary)'"/>
-                      <span class="text-[12px] font-medium ml-1" style="color:var(--color-warning)">{{ ratings[tx.id] }}/5 · {{ rLabel(ratings[tx.id]) }}</span>
-                    </div>
-                    <button @click.stop="openReview(tx)" class="edit-btn">{{ locale.t('แก้ไข','Edit') }}</button>
+                  <div v-if="rated.has(tx.id)" class="flex items-center gap-1.5">
+                    <PhStar v-for="n in 5" :key="n" :size="16"
+                      :weight="n<=ratings[tx.id]?'fill':'regular'"
+                      :color="n<=ratings[tx.id]?'var(--color-warning)':'var(--color-border-secondary)'"/>
+                    <span class="text-[12px] font-medium ml-1" style="color:var(--color-warning)">{{ ratings[tx.id] }}/5 · {{ rLabel(ratings[tx.id]) }}</span>
                   </div>
                   <button v-else @click.stop="openReview(tx)" class="rate-btn">
                     <PhStar :size="14" weight="fill"/>{{ locale.t('รีวิวมื้ออาหาร','Rate Meal') }}
