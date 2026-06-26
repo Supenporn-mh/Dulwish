@@ -69,7 +69,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function login(email: string, password: string) {
-    const res = await api.post('/auth/login', { email, password })
+    const res = await api.post('/auth/parent-login-v2', { contact: email, password })
     const data = res.data
 
     user.value = data.user ?? data.parent ?? null

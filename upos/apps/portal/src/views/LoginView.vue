@@ -66,7 +66,7 @@
         </div>
         <div v-if="isParent" class="lv-demo">
           <span class="lv-demo-label">Demo Account</span>
-          <span class="lv-demo-val">ruttana@gmail.com / Demo1234!</span>
+          <span class="lv-demo-val">suchat@dulwich.ac.th / Demo1234!</span>
           <button @click="fillParentDemo" class="lv-demo-fill">{{ locale.t('กรอกอัตโนมัติ', 'Auto Fill') }}</button>
         </div>
 
@@ -372,7 +372,7 @@ function fillDemo() {
   identifier.value = e; password.value = p
 }
 function fillParentDemo() {
-  identifier.value = 'ruttana@gmail.com'
+  identifier.value = 'suchat@dulwich.ac.th'
   password.value   = 'Demo1234!'
 }
 
