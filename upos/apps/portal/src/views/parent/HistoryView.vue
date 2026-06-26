@@ -959,7 +959,7 @@ watch(() => parentStore.selectedChildId, (newId) => {
 
 .rs-divider { height:0.5px; background:var(--color-border-tertiary); flex-shrink:0; }
 
-.rs-main-heading { font-size:22px; font-weight:500; color:var(--color-text-primary); line-height:1.2; text-align:center; margin:0; }
+.rs-main-heading { font-size:18px; font-weight:500; color:var(--color-text-primary); line-height:1.4; text-align:center; margin:0; }
 .rs-heading-block { text-align:center; }
 .rs-sub-heading { font-size:13px; color:var(--color-text-secondary); }
 
@@ -970,9 +970,9 @@ watch(() => parentStore.selectedChildId, (newId) => {
 .rs-feedback-input:focus { border-color:var(--color-primary); }
 .rs-feedback-input::placeholder { color:var(--color-text-tertiary); }
 
-.rs-cta-btn { width:100%; padding:16px; border-radius:var(--radius-pill); background:var(--color-primary); color:#fff; font-size:16px; font-weight:500; font-family:inherit; border:none; cursor:pointer; transition:opacity 0.15s; -webkit-tap-highlight-color:transparent; }
+.rs-cta-btn { width:100%; height:44px; padding:0 20px; border-radius:var(--radius-pill); background:var(--color-primary); color:#fff; font-size:15px; font-weight:500; font-family:inherit; border:none; cursor:pointer; transition:opacity 0.15s; -webkit-tap-highlight-color:transparent; }
 .rs-cta-btn:not(:disabled):active { opacity:0.85; }
-.rs-ghost-btn { padding:16px; border-radius:var(--radius-pill); background:var(--color-bg-page); color:var(--color-text-secondary); font-size:15px; font-weight:500; font-family:inherit; border:1.5px solid var(--color-border-tertiary); cursor:pointer; transition:opacity 0.15s; -webkit-tap-highlight-color:transparent; }
+.rs-ghost-btn { height:44px; padding:0 20px; border-radius:var(--radius-pill); background:var(--color-bg-page); color:var(--color-text-secondary); font-size:15px; font-weight:500; font-family:inherit; border:1.5px solid var(--color-border-tertiary); cursor:pointer; transition:opacity 0.15s; -webkit-tap-highlight-color:transparent; }
 .rs-ghost-btn:active { opacity:0.7; }
 
 /* fade-up for rating pill */
