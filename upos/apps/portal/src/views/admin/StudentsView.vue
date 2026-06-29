@@ -402,10 +402,6 @@
                   <option v-for="g in GRADES" :key="g" :value="g">{{ g }}</option>
                 </select>
               </div>
-              <div class="edit-field">
-                <label class="promo-label">ห้องเรียน</label>
-                <input v-model="addForm.className" class="edit-input" placeholder="เช่น P1-A" />
-              </div>
             </div>
             <div class="edit-field">
               <label class="promo-label">อีเมล / เบอร์ผู้ปกครอง</label>
@@ -458,10 +454,6 @@
                 <select v-model="editTarget.gradeLevel" class="promo-select" @change="editTarget.className = ''">
                   <option v-for="g in GRADES" :key="g" :value="g">{{ g }}</option>
                 </select>
-              </div>
-              <div class="edit-field">
-                <label class="promo-label">ห้องเรียน</label>
-                <input v-model="editTarget.className" class="edit-input" placeholder="เช่น K1-A" />
               </div>
             </div>
             <div class="edit-field">
