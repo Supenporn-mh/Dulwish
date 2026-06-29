@@ -155,7 +155,7 @@ async function submitChangePw() {
 
 <template>
   <div class="min-h-screen flex justify-center" style="background: var(--color-bg-page)">
-    <div class="w-full max-w-[430px] flex flex-col min-h-screen relative" style="background: var(--color-bg-page)">
+    <div class="w-full max-w-[430px] md:max-w-[720px] lg:max-w-[1100px] flex flex-col min-h-screen relative" style="background: var(--color-bg-page)">
 
       <!-- ── Navbar ────────────────────────────────────────────────────── -->
       <header class="navbar sticky top-0 z-20 flex items-center justify-between px-4 h-[52px]">

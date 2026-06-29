@@ -15,6 +15,7 @@ const userSchema = new Schema({
   pdpaAcceptedAt:  { type: Date },
   studentProfile:  {
     gradeLevel:    String,
+    className:     String,
     dob:           Date,
     guardianEmail: String,
     familyCode:    String,
@@ -484,6 +485,16 @@ const branchSchema = new Schema({
 })
 
 export const Branch = mongoose.model('Branch', branchSchema)
+
+// ─── Classroom ────────────────────────────────────────────────────────────────
+const classroomSchema = new Schema({
+  code:       { type: String, required: true, unique: true },
+  name:       { type: String, required: true },
+  gradeLevel: { type: String, required: true },
+  sortOrder:  { type: Number, required: true, default: 0 },
+})
+
+export const Classroom = mongoose.model('Classroom', classroomSchema)
 
 // ─── StoreSettings ────────────────────────────────────────────────────────────
 const storeSettingsSchema = new Schema({

@@ -276,6 +276,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
         firstName:     s.firstName,
         lastName:      s.lastName,
         gradeLevel:    s.studentProfile?.gradeLevel ?? '',
+        className:     s.studentProfile?.className    ?? '',
         guardianEmail: s.studentProfile?.guardianEmail ?? '',
         familyCode:    s.studentProfile?.familyCode    ?? '',
         cardUid:       card?.cardUid    ?? null,
@@ -301,6 +302,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
         status:    'active',
         studentProfile: {
           gradeLevel:    (body as any).gradeLevel    ?? '',
+          className:     (body as any).className     ?? '',
           guardianEmail: (body as any).guardianEmail ?? '',
           familyCode:    (body as any).familyCode    ?? '',
         },
@@ -316,6 +318,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
       firstName:     t.String(),
       lastName:      t.String(),
       gradeLevel:    t.Optional(t.String()),
+      className:     t.Optional(t.String()),
       guardianEmail: t.Optional(t.String()),
       familyCode:    t.Optional(t.String()),
       uid:           t.Optional(t.String()),
@@ -330,6 +333,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
     if (b.lastName      !== undefined) update.lastName                         = b.lastName
     if (b.status        !== undefined) update.status                           = b.status
     if (b.gradeLevel    !== undefined) update['studentProfile.gradeLevel']     = b.gradeLevel
+    if (b.className     !== undefined) update['studentProfile.className']      = b.className
     if (b.guardianEmail !== undefined) update['studentProfile.guardianEmail']  = b.guardianEmail
     if (b.familyCode    !== undefined) update['studentProfile.familyCode']     = b.familyCode
 
@@ -345,6 +349,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
       firstName:     t.Optional(t.String()),
       lastName:      t.Optional(t.String()),
       gradeLevel:    t.Optional(t.String()),
+      className:     t.Optional(t.String()),
       guardianEmail: t.Optional(t.String()),
       familyCode:    t.Optional(t.String()),
       status:        t.Optional(t.String()),

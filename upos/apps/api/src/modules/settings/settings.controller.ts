@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia'
 import { authPlugin } from '../../middleware/auth'
-import { WalletPermission, AcademicYear, GradeLevel, StoreSettings, Branch, User } from '../../models'
+import { WalletPermission, AcademicYear, GradeLevel, StoreSettings, Branch, User, Classroom } from '../../models'
 
 export const settingsController = new Elysia({ prefix: '/settings' })
   .use(authPlugin(['admin', 'supervisor']))
@@ -259,6 +259,63 @@ export const settingsController = new Elysia({ prefix: '/settings' })
     if (!result) {
       set.status = 404
       return { error: { code: 'NOT_FOUND', message: 'Branch not found' } }
+    }
+    return { ok: true }
+  })
+
+  // ── Classrooms ────────────────────────────────────────────────────────────────
+
+  .get('/classrooms', async ({ query }) => {
+    const filter: any = {}
+    if ((query as any).gradeLevel) filter.gradeLevel = (query as any).gradeLevel
+    const classrooms = await Classroom.find(filter).sort({ gradeLevel: 1, sortOrder: 1 }).lean()
+    return { classrooms }
+  })
+
+  .post('/classrooms', async ({ body, set }) => {
+    const b = body as any
+    const existing = await Classroom.findOne({ code: b.code })
+    if (existing) {
+      set.status = 409
+      return { error: { code: 'CONFLICT', message: 'Classroom code already exists' } }
+    }
+    const count = await Classroom.countDocuments({ gradeLevel: b.gradeLevel })
+    const classroom = await Classroom.create({ ...b, sortOrder: b.sortOrder ?? count })
+    return { classroom }
+  }, {
+    body: t.Object({
+      code:       t.String(),
+      name:       t.String(),
+      gradeLevel: t.String(),
+      sortOrder:  t.Optional(t.Number()),
+    }),
+  })
+
+  .patch('/classrooms/:id', async ({ params, body, set }) => {
+    const classroom = await Classroom.findByIdAndUpdate(
+      params.id,
+      { $set: body },
+      { new: true },
+    ).lean()
+    if (!classroom) {
+      set.status = 404
+      return { error: { code: 'NOT_FOUND', message: 'Classroom not found' } }
+    }
+    return { classroom }
+  }, {
+    body: t.Object({
+      code:       t.Optional(t.String()),
+      name:       t.Optional(t.String()),
+      gradeLevel: t.Optional(t.String()),
+      sortOrder:  t.Optional(t.Number()),
+    }),
+  })
+
+  .delete('/classrooms/:id', async ({ params, set }) => {
+    const result = await Classroom.findByIdAndDelete(params.id)
+    if (!result) {
+      set.status = 404
+      return { error: { code: 'NOT_FOUND', message: 'Classroom not found' } }
     }
     return { ok: true }
   })

@@ -3,6 +3,7 @@ import { ref, computed, nextTick, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api/axios'
 import { useLocaleStore } from '@/stores/locale'
+import { useAuthStore } from '@/stores/auth'
 import {
   PhUsersThree, PhIdentificationCard,
   PhArrowLeft, PhCheck, PhKey, PhDeviceMobileSpeaker, PhUser, PhLockSimple,
@@ -18,6 +19,7 @@ const vClickOutside = {
 
 const router = useRouter()
 const locale = useLocaleStore()
+const auth   = useAuthStore()
 const step = ref<1 | 2 | 3>(1)
 
 // ── Step 1: PDPA ──────────────────────────────────────────────────────────────
@@ -270,8 +272,18 @@ async function handleRegister() {
       }
       if (ctType === 'phone') body.phone = ctVal
       else body.email = ctVal.toLowerCase()
-      await api.post('/auth/parent-register', body)
-      successRedirect = '/login?role=parent&registered=1'
+      const res = await api.post('/auth/parent-register', body)
+      // auto-login with returned tokens — no need to re-enter credentials
+      if (res.data?.accessToken) {
+        auth.token = res.data.accessToken
+        auth.user  = res.data.user
+        localStorage.setItem('upos_token', res.data.accessToken)
+        localStorage.setItem('upos_user', JSON.stringify(res.data.user))
+        api.defaults.headers.common.Authorization = `Bearer ${res.data.accessToken}`
+        successRedirect = '/parent/dashboard'
+      } else {
+        successRedirect = '/login?role=parent&registered=1'
+      }
     } else {
       const body: Record<string, string> = {
         enrollmentCode: enrollmentCode.value.trim().toUpperCase(),

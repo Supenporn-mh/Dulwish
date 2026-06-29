@@ -103,7 +103,7 @@
             <th class="center" style="width:52px">ลำดับ</th>
             <th>รหัสนักเรียน</th>
             <th>ชื่อ-นามสกุล</th>
-            <th class="center">ชั้น / ห้อง</th>
+            <th class="center">ชั้น</th>
             <th>บัตร RFID</th>
             <th class="right">ยอดเงิน (฿)</th>
             <th class="center">ผู้ปกครอง</th>
@@ -135,10 +135,9 @@
               <div v-if="s.guardianEmail" style="font-size:11px;color:#AEAEB2;margin-top:2px">{{ s.guardianEmail }}</div>
             </td>
 
-            <!-- ชั้น/ห้อง -->
+            <!-- ชั้น -->
             <td class="center">
               <div style="font-weight:500;color:#1C1C1E">{{ s.gradeLevel }}</div>
-              <div style="font-size:11px;color:#8E8E93">{{ s.className }}</div>
             </td>
 
             <!-- บัตร RFID -->
@@ -399,13 +398,17 @@
             <div class="edit-field-row">
               <div class="edit-field">
                 <label class="promo-label">ชั้นปี <span style="color:var(--color-danger)">*</span></label>
-                <select v-model="addForm.gradeLevel" class="promo-select">
+                <select v-model="addForm.gradeLevel" class="promo-select" @change="addForm.className = ''">
                   <option v-for="g in GRADES" :key="g" :value="g">{{ g }}</option>
                 </select>
               </div>
               <div class="edit-field">
-                <label class="promo-label">ห้องเรียน <span style="color:var(--color-danger)">*</span></label>
-                <input v-model="addForm.className" class="edit-input" placeholder="เช่น P1-A" />
+                <label class="promo-label">ห้องเรียน</label>
+                <select v-if="filteredClassroomsForAdd.length > 0" v-model="addForm.className" class="promo-select">
+                  <option value="">— ไม่ระบุ —</option>
+                  <option v-for="c in filteredClassroomsForAdd" :key="c.id" :value="c.code">{{ c.code }}</option>
+                </select>
+                <input v-else v-model="addForm.className" class="edit-input" placeholder="เช่น P1-A" />
               </div>
             </div>
             <div class="edit-field">
@@ -456,13 +459,17 @@
             <div class="edit-field-row">
               <div class="edit-field">
                 <label class="promo-label">ชั้นปี</label>
-                <select v-model="editTarget.gradeLevel" class="promo-select">
+                <select v-model="editTarget.gradeLevel" class="promo-select" @change="editTarget.className = ''">
                   <option v-for="g in GRADES" :key="g" :value="g">{{ g }}</option>
                 </select>
               </div>
               <div class="edit-field">
                 <label class="promo-label">ห้องเรียน</label>
-                <input v-model="editTarget.className" class="edit-input" />
+                <select v-if="filteredClassrooms.length > 0" v-model="editTarget.className" class="promo-select">
+                  <option value="">— ไม่ระบุ —</option>
+                  <option v-for="c in filteredClassrooms" :key="c.id" :value="c.code">{{ c.code }}</option>
+                </select>
+                <input v-else v-model="editTarget.className" class="edit-input" placeholder="เช่น K1-A" />
               </div>
             </div>
             <div class="edit-field">
@@ -851,7 +858,8 @@ import {
 } from '@phosphor-icons/vue'
 import * as XLSX from 'xlsx'
 import api from '@/api/axios'
-import { listAcademicYears } from '@/api/settings'
+import { listAcademicYears, listClassrooms } from '@/api/settings'
+import type { Classroom } from '@/api/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Student {
@@ -937,7 +945,7 @@ function openAddModal() {
 async function saveAdd() {
   if (addSaving.value) return
   const { firstName, lastName, gradeLevel, className, guardianEmail, uid } = addForm.value
-  if (!firstName.trim() || !lastName.trim() || !gradeLevel || !className.trim()) {
+  if (!firstName.trim() || !lastName.trim() || !gradeLevel) {
     addError.value = 'กรุณากรอกข้อมูลจำเป็นให้ครบ'
     return
   }
@@ -1027,6 +1035,16 @@ const editSaving         = ref(false)
 const editError          = ref('')
 const editParentsLoading = ref(false)
 const editParents        = ref<ParentLink[]>([])
+
+const allClassrooms = ref<Classroom[]>([])
+const filteredClassrooms = computed(() =>
+  editTarget.value
+    ? allClassrooms.value.filter(c => c.gradeLevel === editTarget.value!.gradeLevel)
+    : []
+)
+const filteredClassroomsForAdd = computed(() =>
+  allClassrooms.value.filter(c => c.gradeLevel === addForm.value.gradeLevel)
+)
 const editFamilyLoading  = ref(false)
 const editFamilyStudents = ref<FamilyMember[]>([])
 const editFamilyParents  = ref<FamilyParent[]>([])
@@ -1541,14 +1559,14 @@ async function promoteAll() {
 
 // ── Map raw API student to local Student shape ────────────────────────────────
 function mapStudent(s: any): Student {
-  const grade = s.gradeLevel ?? s.grade_level ?? s.grade ?? ''
+  const grade = s.gradeLevel ?? s.grade_level ?? s.grade ?? s.studentProfile?.gradeLevel ?? ''
   return {
     uid:           s.uid ?? s._id,
     firstName:     s.firstName ?? s.first_name,
     lastName:      s.lastName  ?? s.last_name,
     gradeLevel:    grade,
-    className:     s.className  ?? s.class_name  ?? '',
-    guardianEmail: s.guardianEmail ?? s.guardian_email,
+    className:     s.className ?? s.class_name ?? s.studentProfile?.className ?? '',
+    guardianEmail: s.guardianEmail ?? s.guardian_email ?? s.studentProfile?.guardianEmail,
     cardUid:       s.cardUid ?? s.card_uid,
     cardStatus:    s.cardStatus ?? undefined,
     balance:       s.balance ?? 0,
@@ -1585,6 +1603,11 @@ onMounted(async () => {
     }
   } catch {
     // keep fallback values
+  }
+  try {
+    allClassrooms.value = await listClassrooms()
+  } catch {
+    // classrooms optional — edit modal falls back to text input if empty
   }
 })
 </script>

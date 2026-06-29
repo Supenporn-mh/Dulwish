@@ -262,7 +262,7 @@ onMounted(async () => {
   <div class="page">
 
     <!-- Section 1: Greeting -->
-    <div class="px-4 pt-4 pb-3">
+    <div class="px-4 pt-4 pb-3 md:px-6 lg:px-8">
       <h1 class="text-[22px] font-medium" style="color: var(--color-text-primary)">
         {{ userName || locale.t('ผู้ปกครอง', 'Parent') }}
       </h1>
@@ -326,9 +326,9 @@ onMounted(async () => {
     </div>
 
     <!-- Section 3: Quick actions ────────────────────────────────────── -->
-    <p class="ios-section-header">{{ locale.t('การดำเนินการ', 'Quick Actions') }}</p>
-    <div class="px-4">
-      <div class="grid grid-cols-2 gap-3">
+    <p class="ios-section-header md:px-6 lg:px-8">{{ locale.t('การดำเนินการ', 'Quick Actions') }}</p>
+    <div class="px-4 md:px-6 lg:px-8">
+      <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
         <button
           v-for="action in quickActions"
           :key="action.label"
@@ -348,8 +348,11 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- Sections 4+5: responsive 2-col on lg+ ───────────────────────── -->
+    <div class="lg:grid lg:grid-cols-2 lg:gap-6 lg:px-8 lg:mt-2">
+
     <!-- Section 4b: Today's Booking ─────────────────────────────────── -->
-    <div class="px-4 mt-4">
+    <div class="px-4 mt-4 md:px-6 lg:px-0 lg:mt-0">
       <div class="flex items-center justify-between mb-2">
         <p class="text-[13px] font-medium uppercase tracking-wide" style="color: var(--color-text-secondary)">
           {{ locale.t('การจองวันนี้', "Today's Booking") }}
@@ -423,8 +426,9 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Section 5: Recent transactions ──────────────────────────────── -->
-    <div class="flex items-center justify-between px-4 pt-5 pb-2">
+    <!-- Section 5: Recent transactions (right col on lg+) ────────────── -->
+    <div>
+    <div class="flex items-center justify-between px-4 pt-5 pb-2 md:px-6 lg:px-0 lg:pt-0 lg:mt-4">
       <p class="text-[13px] font-medium uppercase tracking-wide" style="color: var(--color-text-secondary)">
         {{ locale.t('รายการล่าสุด', 'Recent Transactions') }}
       </p>
@@ -435,7 +439,7 @@ onMounted(async () => {
       >{{ locale.t('ดูทั้งหมด', 'View All') }}</button>
     </div>
 
-    <div class="px-4 pb-8">
+    <div class="px-4 pb-8 md:px-6 lg:px-0">
       <!-- Skeleton -->
       <div v-if="loading" class="card overflow-hidden">
         <div v-for="i in 3" :key="i" class="flex items-center gap-3 px-4 py-[13px]"
@@ -480,6 +484,8 @@ onMounted(async () => {
         <p class="text-[14px] mt-2">{{ locale.t('ยังไม่มีรายการ', 'No transactions yet') }}</p>
       </div>
     </div>
+    </div> <!-- /section 5 col wrapper -->
+    </div> <!-- /sections 4+5 grid -->
 
   </div>
 </template>
@@ -509,6 +515,12 @@ onMounted(async () => {
   flex: 0 0 calc(100% - 68px); /* leaves ~40px peek for next card */
   scroll-snap-align: start;
   cursor: default;
+}
+
+@media (min-width: 640px) {
+  .carousel-card {
+    flex: 0 0 320px;
+  }
 }
 
 .carousel-spacer {

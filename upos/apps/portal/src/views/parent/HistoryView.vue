@@ -383,7 +383,7 @@ watch(() => parentStore.selectedChildId, (newId) => {
     <!-- ── Sticky top block: title + month nav + tabs ─────────────────── -->
     <div class="sticky-top">
       <!-- Title row -->
-      <div class="px-4 pt-4 pb-2 flex items-center justify-between">
+      <div class="px-4 pt-4 pb-2 flex items-center justify-between md:px-6 lg:px-8">
         <p class="text-[22px] font-medium" style="color:var(--color-text-primary)">
           {{ locale.t('ประวัติรายการ','Transactions History') }}
         </p>
@@ -404,7 +404,7 @@ watch(() => parentStore.selectedChildId, (newId) => {
     </div>
 
     <!-- ── Sub-header: subtitle + date filter + summary ──────────────── -->
-    <div class="px-4 pt-3 pb-4" style="background:var(--color-bg-surface); border-bottom:0.5px solid var(--color-border-tertiary)">
+    <div class="px-4 pt-3 pb-4 md:px-6 lg:px-8" style="background:var(--color-bg-surface); border-bottom:0.5px solid var(--color-border-tertiary)">
       <!-- Summary cards -->
       <div class="grid grid-cols-2 gap-3 mt-3">
         <div class="sum-card sum-topup">
@@ -423,7 +423,7 @@ watch(() => parentStore.selectedChildId, (newId) => {
     </div>
 
     <!-- ── Skeleton ───────────────────────────────────────────────────── -->
-    <div v-if="loading" class="px-4 pt-4 pb-8 space-y-4">
+    <div v-if="loading" class="px-4 pt-4 pb-8 space-y-4 md:px-6 lg:px-8">
       <div v-for="g in 2" :key="g">
         <div class="h-3 w-16 rounded animate-pulse mb-2" style="background:var(--color-border-tertiary)"/>
         <div class="card overflow-hidden">
@@ -441,7 +441,7 @@ watch(() => parentStore.selectedChildId, (newId) => {
     </div>
 
     <!-- ── Grouped list ────────────────────────────────────────────────── -->
-    <div v-else class="px-4 pt-3 pb-8 space-y-1">
+    <div v-else class="px-4 pt-3 pb-8 space-y-1 md:px-6 lg:px-8">
       <template v-for="group in grouped" :key="group.label">
 
         <!-- Date label (section header style) -->

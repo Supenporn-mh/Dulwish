@@ -477,6 +477,7 @@ function statusLabel(s: MealSession) {
 
 <template>
   <div class="page-content">
+  <div class="w-full max-w-[720px] mx-auto">
 
     <!-- Load error banner -->
     <div v-if="loadError" class="info-banner mx-4 mt-4" style="background: var(--color-danger-bg)">
@@ -627,6 +628,7 @@ function statusLabel(s: MealSession) {
       </div>
     </div>
 
+  </div> <!-- /centering wrapper -->
   </div>
 
   <!-- ── Menu sheet (item selection) ──────────────────────────────────────── -->

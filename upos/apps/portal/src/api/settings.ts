@@ -3,6 +3,7 @@ import type {
   WalletPermission,
   AcademicYear,
   GradeLevel,
+  Classroom,
   Branch,
   StoreSettings,
 } from './types'
@@ -132,5 +133,32 @@ export async function updateBranch(code: string, payload: Partial<Branch>): Prom
 
 export async function deleteBranch(code: string): Promise<{ ok: true }> {
   const { data } = await api.delete(`/settings/branches/${code}`)
+  return data
+}
+
+// ── Classrooms (/settings/classrooms) ────────────────────────────────────────
+
+function normClassroom(c: any): Classroom {
+  return { ...c, id: String(c._id ?? c.id) }
+}
+
+export async function listClassrooms(gradeLevel?: string): Promise<Classroom[]> {
+  const params = gradeLevel ? { gradeLevel } : {}
+  const { data } = await api.get('/settings/classrooms', { params })
+  return (data.classrooms ?? []).map(normClassroom)
+}
+
+export async function createClassroom(payload: Omit<Classroom, 'id'>): Promise<Classroom> {
+  const { data } = await api.post('/settings/classrooms', payload)
+  return normClassroom(data.classroom)
+}
+
+export async function updateClassroom(id: string, payload: Partial<Classroom>): Promise<Classroom> {
+  const { data } = await api.patch(`/settings/classrooms/${id}`, payload)
+  return normClassroom(data.classroom)
+}
+
+export async function deleteClassroom(id: string): Promise<{ ok: true }> {
+  const { data } = await api.delete(`/settings/classrooms/${id}`)
   return data
 }

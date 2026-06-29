@@ -146,6 +146,7 @@ onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })
 
 <template>
   <div class="flex-1 flex flex-col overflow-y-auto" style="background: var(--color-bg-page)">
+  <div class="flex-1 flex flex-col w-full max-w-[560px] mx-auto">
 
     <!-- Child card (read-only — locked, change on dashboard) -->
     <div class="px-4 pt-2 pb-3 flex-shrink-0">
@@ -403,5 +404,6 @@ onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })
       </div>
     </Teleport>
 
+  </div> <!-- /centering wrapper -->
   </div>
 </template>

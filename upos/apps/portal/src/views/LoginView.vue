@@ -327,7 +327,7 @@ async function sendForgotOtp() {
   forgotLoading.value = true; forgotError.value = ''
   try {
     const res = await api.post('/auth/forgot-password/send', { contact: forgotContact.value.trim().toLowerCase() })
-    forgotOtpDemo.value = res.data.otp ?? ''
+    forgotOtpDemo.value = res.data.demoOtp ?? res.data.otp ?? ''
     forgotStep.value = 2
   } catch (e: any) {
     forgotError.value = translateApiError(e?.response?.data?.error?.message, 'เกิดข้อผิดพลาด', 'An error occurred')

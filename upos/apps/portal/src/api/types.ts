@@ -134,6 +134,14 @@ export interface GradeLevel {
   canRepeat: boolean
 }
 
+export interface Classroom {
+  id: string
+  code: string
+  name: string
+  gradeLevel: string
+  sortOrder: number
+}
+
 export interface BuffetRound {
   id: string
   name: string

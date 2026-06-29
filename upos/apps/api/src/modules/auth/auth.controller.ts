@@ -167,7 +167,8 @@ export const authController = new Elysia({ prefix: '/auth' })
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
     OTP_STORE.set(`reg:${code}:${contact}`, { otp, expiresAt })
 
-    return { expiresAt: expiresAt.toISOString(), ...(IS_DEV && { demoOtp: otp }) }
+    // demoOtp always returned until SMS delivery is configured
+    return { expiresAt: expiresAt.toISOString(), demoOtp: otp }
   }, {
     body: t.Object({
       enrollmentCode: t.String({ minLength: 1 }),
@@ -394,8 +395,9 @@ export const authController = new Elysia({ prefix: '/auth' })
     const otp       = generateOtp()
     const expiresAt = new Date(Date.now() + 14 * 24 * 3600 * 1000) // 14 days (same as mock)
     OTP_STORE.set(contact, { otp, expiresAt, studentId })
-    if (IS_DEV) console.log(`[OTP] ${contact} → ${otp}`)
-    return { sent: true, expiresAt: expiresAt.toISOString(), ...(IS_DEV && { otp, _demo: `OTP: ${otp}` }) }
+    console.log(`[OTP] ${contact} → ${otp}`)
+    // demoOtp always returned until SMS delivery is configured
+    return { sent: true, expiresAt: expiresAt.toISOString(), demoOtp: otp }
   }, {
     body: t.Object({
       studentId: t.String({ minLength: 1 }),
@@ -554,8 +556,9 @@ export const authController = new Elysia({ prefix: '/auth' })
     const otp       = generateOtp()
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 min
     OTP_STORE.set(`reset_${contact}`, { otp, expiresAt })
-    if (IS_DEV) console.log(`[OTP reset] ${contact} → ${otp}`)
-    return { sent: true, ...(IS_DEV && { otp, _demo: `OTP: ${otp}` }) }
+    console.log(`[OTP reset] ${contact} → ${otp}`)
+    // demoOtp always returned until SMS delivery is configured
+    return { sent: true, demoOtp: otp }
   }, {
     body: t.Object({ contact: t.String({ minLength: 1 }) }),
   })
