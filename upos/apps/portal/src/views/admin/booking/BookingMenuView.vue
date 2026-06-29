@@ -221,6 +221,10 @@
                 <input v-model="form.ingredient" class="bm-input" placeholder="ส่วนผสม (ถ้ามี)" />
               </div>
             </div>
+            <div class="bm-field">
+              <label class="bm-label">ราคา (บาท)</label>
+              <input v-model.number="form.price" type="number" min="0" class="bm-input" placeholder="0" />
+            </div>
             <div style="display:flex;gap:12px">
               <div class="bm-field" style="flex:1">
                 <label class="bm-label">วันที่เริ่ม</label>
@@ -285,7 +289,7 @@ const currentPage = ref(1)
 const showModal   = ref(false)
 const showImportModal = ref(false)
 const editTarget  = ref<BookingMenu | null>(null)
-const form        = ref({ name:'', ingredient:'', timeSlot:'Breakfast', enabled:true, startDate:'', endDate:'' })
+const form        = ref({ name:'', ingredient:'', timeSlot:'Breakfast', price:0, enabled:true, startDate:'', endDate:'' })
 const saving      = ref(false)
 const saveError   = ref('')
 
@@ -300,15 +304,15 @@ const filtered = computed(() => {
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize.value)))
 const paginated  = computed(() => filtered.value.slice((currentPage.value-1)*pageSize.value, currentPage.value*pageSize.value))
 
-function openCreate() { editTarget.value=null; form.value={name:'',ingredient:'',timeSlot:'Breakfast',enabled:true,startDate:'',endDate:''}; saveError.value=''; showModal.value=true }
-function openEdit(m: BookingMenu) { editTarget.value=m; form.value={name:m.name,ingredient:m.ingredient,timeSlot:m.timeSlot,enabled:m.enabled,startDate:m.startDate,endDate:m.endDate}; saveError.value=''; showModal.value=true }
+function openCreate() { editTarget.value=null; form.value={name:'',ingredient:'',timeSlot:'Breakfast',price:0,enabled:true,startDate:'',endDate:''}; saveError.value=''; showModal.value=true }
+function openEdit(m: BookingMenu) { editTarget.value=m; form.value={name:m.name,ingredient:m.ingredient,timeSlot:m.timeSlot,price:m.price??0,enabled:m.enabled,startDate:m.startDate,endDate:m.endDate}; saveError.value=''; showModal.value=true }
 
 async function save() {
   if (!form.value.name || saving.value) return
   saving.value = true
   saveError.value = ''
   try {
-    const payload = { name: form.value.name, ingredient: form.value.ingredient, timeSlot: form.value.timeSlot, enabled: form.value.enabled, startDate: form.value.startDate, endDate: form.value.endDate }
+    const payload = { name: form.value.name, ingredient: form.value.ingredient, timeSlot: form.value.timeSlot, price: form.value.price, enabled: form.value.enabled, startDate: form.value.startDate, endDate: form.value.endDate }
     if (editTarget.value) {
       const updated = await updateBookingMenu(String(editTarget.value.id), payload)
       const idx = menus.value.findIndex(m => m.id === editTarget.value!.id)

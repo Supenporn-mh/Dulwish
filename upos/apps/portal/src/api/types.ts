@@ -67,6 +67,7 @@ export interface BookingMenu {
   name: string
   ingredient: string
   timeSlot: string
+  price: number
   enabled: boolean
   startDate: string
   endDate: string
