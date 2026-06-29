@@ -296,6 +296,8 @@ export interface BookingMenuImportRow {
   timeSlot: string
   /** เปิดใช้งาน / ปิดใช้งาน */
   status?: string
+  /** ราคา (บาท) */
+  price?: number
   /** DD/MM/YYYY */
   startDate?: string
   /** DD/MM/YYYY */

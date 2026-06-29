@@ -120,6 +120,7 @@ export const bookingController = new Elysia({ prefix: '/booking' })
           ? row.status.toLowerCase().includes('เปิด') || row.status.toLowerCase() === 'true'
           : true
         const update: Record<string, unknown> = { name: row.name, timeSlot, enabled }
+        if (row.price     !== undefined) update.price     = row.price
         if (row.startDate !== undefined) update.startDate = row.startDate
         if (row.endDate   !== undefined) update.endDate   = row.endDate
         const existing = await BookingMenu.findOne(filter)
@@ -142,6 +143,7 @@ export const bookingController = new Elysia({ prefix: '/booking' })
         name:      t.String(),
         timeSlot:  t.String(),
         status:    t.Optional(t.String()),
+        price:     t.Optional(t.Number()),
         startDate: t.Optional(t.String()),
         endDate:   t.Optional(t.String()),
       })),

@@ -367,15 +367,15 @@ function downloadTemplate() {
   const wb = XLSX.utils.book_new()
 
   // Sheet 1: Template with examples
-  const headers = ['ชื่อเมนู*','ช่วงเวลาการจอง* (คั่นด้วย ,)','สถานะ','วันที่เริ่ม (DD/MM/YYYY)','วันที่สิ้นสุด (DD/MM/YYYY)']
+  const headers = ['ชื่อเมนู*','ช่วงเวลาการจอง* (คั่นด้วย ,)','สถานะ','ราคา (บาท)','วันที่เริ่ม (DD/MM/YYYY)','วันที่สิ้นสุด (DD/MM/YYYY)']
   const example = [
-    ['PWB แกงเขียวหวานไก่',                                        'Breakfast',              'เปิดใช้งาน','25/03/2026','25/03/2026'],
-    ['ข้าวสวย / ข้าวกล้อง, เกี้ยวซ่, หมูตัว, พริกเกลือ, หน่อไม้', 'Dinner',                 'เปิดใช้งาน','25/03/2026','25/03/2026'],
-    ['ข้าวสวย /ข้าวกล้อง, กะเพราเป็ด, ทอดมันปลา',                  'Breakfast,Lunch',        'เปิดใช้งาน','24/03/2026','24/03/2026'],
-    ['ชุดอาหารเช้าแบบอเมริกัน',                                     'Breakfast,Lunch,Dinner', 'เปิดใช้งาน','24/03/2026','25/03/2026'],
+    ['PWB แกงเขียวหวานไก่',                                        'Breakfast',              'เปิดใช้งาน', 35, '25/03/2026','25/03/2026'],
+    ['ข้าวสวย / ข้าวกล้อง, เกี้ยวซ่, หมูตัว, พริกเกลือ, หน่อไม้', 'Dinner',                 'เปิดใช้งาน', 45, '25/03/2026','25/03/2026'],
+    ['ข้าวสวย /ข้าวกล้อง, กะเพราเป็ด, ทอดมันปลา',                  'Breakfast,Lunch',        'เปิดใช้งาน',  0, '24/03/2026','24/03/2026'],
+    ['ชุดอาหารเช้าแบบอเมริกัน',                                     'Breakfast,Lunch,Dinner', 'เปิดใช้งาน', 60, '24/03/2026','25/03/2026'],
   ]
   const ws = XLSX.utils.aoa_to_sheet([headers, ...example])
-  ws['!cols'] = [{wch:48},{wch:12},{wch:14},{wch:22},{wch:22}]
+  ws['!cols'] = [{wch:48},{wch:12},{wch:14},{wch:12},{wch:22},{wch:22}]
   XLSX.utils.book_append_sheet(wb, ws, 'ต้นฉบับ')
 
   // Sheet 2: Instructions
@@ -385,6 +385,7 @@ function downloadTemplate() {
     ['ชื่อเมนู*','ชื่อเมนูหรือรายการอาหาร (รองรับข้อความยาว)','PWB แกงเขียวหวานไก่','ใช่'],
     ['ช่วงเวลา*','ช่วงเวลาการจอง ถ้ามีมากกว่า 1 ให้คั่นด้วย , เช่น Breakfast,Lunch','Breakfast หรือ Breakfast,Lunch,Dinner','ใช่'],
     ['สถานะ','สถานะเมนู','เปิดใช้งาน หรือ ปิดใช้งาน','ไม่จำเป็น (default: เปิดใช้งาน)'],
+    ['ราคา (บาท)','ราคาสินค้าเป็นตัวเลข (ไม่ต้องใส่หน่วย)','35','ไม่จำเป็น (default: 0)'],
     ['วันที่เริ่ม','วันที่เริ่มเมนูนี้ รูปแบบ DD/MM/YYYY','25/03/2026','ไม่จำเป็น'],
     ['วันที่สิ้นสุด','วันที่สิ้นสุดเมนูนี้ รูปแบบ DD/MM/YYYY','25/03/2026','ไม่จำเป็น'],
     [''],
@@ -421,8 +422,9 @@ async function confirmImport() {
         name:      String(r[0] ?? '').trim(),
         timeSlot:  String(r[1] ?? '').trim(),
         status:    r[2] ? String(r[2]).trim() : undefined,
-        startDate: r[3] ? String(r[3]).trim() : undefined,
-        endDate:   r[4] ? String(r[4]).trim() : undefined,
+        price:     r[3] !== undefined && r[3] !== '' ? Number(r[3]) : undefined,
+        startDate: r[4] ? String(r[4]).trim() : undefined,
+        endDate:   r[5] ? String(r[5]).trim() : undefined,
       })
     }
 
