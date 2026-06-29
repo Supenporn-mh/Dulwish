@@ -398,17 +398,13 @@
             <div class="edit-field-row">
               <div class="edit-field">
                 <label class="promo-label">ชั้นปี <span style="color:var(--color-danger)">*</span></label>
-                <select v-model="addForm.gradeLevel" class="promo-select" @change="addForm.className = ''">
+                <select v-model="addForm.gradeLevel" class="promo-select">
                   <option v-for="g in GRADES" :key="g" :value="g">{{ g }}</option>
                 </select>
               </div>
               <div class="edit-field">
                 <label class="promo-label">ห้องเรียน</label>
-                <select v-if="filteredClassroomsForAdd.length > 0" v-model="addForm.className" class="promo-select">
-                  <option value="">— ไม่ระบุ —</option>
-                  <option v-for="c in filteredClassroomsForAdd" :key="c.id" :value="c.code">{{ c.code }}</option>
-                </select>
-                <input v-else v-model="addForm.className" class="edit-input" placeholder="เช่น P1-A" />
+                <input v-model="addForm.className" class="edit-input" placeholder="เช่น P1-A" />
               </div>
             </div>
             <div class="edit-field">
@@ -465,11 +461,7 @@
               </div>
               <div class="edit-field">
                 <label class="promo-label">ห้องเรียน</label>
-                <select v-if="filteredClassrooms.length > 0" v-model="editTarget.className" class="promo-select">
-                  <option value="">— ไม่ระบุ —</option>
-                  <option v-for="c in filteredClassrooms" :key="c.id" :value="c.code">{{ c.code }}</option>
-                </select>
-                <input v-else v-model="editTarget.className" class="edit-input" placeholder="เช่น K1-A" />
+                <input v-model="editTarget.className" class="edit-input" placeholder="เช่น K1-A" />
               </div>
             </div>
             <div class="edit-field">
@@ -858,8 +850,7 @@ import {
 } from '@phosphor-icons/vue'
 import * as XLSX from 'xlsx'
 import api from '@/api/axios'
-import { listAcademicYears, listClassrooms } from '@/api/settings'
-import type { Classroom } from '@/api/types'
+import { listAcademicYears } from '@/api/settings'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Student {
@@ -1036,15 +1027,6 @@ const editError          = ref('')
 const editParentsLoading = ref(false)
 const editParents        = ref<ParentLink[]>([])
 
-const allClassrooms = ref<Classroom[]>([])
-const filteredClassrooms = computed(() =>
-  editTarget.value
-    ? allClassrooms.value.filter(c => c.gradeLevel === editTarget.value!.gradeLevel)
-    : []
-)
-const filteredClassroomsForAdd = computed(() =>
-  allClassrooms.value.filter(c => c.gradeLevel === addForm.value.gradeLevel)
-)
 const editFamilyLoading  = ref(false)
 const editFamilyStudents = ref<FamilyMember[]>([])
 const editFamilyParents  = ref<FamilyParent[]>([])
@@ -1603,11 +1585,6 @@ onMounted(async () => {
     }
   } catch {
     // keep fallback values
-  }
-  try {
-    allClassrooms.value = await listClassrooms()
-  } catch {
-    // classrooms optional — edit modal falls back to text input if empty
   }
 })
 </script>

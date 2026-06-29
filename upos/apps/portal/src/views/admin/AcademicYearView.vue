@@ -348,11 +348,6 @@
       <GradeLevelTab />
     </template>
 
-    <!-- Tab: ห้องเรียน -->
-    <template v-if="activeTab === 'classrooms'">
-      <ClassroomTab />
-    </template>
-
     </div><!-- /ay-content -->
 
   </div>
@@ -373,12 +368,10 @@ import {
   deleteAcademicYear,
 } from '@/api/settings'
 import GradeLevelTab from './GradeLevelTab.vue'
-import ClassroomTab from './ClassroomTab.vue'
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 const tabs = [
   { key: 'semesters',   label: 'ภาคเรียน' },
   { key: 'gradeLevels', label: 'ชั้นเรียน' },
-  { key: 'classrooms',  label: 'ห้องเรียน' },
 ] as const
 type TabKey = typeof tabs[number]['key']
 const activeTab = ref<TabKey>('semesters')
