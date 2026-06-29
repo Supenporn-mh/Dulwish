@@ -478,7 +478,6 @@
               </div>
             </div>
             <!-- RFID -->
-            <div class="promo-divider" style="margin:4px -24px;width:calc(100% + 48px)" />
             <div class="edit-field-row" style="align-items:flex-end">
               <div class="edit-field" style="flex:2">
                 <label class="promo-label">รหัสบัตร RFID <span style="color:#AEAEB2;font-weight:400">(ถ้ามี)</span></label>
