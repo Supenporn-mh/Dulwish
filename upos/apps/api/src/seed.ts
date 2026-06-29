@@ -109,19 +109,19 @@ const uAdmin = await User.create({
   passwordHash: hash('Admin1234!'), status: 'active',
 })
 const uSuper = await User.create({
-  uid: 'SUP-001', role: 'supervisor', email: 'supervisor@dulwich.ac.th',
-  firstName: 'สมใจ', lastName: 'จันทร์พิมพ์',
+  uid: 'SUP-001', role: 'supervisor', email: 'patcha@school.local',
+  firstName: 'พัชรา', lastName: 'จันทร์พิมพ์',
   passwordHash: hash('Super123!'), status: 'active',
 })
 const uCashier = await User.create({
-  uid: 'CSH-001', role: 'cashier', email: 'cashier@dulwich.ac.th',
-  firstName: 'ธนกฤต', lastName: 'มาลัยรัตน์',
+  uid: 'CSH-001', role: 'cashier', email: 'nong@school.local',
+  firstName: 'น้อง', lastName: 'มาลัยรัตน์',
   passwordHash: hash('Cashier123!'), status: 'active',
 })
 // Parents
 const uParent1 = await User.create({
-  uid: 'PAR-001', role: 'parent', email: 'ruttana@gmail.com', phone: '0812345678',
-  firstName: 'รัตนา', lastName: 'ศรีวิไล',
+  uid: 'PAR-001', role: 'parent', email: 'suchat@dulwich.ac.th', phone: '0812345678',
+  firstName: 'สุชาติ', lastName: 'ศรีวิไล',
   passwordHash: hash(PW), status: 'active', pdpaAcceptedAt: new Date('2025-05-19'),
 })
 const uParent2 = await User.create({
@@ -295,15 +295,24 @@ const btsBreak = await BookingTimeSlot.create({ name: 'Breakfast', meal: 'breakf
 const btsLunch = await BookingTimeSlot.create({ name: 'Lunch',     meal: 'lunch',     startTime: '11:00', endTime: '12:30', capacity: 100, cutoffHours: 3, description: 'มื้อกลางวัน', enabled: true })
 console.log('[Seed] BookingTimeSlots created')
 
-// ── 16. BOOKING MENUS ─────────────────────────────────────────────────────────
+// ── 16. BOOKING MENUS (3–4 per slot, Title-case timeSlot, with price) ──────────
 await BookingMenu.insertMany([
-  { name: 'ข้าวต้มหมู',         ingredient: 'หมู,ข้าว',    timeSlot: 'breakfast', enabled: true,  startDate: '2025-05-19', endDate: '2026-03-31' },
-  { name: 'ข้าวไข่ดาว',         ingredient: 'ไข่,ข้าว',    timeSlot: 'breakfast', enabled: true,  startDate: '2025-05-19', endDate: '2026-03-31' },
-  { name: 'ข้าวผัดกระเพราหมู',  ingredient: 'หมู,กะเพรา',  timeSlot: 'lunch',     enabled: true,  startDate: '2025-05-19', endDate: '2026-03-31' },
-  { name: 'ข้าวมันไก่',          ingredient: 'ไก่,ข้าว',    timeSlot: 'lunch',     enabled: true,  startDate: '2025-05-19', endDate: '2026-03-31' },
-  { name: 'ข้าวหมูกรอบ',         ingredient: 'หมู,ข้าว',    timeSlot: 'lunch',     enabled: false, startDate: '2025-05-19', endDate: '2025-12-31' },  // ปิด
+  // ─── Breakfast ───
+  { name: 'ข้าวต้มหมู',                      ingredient: 'หมู,ข้าว,ขิง,ต้นหอม',          timeSlot: 'Breakfast', price: 35,  enabled: true,  startDate: '2025-05-19', endDate: '2026-03-31' },
+  { name: 'ข้าวไข่ดาว + หมูทอด',             ingredient: 'ไข่,หมู,ข้าว,ซอสมะเขือเทศ',    timeSlot: 'Breakfast', price: 40,  enabled: true,  startDate: '2025-05-19', endDate: '2026-03-31' },
+  { name: 'ขนมปังปิ้งไข่กวน',                ingredient: 'ขนมปัง,ไข่,เนย,น้ำตาล',         timeSlot: 'Breakfast', price: 30,  enabled: true,  startDate: '2025-05-19', endDate: '2026-03-31' },
+  { name: 'โจ๊กไก่',                          ingredient: 'ไก่,ข้าว,ขิง,ซีอิ๊ว',          timeSlot: 'Breakfast', price: 35,  enabled: false, startDate: '2025-05-19', endDate: '2026-03-31' },  // ปิดชั่วคราว
+  // ─── Lunch ───
+  { name: 'ข้าวผัดกะเพราหมูสับ + ไข่ดาว',   ingredient: 'หมูสับ,กะเพรา,ไข่,ข้าว,พริก',  timeSlot: 'Lunch',     price: 55,  enabled: true,  startDate: '2025-05-19', endDate: '2026-03-31' },
+  { name: 'ข้าวมันไก่ต้ม',                    ingredient: 'ไก่,ข้าว,น้ำซุป,น้ำจิ้ม',       timeSlot: 'Lunch',     price: 50,  enabled: true,  startDate: '2025-05-19', endDate: '2026-03-31' },
+  { name: 'ก๋วยเตี๋ยวหมูน้ำใส',              ingredient: 'หมู,เส้นเล็ก,น้ำซุป,ผักชี',     timeSlot: 'Lunch',     price: 45,  enabled: true,  startDate: '2025-05-19', endDate: '2026-03-31' },
+  { name: 'ข้าวหมูกรอบราดน้ำแดง',            ingredient: 'หมูกรอบ,ข้าว,น้ำแดง',           timeSlot: 'Lunch',     price: 60,  enabled: false, startDate: '2025-05-19', endDate: '2025-12-31' },  // ปิด
+  // ─── Dinner ───
+  { name: 'ข้าวผัดไก่ซอสบ๊วย',               ingredient: 'ไก่,ข้าว,ซอสบ๊วย,แครอท',        timeSlot: 'Dinner',    price: 55,  enabled: true,  startDate: '2025-05-19', endDate: '2026-03-31' },
+  { name: 'ผัดซีอิ๊วหมู',                    ingredient: 'หมู,เส้นใหญ่,ผักคะน้า,ไข่',     timeSlot: 'Dinner',    price: 55,  enabled: true,  startDate: '2025-05-19', endDate: '2026-03-31' },
+  { name: 'ต้มยำกุ้งน้ำข้น + ข้าว',          ingredient: 'กุ้ง,เห็ด,ตะไคร้,ใบมะกรูด',     timeSlot: 'Dinner',    price: 75,  enabled: true,  startDate: '2025-05-19', endDate: '2026-03-31' },
 ])
-console.log('[Seed] BookingMenus created')
+console.log('[Seed] BookingMenus created (4 Breakfast, 4 Lunch, 3 Dinner — with price)')
 
 // ── 17. BOOKING CONFIG & BLACKOUT (now proper models, not Policy) ────────────
 await BookingConfig.create({ key: 'default', openDays: [1,2,3,4,5] })
@@ -495,7 +504,7 @@ await Booking.insertMany([
   {
     code: 'BK-20250609-001', name: 'นิรันดร์ ศรีวิไล',
     type: 'student', bookingDate: '2025-06-09',
-    slotId: btsLunch._id, slot: 'Lunch', slotTime: '11:00-12:30',
+    slotId: btsLunch._id, slot: 'Lunch', slotTime: '11:00–12:30',
     status: 'จองแล้ว', bookedAt: new Date('2025-06-08T18:00:00Z'),
     adminCode: 'ADM-001',
     studentUserId: uStudent1._id, parentUserId: uParent1._id,
@@ -503,7 +512,7 @@ await Booking.insertMany([
   {
     code: 'BK-20250608-001', name: 'พิมพ์ใจ ศรีวิไล',
     type: 'student', bookingDate: '2025-06-08',
-    slotId: btsBreak._id, slot: 'Breakfast', slotTime: '07:00-08:30',
+    slotId: btsBreak._id, slot: 'Breakfast', slotTime: '07:00–08:30',
     status: 'เสร็จสิ้น', bookedAt: new Date('2025-06-07T19:00:00Z'),
     adminCode: 'ADM-001',
     studentUserId: uStudent2._id, parentUserId: uParent1._id,
@@ -601,9 +610,9 @@ console.log('[Seed] AuditLog created')
 console.log('\n✅ Seed complete!')
 console.log('\n📋 Demo Accounts:')
 console.log('  Admin:      admin@dulwich.ac.th        / Admin1234!')
-console.log('  Supervisor: supervisor@dulwich.ac.th   / Super123!')
-console.log('  Cashier:    cashier@dulwich.ac.th      / Cashier123!')
-console.log('  Parent1:    ruttana@gmail.com          / Demo1234!  (มี 2 ลูก)')
+console.log('  Supervisor: patcha@school.local        / Super123!')
+console.log('  Cashier:    nong@school.local          / Cashier123!')
+console.log('  Parent1:    suchat@dulwich.ac.th       / Demo1234!  (มี 2 ลูก)')
 console.log('  Parent2:    prasit@gmail.com           / Demo1234!  (มี 1 ลูก ยังไม่ link)')
 console.log('  Teacher:    anna@dulwich.ac.th         / Teacher123!')
 console.log('  Member:     somchai@dulwich.ac.th      / Demo1234!')
