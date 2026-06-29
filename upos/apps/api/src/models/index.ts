@@ -14,11 +14,12 @@ const userSchema = new Schema({
   status:          { type: String, default: 'active', enum: ['active','inactive','suspended'] },
   pdpaAcceptedAt:  { type: Date },
   studentProfile:  {
-    gradeLevel:    String,
-    className:     String,
-    dob:           Date,
-    guardianEmail: String,
-    familyCode:    String,
+    gradeLevel:     String,
+    className:      String,
+    dob:            Date,
+    guardianEmail:  String,
+    guardianEmail2: String,
+    familyCode:     String,
   },
 }, { timestamps: true })
 userSchema.index({ email: 1 }, { unique: true, sparse: true })

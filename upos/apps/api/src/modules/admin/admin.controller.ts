@@ -253,38 +253,55 @@ export const adminController = new Elysia({ prefix: '/admin' })
     const students = await User.find({ role: 'student' }).lean()
     const studentIds = students.map(s => s._id)
 
-    const [wallets, cards, parentCounts] = await Promise.all([
+    const [wallets, cards, parentCounts, parentLinks] = await Promise.all([
       Wallet.find({ userId: { $in: studentIds } }).lean(),
       Card.find({ userId: { $in: studentIds } }).lean(),
       ParentStudent.aggregate([
         { $match: { studentUserId: { $in: studentIds } } },
         { $group: { _id: '$studentUserId', count: { $sum: 1 } } },
       ]),
+      ParentStudent.find({ studentUserId: { $in: studentIds } })
+        .populate<{ parentUserId: any }>('parentUserId', 'email phone firstName lastName')
+        .lean(),
     ])
 
-    const walletMap   = new Map(wallets.map(w => [String(w.userId), w]))
-    const cardMap     = new Map(cards.map(c => [String(c.userId), c]))
-    const parentMap   = new Map(parentCounts.map((p: any) => [String(p._id), p.count]))
+    const walletMap     = new Map(wallets.map(w => [String(w.userId), w]))
+    const cardMap       = new Map(cards.map(c => [String(c.userId), c]))
+    const parentMap     = new Map(parentCounts.map((p: any) => [String(p._id), p.count]))
+    const parentLinksMap = new Map<string, { email: string; phone: string; firstName: string; lastName: string }[]>()
+    for (const lnk of parentLinks) {
+      const sid = String(lnk.studentUserId)
+      const p   = lnk.parentUserId as any
+      if (!parentLinksMap.has(sid)) parentLinksMap.set(sid, [])
+      parentLinksMap.get(sid)!.push({
+        email:     p?.email     ?? '',
+        phone:     p?.phone     ?? '',
+        firstName: p?.firstName ?? '',
+        lastName:  p?.lastName  ?? '',
+      })
+    }
 
     const rows = students.map(s => {
       const id      = String(s._id)
       const wallet  = walletMap.get(id)
       const card    = cardMap.get(id)
       return {
-        _id:           id,
-        uid:           s.uid,
-        firstName:     s.firstName,
-        lastName:      s.lastName,
-        gradeLevel:    s.studentProfile?.gradeLevel ?? '',
-        className:     s.studentProfile?.className    ?? '',
-        guardianEmail: s.studentProfile?.guardianEmail ?? '',
-        familyCode:    s.studentProfile?.familyCode    ?? '',
-        cardUid:       card?.cardUid    ?? null,
-        cardStatus:    card?.status     ?? null,
-        balance:       wallet?.balance       ?? 0,
-        lowThreshold:  wallet?.lowThreshold  ?? 200,
-        parentCount:   parentMap.get(id) ?? 0,
-        status:        s.status,
+        _id:            id,
+        uid:            s.uid,
+        firstName:      s.firstName,
+        lastName:       s.lastName,
+        gradeLevel:     s.studentProfile?.gradeLevel    ?? '',
+        className:      s.studentProfile?.className     ?? '',
+        guardianEmail:  s.studentProfile?.guardianEmail  ?? '',
+        guardianEmail2: s.studentProfile?.guardianEmail2 ?? '',
+        familyCode:     s.studentProfile?.familyCode    ?? '',
+        cardUid:        card?.cardUid    ?? null,
+        cardStatus:     card?.status     ?? null,
+        balance:        wallet?.balance       ?? 0,
+        lowThreshold:   wallet?.lowThreshold  ?? 200,
+        parentCount:    parentMap.get(id) ?? 0,
+        linkedParents:  parentLinksMap.get(id) ?? [],
+        status:         s.status,
       }
     })
     return { students: rows }
@@ -301,10 +318,11 @@ export const adminController = new Elysia({ prefix: '/admin' })
         lastName:  (body as any).lastName,
         status:    'active',
         studentProfile: {
-          gradeLevel:    (body as any).gradeLevel    ?? '',
-          className:     (body as any).className     ?? '',
-          guardianEmail: (body as any).guardianEmail ?? '',
-          familyCode:    (body as any).familyCode    ?? '',
+          gradeLevel:     (body as any).gradeLevel     ?? '',
+          className:      (body as any).className      ?? '',
+          guardianEmail:  (body as any).guardianEmail  ?? '',
+          guardianEmail2: (body as any).guardianEmail2 ?? '',
+          familyCode:     (body as any).familyCode     ?? '',
         },
       })
       await Wallet.create({ userId: student._id, balance: 0 })
@@ -315,13 +333,14 @@ export const adminController = new Elysia({ prefix: '/admin' })
     }
   }, {
     body: t.Object({
-      firstName:     t.String(),
-      lastName:      t.String(),
-      gradeLevel:    t.Optional(t.String()),
-      className:     t.Optional(t.String()),
-      guardianEmail: t.Optional(t.String()),
-      familyCode:    t.Optional(t.String()),
-      uid:           t.Optional(t.String()),
+      firstName:      t.String(),
+      lastName:       t.String(),
+      gradeLevel:     t.Optional(t.String()),
+      className:      t.Optional(t.String()),
+      guardianEmail:  t.Optional(t.String()),
+      guardianEmail2: t.Optional(t.String()),
+      familyCode:     t.Optional(t.String()),
+      uid:            t.Optional(t.String()),
     }),
   })
 
@@ -332,10 +351,11 @@ export const adminController = new Elysia({ prefix: '/admin' })
     if (b.firstName     !== undefined) update.firstName                        = b.firstName
     if (b.lastName      !== undefined) update.lastName                         = b.lastName
     if (b.status        !== undefined) update.status                           = b.status
-    if (b.gradeLevel    !== undefined) update['studentProfile.gradeLevel']     = b.gradeLevel
-    if (b.className     !== undefined) update['studentProfile.className']      = b.className
-    if (b.guardianEmail !== undefined) update['studentProfile.guardianEmail']  = b.guardianEmail
-    if (b.familyCode    !== undefined) update['studentProfile.familyCode']     = b.familyCode
+    if (b.gradeLevel     !== undefined) update['studentProfile.gradeLevel']      = b.gradeLevel
+    if (b.className      !== undefined) update['studentProfile.className']       = b.className
+    if (b.guardianEmail  !== undefined) update['studentProfile.guardianEmail']   = b.guardianEmail
+    if (b.guardianEmail2 !== undefined) update['studentProfile.guardianEmail2']  = b.guardianEmail2
+    if (b.familyCode     !== undefined) update['studentProfile.familyCode']      = b.familyCode
 
     const student = await User.findOneAndUpdate(
       { uid: params.uid, role: 'student' },
@@ -346,13 +366,14 @@ export const adminController = new Elysia({ prefix: '/admin' })
     return { student }
   }, {
     body: t.Object({
-      firstName:     t.Optional(t.String()),
-      lastName:      t.Optional(t.String()),
-      gradeLevel:    t.Optional(t.String()),
-      className:     t.Optional(t.String()),
-      guardianEmail: t.Optional(t.String()),
-      familyCode:    t.Optional(t.String()),
-      status:        t.Optional(t.String()),
+      firstName:      t.Optional(t.String()),
+      lastName:       t.Optional(t.String()),
+      gradeLevel:     t.Optional(t.String()),
+      className:      t.Optional(t.String()),
+      guardianEmail:  t.Optional(t.String()),
+      guardianEmail2: t.Optional(t.String()),
+      familyCode:     t.Optional(t.String()),
+      status:         t.Optional(t.String()),
     }),
   })
 

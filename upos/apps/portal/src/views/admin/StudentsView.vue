@@ -167,10 +167,15 @@
 
             <!-- ผู้ปกครอง -->
             <td class="center">
-              <span class="adm-badge adm-badge-success" style="font-size:11px;padding:3px 10px;display:inline-flex;align-items:center;gap:4px">
-                <PhUsers :size="11" weight="fill" />
-                {{ s.parentCount ?? 0 }}/2
-              </span>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+                <span class="adm-badge adm-badge-success" style="font-size:11px;padding:3px 10px;display:inline-flex;align-items:center;gap:4px">
+                  <PhUsers :size="11" weight="fill" />
+                  {{ s.parentCount ?? 0 }}/2
+                </span>
+                <div v-for="(p, i) in s.linkedParents" :key="i" style="font-size:10px;color:#6B7280;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="p.email || p.phone">
+                  {{ p.email || p.phone }}
+                </div>
+              </div>
             </td>
 
             <!-- สิทธิ -->
@@ -403,9 +408,15 @@
                 </select>
               </div>
             </div>
-            <div class="edit-field">
-              <label class="promo-label">อีเมล / เบอร์ผู้ปกครอง</label>
-              <input v-model="addForm.guardianEmail" class="edit-input" placeholder="parent@example.com หรือ 08xxxxxxxx" />
+            <div class="edit-field-row">
+              <div class="edit-field">
+                <label class="promo-label">อีเมล / เบอร์ผู้ปกครองคนที่ 1</label>
+                <input v-model="addForm.guardianEmail" class="edit-input" placeholder="parent@example.com หรือ 08xxxxxxxx" />
+              </div>
+              <div class="edit-field">
+                <label class="promo-label">อีเมล / เบอร์ผู้ปกครองคนที่ 2</label>
+                <input v-model="addForm.guardianEmail2" class="edit-input" placeholder="parent2@example.com หรือ 08xxxxxxxx" />
+              </div>
             </div>
             <div class="edit-field">
               <label class="promo-label">รหัสนักเรียน <span style="color:#AEAEB2;font-weight:400">(ระบบจะสร้างให้อัตโนมัติถ้าไม่กรอก)</span></label>
@@ -456,9 +467,15 @@
                 </select>
               </div>
             </div>
-            <div class="edit-field">
-              <label class="promo-label">อีเมล / เบอร์ผู้ปกครอง</label>
-              <input v-model="editTarget.guardianEmail" class="edit-input" placeholder="parent@example.com หรือ 08xxxxxxxx" />
+            <div class="edit-field-row">
+              <div class="edit-field">
+                <label class="promo-label">อีเมล / เบอร์ผู้ปกครองคนที่ 1</label>
+                <input v-model="editTarget.guardianEmail" class="edit-input" placeholder="parent@example.com หรือ 08xxxxxxxx" />
+              </div>
+              <div class="edit-field">
+                <label class="promo-label">อีเมล / เบอร์ผู้ปกครองคนที่ 2</label>
+                <input v-model="editTarget.guardianEmail2" class="edit-input" placeholder="parent2@example.com หรือ 08xxxxxxxx" />
+              </div>
             </div>
             <!-- RFID -->
             <div class="promo-divider" style="margin:4px -24px;width:calc(100% + 48px)" />
@@ -845,23 +862,27 @@ import api from '@/api/axios'
 import { listAcademicYears } from '@/api/settings'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+interface LinkedParent { email: string; phone: string; firstName: string; lastName: string }
+
 interface Student {
-  uid:           string
-  firstName:     string
-  lastName:      string
-  gradeLevel:    string
-  className:     string
-  guardianEmail?: string
-  walletIds?:     string[]
-  cardUid?:      string
-  cardStatus?:   'active' | 'inactive' | 'lost'
-  balance:       number
-  lowThreshold:  number
-  parentCount:   number
-  familyCode?:   string
-  canPreorder:   boolean
-  buffetGroup:   'primary' | 'secondary'
-  status:        'active' | 'inactive' | 'suspended'
+  uid:            string
+  firstName:      string
+  lastName:       string
+  gradeLevel:     string
+  className:      string
+  guardianEmail?:  string
+  guardianEmail2?: string
+  linkedParents:   LinkedParent[]
+  walletIds?:      string[]
+  cardUid?:       string
+  cardStatus?:    'active' | 'inactive' | 'lost'
+  balance:        number
+  lowThreshold:   number
+  parentCount:    number
+  familyCode?:    string
+  canPreorder:    boolean
+  buffetGroup:    'primary' | 'secondary'
+  status:         'active' | 'inactive' | 'suspended'
 }
 
 interface ParentLink {
@@ -913,21 +934,21 @@ const csvInput         = ref<HTMLInputElement | null>(null)
 // ── Add student state ──────────────────────────────────────────────────────
 interface AddForm {
   firstName: string; lastName: string; gradeLevel: string
-  className: string; guardianEmail: string; uid: string
+  className: string; guardianEmail: string; guardianEmail2: string; uid: string
 }
-const addForm    = ref<AddForm>({ firstName: '', lastName: '', gradeLevel: 'P1', className: '', guardianEmail: '', uid: '' })
+const addForm    = ref<AddForm>({ firstName: '', lastName: '', gradeLevel: 'P1', className: '', guardianEmail: '', guardianEmail2: '', uid: '' })
 const addSaving  = ref(false)
 const addError   = ref('')
 
 function openAddModal() {
-  addForm.value   = { firstName: '', lastName: '', gradeLevel: 'P1', className: '', guardianEmail: '', uid: '' }
+  addForm.value   = { firstName: '', lastName: '', gradeLevel: 'P1', className: '', guardianEmail: '', guardianEmail2: '', uid: '' }
   addError.value  = ''
   showAddModal.value = true
 }
 
 async function saveAdd() {
   if (addSaving.value) return
-  const { firstName, lastName, gradeLevel, className, guardianEmail, uid } = addForm.value
+  const { firstName, lastName, gradeLevel, className, guardianEmail, guardianEmail2, uid } = addForm.value
   if (!firstName.trim() || !lastName.trim() || !gradeLevel) {
     addError.value = 'กรุณากรอกข้อมูลจำเป็นให้ครบ'
     return
@@ -936,7 +957,8 @@ async function saveAdd() {
   addError.value  = ''
   try {
     const payload: any = { firstName: firstName.trim(), lastName: lastName.trim(), gradeLevel, className: className.trim() }
-    if (guardianEmail.trim()) payload.guardianEmail = guardianEmail.trim()
+    if (guardianEmail.trim())  payload.guardianEmail  = guardianEmail.trim()
+    if (guardianEmail2.trim()) payload.guardianEmail2 = guardianEmail2.trim()
     if (uid.trim()) payload.uid = uid.trim()
     const res = await api.post('/admin/students', payload)
     const newStudent = mapStudent(res.data?.student ?? res.data)
@@ -1057,8 +1079,8 @@ async function saveEdit() {
   editSaving.value = true
   editError.value  = ''
   try {
-    const { uid, firstName, lastName, gradeLevel, className, guardianEmail, status } = editTarget.value
-    const res = await api.patch(`/admin/students/${uid}`, { firstName, lastName, gradeLevel, className, guardianEmail, status })
+    const { uid, firstName, lastName, gradeLevel, className, guardianEmail, guardianEmail2, status } = editTarget.value
+    const res = await api.patch(`/admin/students/${uid}`, { firstName, lastName, gradeLevel, className, guardianEmail, guardianEmail2, status })
     const updated = res.data?.student ?? res.data
     const mapped = mapStudent(updated)
     const idx = students.value.findIndex(s => s.uid === uid)
@@ -1538,9 +1560,11 @@ function mapStudent(s: any): Student {
     uid:           s.uid ?? s._id,
     firstName:     s.firstName ?? s.first_name,
     lastName:      s.lastName  ?? s.last_name,
-    gradeLevel:    grade,
-    className:     s.className ?? s.class_name ?? s.studentProfile?.className ?? '',
-    guardianEmail: s.guardianEmail ?? s.guardian_email ?? s.studentProfile?.guardianEmail,
+    gradeLevel:     grade,
+    className:      s.className ?? s.class_name ?? s.studentProfile?.className ?? '',
+    guardianEmail:  s.guardianEmail  ?? s.guardian_email  ?? s.studentProfile?.guardianEmail,
+    guardianEmail2: s.guardianEmail2 ?? s.studentProfile?.guardianEmail2 ?? '',
+    linkedParents:  s.linkedParents ?? [],
     cardUid:       s.cardUid ?? s.card_uid,
     cardStatus:    s.cardStatus ?? undefined,
     balance:       s.balance ?? 0,
