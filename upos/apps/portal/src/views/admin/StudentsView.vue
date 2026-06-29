@@ -495,7 +495,6 @@
           </div>
 
           <!-- ── ผู้ปกครอง + ครอบครัว ── -->
-          <div class="promo-divider" style="margin:0" />
           <div style="padding:16px 24px;display:flex;flex-direction:column;gap:12px;background:#FAFAFA">
             <div>
               <div style="font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">ผู้ปกครองที่ลิงก์แล้ว</div>
