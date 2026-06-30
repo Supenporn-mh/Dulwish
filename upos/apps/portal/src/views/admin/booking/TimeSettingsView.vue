@@ -165,7 +165,7 @@
               >
                 <span class="ts-toggle-thumb" />
               </button>
-              <span style="font-size:13px;color:var(--color-text-primary)">เปิดใช้งาน</span>
+              <span style="font-size:13px;color:var(--color-text-primary)">{{ form.enabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน' }}</span>
             </div>
           </div>
 
