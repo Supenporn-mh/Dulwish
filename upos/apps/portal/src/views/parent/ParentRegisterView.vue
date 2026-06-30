@@ -502,7 +502,7 @@ async function handleRegister() {
             </div>
             <p class="text-body-sm leading-relaxed" style="color: var(--color-text-primary)">
               {{ locale.t('ฉันได้อ่านและยอมรับ', 'I have read and accepted the') }}
-              <span style="color: var(--color-primary); font-weight: 500">{{ locale.t('นโยบายความเป็นส่วนตัว', 'Privacy Policy') }}</span>
+              <a href="https://th.sodexo.com/legal/online-data-protection-policy-TH" target="_blank" rel="noopener noreferrer" @click.stop style="color: var(--color-primary); font-weight: 500; text-decoration: underline">{{ locale.t('นโยบายความเป็นส่วนตัว', 'Privacy Policy') }}</a>
               {{ locale.t('และยินยอมให้โรงเรียนเก็บรวบรวมและใช้ข้อมูลของฉันตามที่ระบุไว้', 'and consent to the school collecting and using my data as specified') }}
             </p>
           </label>
