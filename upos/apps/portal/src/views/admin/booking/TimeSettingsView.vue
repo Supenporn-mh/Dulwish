@@ -63,7 +63,6 @@
                 <button
                   :class="['ts-status', s.enabled ? 'ts-status-on' : 'ts-status-off']"
                   :disabled="savingId === s._id"
-                  style="border:none;cursor:pointer;background:none;padding:0"
                   :title="s.enabled ? 'คลิกเพื่อปิดใช้งาน' : 'คลิกเพื่อเปิดใช้งาน'"
                   @click="toggleEnabled(s)"
                 >
@@ -390,7 +389,10 @@ async function toggleEnabled(s: SlotDoc) {
 .ts-status {
   display:inline-flex; align-items:center; gap:5px;
   font-size:12px; font-weight:500; padding:3px 10px; border-radius:100px;
+  border:none; cursor:pointer; transition:opacity 0.15s, filter 0.15s;
 }
+.ts-status:hover:not(:disabled) { filter:brightness(0.92); }
+.ts-status:disabled { cursor:not-allowed; opacity:0.6; }
 .ts-status-on  { background:var(--color-primary-tint); color:var(--color-primary); }
 .ts-status-off { background:var(--color-bg-secondary); color:var(--color-text-tertiary); }
 
