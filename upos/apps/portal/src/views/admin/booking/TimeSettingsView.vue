@@ -384,6 +384,7 @@ async function toggleEnabled(s: SlotDoc) {
 .ts-status {
   display:inline-flex; align-items:center; gap:5px;
   font-size:12px; font-weight:500; padding:3px 10px; border-radius:100px;
+  white-space:nowrap;
 }
 .ts-status-on  { background:var(--color-primary-tint); color:var(--color-primary); }
 .ts-status-off { background:var(--color-bg-secondary); color:var(--color-text-tertiary); }

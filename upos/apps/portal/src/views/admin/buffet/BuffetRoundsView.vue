@@ -35,7 +35,7 @@
             <th class="center" style="width:60px">ลำดับ</th>
             <th>ชื่อรอบ</th>
             <th class="center" style="width:180px">เวลา</th>
-            <th class="center" style="width:120px">สถานะ</th>
+            <th class="center" style="width:140px">สถานะ</th>
             <th class="center" style="width:100px">การดำเนินการ</th>
           </tr>
         </thead>
@@ -248,7 +248,7 @@ async function deleteRound(r: BuffetRound) {
 .br-search::placeholder { color:var(--color-text-tertiary); }
 .br-error-banner { display:flex;align-items:center;gap:8px;background:#fff1f0;border:1px solid #ffa39e;border-radius:8px;padding:10px 14px;font-size:13px;color:#cf1322; }
 .br-error-dismiss { margin-left:auto;border:none;background:none;cursor:pointer;color:#cf1322;font-size:14px;padding:0 4px; }
-.br-status { display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:3px 10px;border-radius:100px; }
+.br-status { display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:3px 10px;border-radius:100px;white-space:nowrap; }
 .br-status-on  { background:var(--color-primary-tint);color:var(--color-primary); }
 .br-status-off { background:var(--color-bg-secondary);color:var(--color-text-tertiary); }
 .br-backdrop { position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.4); }
