@@ -52,15 +52,11 @@
               <td style="font-weight:500;color:var(--color-primary)">{{ r.name }}</td>
               <td class="center" style="font-size:13px;font-family:monospace">{{ r.startTime }} – {{ r.endTime }}</td>
               <td class="center">
-                <button
-                  :class="['br-status', r.active ? 'br-status-on' : 'br-status-off']"
-                  :disabled="savingId === r.id"
-                  @click="toggleActive(r)"
-                >
+                <span :class="['br-status', r.active ? 'br-status-on' : 'br-status-off']">
                   <PhCheckCircle v-if="r.active" :size="13" weight="fill" />
                   <PhCircle v-else :size="13" />
                   {{ r.active ? 'เปิดใช้งาน' : 'ปิดใช้งาน' }}
-                </button>
+                </span>
               </td>
               <td class="center">
                 <div class="adm-actions">
@@ -252,9 +248,7 @@ async function deleteRound(r: BuffetRound) {
 .br-search::placeholder { color:var(--color-text-tertiary); }
 .br-error-banner { display:flex;align-items:center;gap:8px;background:#fff1f0;border:1px solid #ffa39e;border-radius:8px;padding:10px 14px;font-size:13px;color:#cf1322; }
 .br-error-dismiss { margin-left:auto;border:none;background:none;cursor:pointer;color:#cf1322;font-size:14px;padding:0 4px; }
-.br-status { display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:3px 10px;border-radius:100px;border:none;cursor:pointer;transition:opacity 0.15s,filter 0.15s; }
-.br-status:hover:not(:disabled) { filter:brightness(0.92); }
-.br-status:disabled { cursor:not-allowed;opacity:0.6; }
+.br-status { display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:3px 10px;border-radius:100px; }
 .br-status-on  { background:var(--color-primary-tint);color:var(--color-primary); }
 .br-status-off { background:var(--color-bg-secondary);color:var(--color-text-tertiary); }
 .br-backdrop { position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.4); }
