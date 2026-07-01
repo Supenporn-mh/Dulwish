@@ -394,6 +394,7 @@ const bookingMenuSchema = new Schema({
   name:       { type: String, required: true },
   ingredient: { type: String },
   timeSlot:   { type: String },
+  price:      { type: Number, default: 0 },
   enabled:    { type: Boolean, default: true },
   startDate:  { type: String },
   endDate:    { type: String },

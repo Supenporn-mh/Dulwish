@@ -41,6 +41,8 @@ interface Transaction {
   bookingStatus?: 'confirmed' | 'consumed' | 'cancelled'
   // refund
   refundFor?: string
+  // balance snapshot
+  balanceBefore?: number; balanceAfter?: number; status?: string
 }
 
 // ── Rating scale ──────────────────────────────────────────────────────────────
@@ -115,7 +117,9 @@ const TABS = [
   { key: 'booking'  as FilterKey, th: 'จองอาหาร',  en: 'Booking'  },
 ]
 const activeFilter = ref<FilterKey>('all')
-const expandedId   = ref<string | null>(null)
+const modalTx = ref<Transaction | null>(null)
+function openModal(tx: Transaction) { modalTx.value = tx }
+function closeModal() { modalTx.value = null }
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 const transactions = ref<Transaction[]>([])
@@ -255,10 +259,63 @@ function deriveVenue(tx: Transaction): string {
     .trim() || '-'
 }
 function fmtTime(iso: string) { return new Date(iso).toLocaleTimeString(locale.lang==='th'?'th-TH':'en-GB', { hour:'2-digit', minute:'2-digit' }) }
+function fmtDateTime(iso: string) {
+  const d = new Date(iso), loc = locale.lang === 'en' ? 'en-GB' : 'th-TH'
+  return d.toLocaleDateString(loc, { day:'2-digit', month:'2-digit', year:'numeric' }) + ', ' +
+         d.toLocaleTimeString(loc, { hour:'2-digit', minute:'2-digit' })
+}
+
+function txStatusLabel(s: string) {
+  const map: Record<string, { th:string; en:string }> = {
+    complete:  { th:'สำเร็จ',        en:'Complete'  },
+    completed: { th:'สำเร็จ',        en:'Complete'  },
+    success:   { th:'สำเร็จ',        en:'Complete'  },
+    pending:   { th:'รอดำเนินการ',   en:'Pending'   },
+    failed:    { th:'ล้มเหลว',       en:'Failed'    },
+  }
+  const e = map[s.toLowerCase()]
+  return e ? (locale.lang === 'th' ? e.th : e.en) : s
+}
+function txStatusColor(s: string) {
+  const l = s.toLowerCase()
+  if (['complete','completed','success'].includes(l)) return 'var(--color-success)'
+  if (l === 'pending') return 'var(--color-warning)'
+  return 'var(--color-danger)'
+}
+function txStatusBg(s: string) {
+  const l = s.toLowerCase()
+  if (['complete','completed','success'].includes(l)) return 'var(--color-success-bg)'
+  if (l === 'pending') return 'var(--color-warning-bg)'
+  return 'var(--color-danger-bg)'
+}
+
+const modalTxTitle = computed(() => {
+  if (!modalTx.value) return ''
+  const map: Record<TxType,{th:string;en:string}> = {
+    topup:    { th:'รายละเอียดการเติมเงิน',  en:'Top-up Details'   },
+    purchase: { th:'รายละเอียดการซื้อสินค้า', en:'Purchase Details' },
+    buffet:   { th:'รายละเอียดบุฟเฟต์',      en:'Buffet Details'   },
+    booking:  { th:'รายละเอียดการจอง',        en:'Booking Details'  },
+    refund:   { th:'รายละเอียดการคืนเงิน',    en:'Refund Details'   },
+  }
+  const e = map[modalTx.value.type]
+  return locale.lang === 'th' ? e.th : e.en
+})
+const modalTxSubtitle = computed(() => {
+  if (!modalTx.value) return ''
+  const map: Record<TxType,{th:string;en:string}> = {
+    topup:    { th:'รายละเอียดการทำรายการเติมเงิน',  en:'Top-up transaction details'   },
+    purchase: { th:'รายละเอียดการซื้อสินค้า',         en:'Purchase transaction details'  },
+    buffet:   { th:'รายละเอียดการใช้บุฟเฟต์',         en:'Buffet session details'        },
+    booking:  { th:'รายละเอียดการจองอาหาร',           en:'Food booking details'          },
+    refund:   { th:'รายละเอียดการคืนเงิน',             en:'Refund details'               },
+  }
+  const e = map[modalTx.value.type]
+  return locale.lang === 'th' ? e.th : e.en
+})
 function amtColor(a: number) { return a>0?'var(--color-success)':a<0?'var(--color-danger)':'var(--color-text-tertiary)' }
 function amtText(a: number)  { return a===0 ? '–' : `${a>0?'+':''}฿${Math.abs(a).toLocaleString('th-TH',{minimumFractionDigits:2})}` }
 function canReview(t: Transaction) { return t.type === 'buffet' || t.type === 'booking' }
-function toggleExpand(id: string)  { expandedId.value = expandedId.value===id ? null : id }
 
 function purchaseTotal(items: PurchaseItem[]) { return items.reduce((s,i)=>s+i.qty*i.price, 0) }
 
@@ -336,9 +393,12 @@ async function fetchHistory(childId: string) {
   const walletTxns: Transaction[] = txRes.status === 'fulfilled'
     ? (txRes.value.data?.transactions ?? txRes.value.data ?? []).map((t: any) => ({
         ...t,
-        id:          t.id ?? t._id,
-        description: t.description ?? t.note ?? '',
-        items:       t.items ?? undefined,
+        id:            t.id ?? t._id,
+        description:   t.description ?? t.note ?? '',
+        items:         t.items ?? undefined,
+        balanceBefore: t.balanceBefore ?? t.balance_before,
+        balanceAfter:  t.balanceAfter  ?? t.balance_after,
+        status:        t.status,
       }))
     : []
 
@@ -396,7 +456,7 @@ watch(() => parentStore.selectedChildId, (newId) => {
       <!-- Tabs -->
       <div class="tab-bar">
         <button v-for="tab in TABS" :key="tab.key"
-          @click="activeFilter=tab.key; expandedId=null"
+          @click="activeFilter=tab.key"
           :class="['tab-pill', activeFilter===tab.key&&'tab-on']">
           {{ locale.lang==='th' ? tab.th : tab.en }}
         </button>
@@ -452,7 +512,7 @@ watch(() => parentStore.selectedChildId, (newId) => {
           <template v-for="(tx, ti) in group.items" :key="tx.id">
 
             <!-- Transaction row (dashboard style) -->
-            <button @click="toggleExpand(tx.id)" class="tx-row w-full"
+            <button @click="openModal(tx)" class="tx-row w-full"
               :style="ti>0?'border-top:0.5px solid var(--color-border-tertiary)':''">
               <!-- Icon circle -->
               <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
@@ -479,194 +539,6 @@ watch(() => parentStore.selectedChildId, (newId) => {
               </span>
             </button>
 
-            <!-- Detail panel -->
-            <div v-if="expandedId===tx.id" class="detail-pane">
-
-              <!-- ── TOPUP detail ──────────────────────────────────── -->
-              <template v-if="tx.type==='topup'">
-                <div class="detail-section">
-                  <p class="detail-section-title">{{ locale.t('รายละเอียดการเติมเงิน','Top-up Details') }}</p>
-                  <div class="detail-row">
-                    <PhWallet :size="14" style="color:var(--color-success)"/>
-                    <span class="dl">{{ locale.t('จำนวนเงิน','Amount') }}</span>
-                    <span class="dv font-medium" style="color:var(--color-success)">+{{ fmtAmt(tx.amount) }}</span>
-                  </div>
-                  <!-- ช่องทางการชำระ = payment method (ไม่แยก channel กับ payment) -->
-                  <div class="detail-row">
-                    <PhReceipt :size="14" style="color:var(--color-primary)"/>
-                    <span class="dl">{{ locale.t('ช่องทางการชำระ','Payment Via') }}</span>
-                    <span class="dv font-medium" style="color:var(--color-primary)">
-                      {{ tx.topupSource
-                          ?? PAYMENT_LABEL[tx.paymentMethod??'']
-                          ?? tx.paymentMethod
-                          ?? CHANNEL_LABEL[tx.channel??''] ?? '-' }}
-                    </span>
-                  </div>
-                  <div class="detail-row">
-                    <PhClock :size="14" style="color:var(--color-text-tertiary)"/>
-                    <span class="dl">{{ locale.t('เวลา','Time') }}</span>
-                    <span class="dv">{{ fmtTime(tx.createdAt) }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <PhReceipt :size="14" style="color:var(--color-text-tertiary)"/>
-                    <span class="dl">{{ locale.t('เลขอ้างอิง','Ref No.') }}</span>
-                    <span class="dv font-mono text-[12px]">{{ tx.refNo ?? '-' }}</span>
-                  </div>
-                </div>
-              </template>
-
-              <!-- ── PURCHASE detail ──────────────────────────────── -->
-              <template v-if="tx.type==='purchase'">
-                <div class="detail-section">
-                  <p class="detail-section-title">{{ locale.t('รายการสินค้า','Items Purchased') }}</p>
-                  <div v-for="item in derivePurchaseItems(tx)" :key="item.name" class="purchase-row">
-                    <span class="flex-1 text-[14px]" style="color:var(--color-text-primary)">{{ item.name }}</span>
-                    <span class="text-[13px]" style="color:var(--color-text-secondary)">×{{ item.qty }}</span>
-                    <span class="text-[14px] font-medium w-16 text-right" style="color:var(--color-text-primary)">{{ fmtAmt(item.qty*item.price) }}</span>
-                  </div>
-                  <div class="purchase-total-row">
-                    <span class="text-[13px] font-medium" style="color:var(--color-text-secondary)">{{ locale.t('รวม','Total') }}</span>
-                    <span class="text-[15px] font-medium" style="color:var(--color-danger)">{{ fmtAmt(purchaseTotal(derivePurchaseItems(tx))) }}</span>
-                  </div>
-                  <div class="detail-row mt-2">
-                    <PhStorefront :size="14" style="color:var(--color-text-tertiary)"/>
-                    <span class="dl">{{ locale.t('จุดชำระ','Point') }}</span>
-                    <span class="dv">{{ CHANNEL_LABEL[tx.channel??''] ?? tx.channel }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <PhClock :size="14" style="color:var(--color-text-tertiary)"/>
-                    <span class="dl">{{ locale.t('เวลา','Time') }}</span>
-                    <span class="dv">{{ fmtTime(tx.createdAt) }}</span>
-                  </div>
-                </div>
-              </template>
-
-              <!-- ── BUFFET detail ────────────────────────────────── -->
-              <template v-if="tx.type==='buffet'">
-                <div class="detail-section">
-                  <p class="detail-section-title">{{ locale.t('รายละเอียดบุฟเฟต์','Buffet Details') }}</p>
-                  <div class="detail-row">
-                    <PhForkKnife :size="14" style="color:var(--color-primary)"/>
-                    <span class="dl">{{ locale.t('มื้อ','Meal') }}</span>
-                    <span class="dv">
-                      <span class="session-badge session-buffet">{{ deriveSession(tx) }}</span>
-                    </span>
-                  </div>
-                  <div class="detail-row">
-                    <PhClock :size="14" style="color:var(--color-text-tertiary)"/>
-                    <span class="dl">{{ locale.t('เวลา','Time') }}</span>
-                    <span class="dv">{{ fmtTime(tx.createdAt) }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <PhStorefront :size="14" style="color:var(--color-text-tertiary)"/>
-                    <span class="dl">{{ locale.t('ห้องอาหาร','Venue') }}</span>
-                    <span class="dv">{{ deriveVenue(tx) }}</span>
-                  </div>
-                </div>
-                <!-- Items: structured items array preferred, fall back to buffetItems strings -->
-                <div class="detail-section" v-if="tx.items?.length || tx.buffetItems?.length">
-                  <p class="detail-section-title">{{ locale.t('เมนูที่กินในมื้อนี้','Consumed Items') }}</p>
-                  <template v-if="tx.items?.length">
-                    <div v-for="item in tx.items" :key="item.name" class="purchase-row">
-                      <span class="flex-1 text-[14px]" style="color:var(--color-text-primary)">{{ item.name }}</span>
-                      <span class="text-[13px]" style="color:var(--color-text-secondary)">×{{ item.qty }}</span>
-                      <span class="text-[14px] font-medium w-16 text-right" style="color:var(--color-text-primary)">{{ fmtAmt(item.lineTotal) }}</span>
-                    </div>
-                  </template>
-                  <template v-else>
-                    <div class="items-grid">
-                      <span v-for="item in tx.buffetItems" :key="item" class="item-chip">{{ item }}</span>
-                    </div>
-                  </template>
-                </div>
-                <div class="review-section">
-                  <div v-if="rated.has(tx.id)" class="flex items-center gap-1.5">
-                    <PhStar v-for="n in 5" :key="n" :size="16"
-                      :weight="n<=ratings[tx.id]?'fill':'regular'"
-                      :color="n<=ratings[tx.id]?'var(--color-warning)':'var(--color-border-secondary)'"/>
-                    <span class="text-[12px] font-medium ml-1" style="color:var(--color-warning)">{{ ratings[tx.id] }}/5 · {{ rLabel(ratings[tx.id]) }}</span>
-                  </div>
-                  <button v-else @click.stop="openReview(tx)" class="rate-btn">
-                    <PhStar :size="14" weight="fill"/>{{ locale.t('รีวิวบุฟเฟต์','Rate Buffet') }}
-                  </button>
-                </div>
-              </template>
-
-              <!-- ── BOOKING detail ───────────────────────────────── -->
-              <template v-if="tx.type==='booking'">
-                <div class="detail-section">
-                  <p class="detail-section-title">{{ locale.t('รายละเอียดการจอง','Booking Details') }}</p>
-                  <div class="detail-row">
-                    <PhCalendarCheck :size="14" style="color:#3C3489"/>
-                    <span class="dl">{{ locale.t('มื้ออาหาร','Meal') }}</span>
-                    <span class="dv">
-                      <span class="session-badge session-booking">{{ deriveSession(tx) }}</span>
-                    </span>
-                  </div>
-                  <div class="detail-row">
-                    <span class="w-[14px] flex-shrink-0"/>
-                    <span class="dl">{{ locale.t('สถานะ','Status') }}</span>
-                    <span class="dv">
-                      <span class="status-badge"
-                        :style="`color:${BOOKING_STATUS[tx.bookingStatus??'confirmed'].color}; background:${BOOKING_STATUS[tx.bookingStatus??'confirmed'].bg}`">
-                        {{ locale.lang==='th' ? BOOKING_STATUS[tx.bookingStatus??'confirmed'].th : BOOKING_STATUS[tx.bookingStatus??'confirmed'].en }}
-                      </span>
-                    </span>
-                  </div>
-                  <div class="detail-row">
-                    <PhClock :size="14" style="color:var(--color-text-tertiary)"/>
-                    <span class="dl">{{ locale.t('เวลาจอง','Booked At') }}</span>
-                    <span class="dv">{{ fmtTime(tx.createdAt) }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <PhReceipt :size="14" style="color:var(--color-text-tertiary)"/>
-                    <span class="dl">{{ locale.t('เลขจอง','Ref') }}</span>
-                    <span class="dv font-mono text-[12px]">{{ tx.refNo }}</span>
-                  </div>
-                </div>
-                <!-- Ordered items -->
-                <div class="detail-section" v-if="tx.bookingItems?.length">
-                  <p class="detail-section-title">{{ locale.t('เมนูที่จองไว้','Ordered Items') }}</p>
-                  <div class="items-grid">
-                    <span v-for="item in tx.bookingItems" :key="item" class="item-chip item-chip-booking">{{ item }}</span>
-                  </div>
-                </div>
-                <div class="review-section" v-if="tx.bookingStatus==='consumed'">
-                  <div v-if="rated.has(tx.id)" class="flex items-center gap-1.5">
-                    <PhStar v-for="n in 5" :key="n" :size="16"
-                      :weight="n<=ratings[tx.id]?'fill':'regular'"
-                      :color="n<=ratings[tx.id]?'var(--color-warning)':'var(--color-border-secondary)'"/>
-                    <span class="text-[12px] font-medium ml-1" style="color:var(--color-warning)">{{ ratings[tx.id] }}/5 · {{ rLabel(ratings[tx.id]) }}</span>
-                  </div>
-                  <button v-else @click.stop="openReview(tx)" class="rate-btn">
-                    <PhStar :size="14" weight="fill"/>{{ locale.t('รีวิวมื้ออาหาร','Rate Meal') }}
-                  </button>
-                </div>
-              </template>
-
-              <!-- ── REFUND detail ────────────────────────────────── -->
-              <template v-if="tx.type==='refund'">
-                <div class="detail-section">
-                  <p class="detail-section-title">{{ locale.t('รายละเอียดการคืนเงิน','Refund Details') }}</p>
-                  <div class="detail-row">
-                    <PhWallet :size="14" style="color:var(--color-success)"/>
-                    <span class="dl">{{ locale.t('จำนวนที่คืน','Refunded') }}</span>
-                    <span class="dv" style="color:var(--color-success)">{{ fmtAmt(tx.amount) }}</span>
-                  </div>
-                  <div v-if="tx.refundFor" class="detail-row">
-                    <PhReceipt :size="14" style="color:var(--color-text-tertiary)"/>
-                    <span class="dl">{{ locale.t('อ้างอิงรายการ','Original Ref') }}</span>
-                    <span class="dv font-mono text-[12px]">{{ tx.refundFor }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <PhClock :size="14" style="color:var(--color-text-tertiary)"/>
-                    <span class="dl">{{ locale.t('เวลา','Time') }}</span>
-                    <span class="dv">{{ fmtTime(tx.createdAt) }}</span>
-                  </div>
-                </div>
-              </template>
-
-            </div>
           </template>
         </div>
       </template>
@@ -680,6 +552,216 @@ watch(() => parentStore.selectedChildId, (newId) => {
       </div>
     </div>
   </div>
+
+  <!-- ── Transaction detail modal ────────────────────────────────────────── -->
+  <Teleport to="body">
+    <Transition name="modal-bg">
+      <div v-if="modalTx" class="modal-backdrop" @click="closeModal"/>
+    </Transition>
+    <Transition name="modal-card">
+      <div v-if="modalTx" class="modal-outer" @click.self="closeModal">
+        <div class="modal-card" role="dialog" aria-modal="true">
+
+          <!-- Header -->
+          <div class="modal-header">
+            <div class="flex items-center gap-3">
+              <div class="modal-icon-circle" :style="`background:${txIconBg(modalTx.type)}`">
+                <component :is="txIcon(modalTx.type)" :size="20" weight="fill" :color="txIconColor(modalTx.type)"/>
+              </div>
+              <div>
+                <h3 class="modal-title">{{ modalTxTitle }}</h3>
+                <p class="modal-subtitle">{{ modalTxSubtitle }}</p>
+              </div>
+            </div>
+            <button class="modal-close" @click="closeModal" :aria-label="locale.t('ปิด','Close')">
+              <PhX :size="14" weight="bold"/>
+            </button>
+          </div>
+
+          <!-- ── TOPUP ── -->
+          <template v-if="modalTx.type === 'topup'">
+            <div class="modal-amount-card" style="border-color:var(--color-success)">
+              <p class="modal-amount-label" style="color:var(--color-success)">{{ locale.t('จำนวนเงิน','Amount') }}</p>
+              <p class="modal-amount-value" style="color:var(--color-success)">+{{ fmtAmt(modalTx.amount) }}</p>
+            </div>
+            <div class="modal-rows">
+              <div class="modal-row">
+                <span class="modal-row-label">{{ locale.t('วันที่ / เวลา','Date / Time') }}</span>
+                <span class="modal-row-value">{{ fmtDateTime(modalTx.createdAt) }}</span>
+              </div>
+              <div class="modal-row">
+                <span class="modal-row-label">{{ locale.t('วิธีชำระ','Method') }}</span>
+                <span class="modal-row-value font-medium">{{ PAYMENT_LABEL[modalTx.paymentMethod??''] ?? modalTx.paymentMethod ?? '-' }}</span>
+              </div>
+              <div class="modal-row">
+                <span class="modal-row-label">{{ locale.t('ช่องทาง','Channel') }}</span>
+                <span class="modal-row-value">{{ modalTx.topupSource ?? CHANNEL_LABEL[modalTx.channel??''] ?? modalTx.channel ?? '-' }}</span>
+              </div>
+              <div class="modal-row">
+                <span class="modal-row-label">{{ locale.t('อ้างอิง','Reference') }}</span>
+                <span class="modal-row-value font-mono text-[12px]">{{ modalTx.refNo ?? '-' }}</span>
+              </div>
+            </div>
+            <div v-if="modalTx.balanceBefore != null || modalTx.balanceAfter != null" class="modal-balance-section">
+              <div v-if="modalTx.balanceBefore != null" class="modal-row">
+                <span class="modal-row-label">{{ locale.t('ยอดก่อน','Balance before') }}</span>
+                <span class="modal-row-value">{{ fmtAmt(modalTx.balanceBefore!) }}</span>
+              </div>
+              <div v-if="modalTx.balanceAfter != null" class="modal-row">
+                <span class="modal-row-label">{{ locale.t('ยอดหลัง','Balance after') }}</span>
+                <span class="modal-row-value font-medium" style="color:var(--color-success)">{{ fmtAmt(modalTx.balanceAfter!) }}</span>
+              </div>
+            </div>
+            <div v-if="modalTx.status" class="modal-status-row">
+              <span class="modal-row-label">{{ locale.t('สถานะ','Status') }}</span>
+              <span class="modal-status-badge"
+                :style="`color:${txStatusColor(modalTx.status)};background:${txStatusBg(modalTx.status)};border-color:${txStatusColor(modalTx.status)}20`">
+                <PhCheckCircle :size="13" weight="fill"/>
+                {{ txStatusLabel(modalTx.status) }}
+              </span>
+            </div>
+          </template>
+
+          <!-- ── PURCHASE ── -->
+          <template v-if="modalTx.type === 'purchase'">
+            <div class="modal-section">
+              <p class="modal-section-title">{{ locale.t('รายการสินค้า','Items Purchased') }}</p>
+              <div v-for="item in derivePurchaseItems(modalTx)" :key="item.name" class="purchase-row">
+                <span class="flex-1 text-[14px]" style="color:var(--color-text-primary)">{{ item.name }}</span>
+                <span class="text-[13px]" style="color:var(--color-text-secondary)">×{{ item.qty }}</span>
+                <span class="text-[14px] font-medium w-16 text-right" style="color:var(--color-text-primary)">{{ fmtAmt(item.qty*item.price) }}</span>
+              </div>
+              <div class="purchase-total-row">
+                <span class="text-[13px] font-medium" style="color:var(--color-text-secondary)">{{ locale.t('รวม','Total') }}</span>
+                <span class="text-[15px] font-medium" style="color:var(--color-danger)">{{ fmtAmt(purchaseTotal(derivePurchaseItems(modalTx))) }}</span>
+              </div>
+            </div>
+            <div class="modal-rows">
+              <div class="modal-row">
+                <span class="modal-row-label">{{ locale.t('จุดชำระ','Point') }}</span>
+                <span class="modal-row-value">{{ CHANNEL_LABEL[modalTx.channel??''] ?? modalTx.channel ?? '-' }}</span>
+              </div>
+              <div class="modal-row">
+                <span class="modal-row-label">{{ locale.t('วันที่ / เวลา','Date / Time') }}</span>
+                <span class="modal-row-value">{{ fmtDateTime(modalTx.createdAt) }}</span>
+              </div>
+            </div>
+          </template>
+
+          <!-- ── BUFFET ── -->
+          <template v-if="modalTx.type === 'buffet'">
+            <div v-if="modalTx.amount" class="modal-amount-card" style="border-color:var(--color-primary)">
+              <p class="modal-amount-label" style="color:var(--color-primary)">{{ locale.t('จำนวนเงิน','Amount') }}</p>
+              <p class="modal-amount-value" style="color:var(--color-danger)">{{ amtText(modalTx.amount) }}</p>
+            </div>
+            <div class="modal-rows">
+              <div class="modal-row">
+                <span class="modal-row-label">{{ locale.t('มื้อ','Meal') }}</span>
+                <span class="modal-row-value"><span class="session-badge session-buffet">{{ deriveSession(modalTx) }}</span></span>
+              </div>
+              <div class="modal-row">
+                <span class="modal-row-label">{{ locale.t('วันที่ / เวลา','Date / Time') }}</span>
+                <span class="modal-row-value">{{ fmtDateTime(modalTx.createdAt) }}</span>
+              </div>
+              <div class="modal-row">
+                <span class="modal-row-label">{{ locale.t('ห้องอาหาร','Venue') }}</span>
+                <span class="modal-row-value">{{ deriveVenue(modalTx) }}</span>
+              </div>
+            </div>
+            <div class="modal-section" v-if="modalTx.items?.length || modalTx.buffetItems?.length">
+              <p class="modal-section-title">{{ locale.t('เมนูที่กินในมื้อนี้','Consumed Items') }}</p>
+              <template v-if="modalTx.items?.length">
+                <div v-for="item in modalTx.items" :key="item.name" class="purchase-row">
+                  <span class="flex-1 text-[14px]" style="color:var(--color-text-primary)">{{ item.name }}</span>
+                  <span class="text-[13px]" style="color:var(--color-text-secondary)">×{{ item.qty }}</span>
+                  <span class="text-[14px] font-medium w-16 text-right" style="color:var(--color-text-primary)">{{ fmtAmt(item.lineTotal) }}</span>
+                </div>
+              </template>
+              <template v-else>
+                <div class="items-grid mt-1">
+                  <span v-for="item in modalTx.buffetItems" :key="item" class="item-chip">{{ item }}</span>
+                </div>
+              </template>
+            </div>
+            <div class="review-section">
+              <div v-if="rated.has(modalTx.id)" class="flex items-center gap-1.5">
+                <PhStar v-for="n in 5" :key="n" :size="16"
+                  :weight="n<=ratings[modalTx.id]?'fill':'regular'"
+                  :color="n<=ratings[modalTx.id]?'var(--color-warning)':'var(--color-border-secondary)'"/>
+                <span class="text-[12px] font-medium ml-1" style="color:var(--color-warning)">{{ ratings[modalTx.id] }}/5 · {{ rLabel(ratings[modalTx.id]) }}</span>
+              </div>
+              <button v-else @click.stop="openReview(modalTx)" class="rate-btn">
+                <PhStar :size="14" weight="fill"/>{{ locale.t('รีวิวบุฟเฟต์','Rate Buffet') }}
+              </button>
+            </div>
+          </template>
+
+          <!-- ── BOOKING ── -->
+          <template v-if="modalTx.type === 'booking'">
+            <div class="modal-rows">
+              <div class="modal-row">
+                <span class="modal-row-label">{{ locale.t('มื้ออาหาร','Meal') }}</span>
+                <span class="modal-row-value"><span class="session-badge session-booking">{{ deriveSession(modalTx) }}</span></span>
+              </div>
+              <div class="modal-row">
+                <span class="modal-row-label">{{ locale.t('สถานะ','Status') }}</span>
+                <span class="modal-row-value">
+                  <span class="status-badge"
+                    :style="`color:${BOOKING_STATUS[modalTx.bookingStatus??'confirmed'].color};background:${BOOKING_STATUS[modalTx.bookingStatus??'confirmed'].bg}`">
+                    {{ locale.lang==='th' ? BOOKING_STATUS[modalTx.bookingStatus??'confirmed'].th : BOOKING_STATUS[modalTx.bookingStatus??'confirmed'].en }}
+                  </span>
+                </span>
+              </div>
+              <div class="modal-row">
+                <span class="modal-row-label">{{ locale.t('วันที่ / เวลา','Date / Time') }}</span>
+                <span class="modal-row-value">{{ fmtDateTime(modalTx.createdAt) }}</span>
+              </div>
+              <div class="modal-row">
+                <span class="modal-row-label">{{ locale.t('เลขจอง','Ref') }}</span>
+                <span class="modal-row-value font-mono text-[12px]">{{ modalTx.refNo ?? '-' }}</span>
+              </div>
+            </div>
+            <div class="modal-section" v-if="modalTx.bookingItems?.length">
+              <p class="modal-section-title">{{ locale.t('เมนูที่จองไว้','Ordered Items') }}</p>
+              <div class="items-grid mt-1">
+                <span v-for="item in modalTx.bookingItems" :key="item" class="item-chip item-chip-booking">{{ item }}</span>
+              </div>
+            </div>
+            <div class="review-section" v-if="modalTx.bookingStatus === 'consumed'">
+              <div v-if="rated.has(modalTx.id)" class="flex items-center gap-1.5">
+                <PhStar v-for="n in 5" :key="n" :size="16"
+                  :weight="n<=ratings[modalTx.id]?'fill':'regular'"
+                  :color="n<=ratings[modalTx.id]?'var(--color-warning)':'var(--color-border-secondary)'"/>
+                <span class="text-[12px] font-medium ml-1" style="color:var(--color-warning)">{{ ratings[modalTx.id] }}/5 · {{ rLabel(ratings[modalTx.id]) }}</span>
+              </div>
+              <button v-else @click.stop="openReview(modalTx)" class="rate-btn">
+                <PhStar :size="14" weight="fill"/>{{ locale.t('รีวิวมื้ออาหาร','Rate Meal') }}
+              </button>
+            </div>
+          </template>
+
+          <!-- ── REFUND ── -->
+          <template v-if="modalTx.type === 'refund'">
+            <div class="modal-amount-card" style="border-color:var(--color-success)">
+              <p class="modal-amount-label" style="color:var(--color-success)">{{ locale.t('จำนวนที่คืน','Refunded') }}</p>
+              <p class="modal-amount-value" style="color:var(--color-success)">{{ fmtAmt(modalTx.amount) }}</p>
+            </div>
+            <div class="modal-rows">
+              <div class="modal-row">
+                <span class="modal-row-label">{{ locale.t('วันที่ / เวลา','Date / Time') }}</span>
+                <span class="modal-row-value">{{ fmtDateTime(modalTx.createdAt) }}</span>
+              </div>
+              <div v-if="modalTx.refundFor" class="modal-row">
+                <span class="modal-row-label">{{ locale.t('อ้างอิงรายการ','Original Ref') }}</span>
+                <span class="modal-row-value font-mono text-[12px]">{{ modalTx.refundFor }}</span>
+              </div>
+            </div>
+          </template>
+
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 
   <!-- ── Date filter sheet ─────────────────────────────────────────────────── -->
   <Teleport to="body">
@@ -978,4 +1060,106 @@ watch(() => parentStore.selectedChildId, (newId) => {
 .rs-bg-enter-from,  .rs-bg-leave-to      { opacity:0; }
 .rs-sh-enter-active, .rs-sh-leave-active { transition:transform 0.3s cubic-bezier(0.32,0.72,0,1); }
 .rs-sh-enter-from,  .rs-sh-leave-to      { transform:translateX(-50%) translateY(100%); }
+
+/* ── Modal ────────────────────────────────────────────────────────────────── */
+.modal-backdrop {
+  position:fixed; inset:0; z-index:50;
+  background:rgba(0,0,0,0.45);
+}
+.modal-outer {
+  position:fixed; inset:0; z-index:51;
+  display:flex; align-items:center; justify-content:center;
+  padding:20px;
+}
+.modal-card {
+  width:min(420px, 100%); max-height:85vh; overflow-y:auto;
+  background:var(--color-bg-surface);
+  border-radius:16px;
+  box-shadow:0 8px 40px rgba(0,0,0,0.18);
+  display:flex; flex-direction:column;
+}
+
+.modal-header {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:12px; padding:18px 18px 14px;
+  border-bottom:0.5px solid var(--color-border-tertiary);
+  flex-shrink:0;
+}
+.modal-icon-circle {
+  width:40px; height:40px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.modal-title {
+  font-size:15px; font-weight:500; color:var(--color-text-primary); margin:0; line-height:1.3;
+}
+.modal-subtitle {
+  font-size:12px; color:var(--color-text-secondary); margin:2px 0 0;
+}
+.modal-close {
+  width:28px; height:28px; border-radius:6px;
+  border:1.5px solid var(--color-warning);
+  background:var(--color-bg-surface);
+  color:var(--color-warning);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; flex-shrink:0;
+  -webkit-tap-highlight-color:transparent;
+}
+.modal-close:active { opacity:0.7; }
+
+.modal-amount-card {
+  margin:14px 16px 0;
+  border-radius:var(--radius-lg);
+  background:var(--color-bg-page);
+  border:1px solid;
+  padding:14px 16px; text-align:center;
+}
+.modal-amount-label { font-size:12px; font-weight:500; margin-bottom:4px; }
+.modal-amount-value { font-size:26px; font-weight:500; line-height:1.2; }
+
+.modal-rows {
+  padding:4px 16px 8px;
+}
+.modal-row {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; padding:9px 0;
+  border-bottom:0.5px solid var(--color-border-tertiary);
+}
+.modal-row:last-child { border-bottom:none; }
+.modal-row-label { font-size:13px; color:var(--color-text-secondary); flex-shrink:0; }
+.modal-row-value { font-size:13px; color:var(--color-text-primary); text-align:right; }
+
+.modal-balance-section {
+  margin:0 16px;
+  padding:4px 0 8px;
+  border-top:0.5px solid var(--color-border-tertiary);
+}
+.modal-balance-section .modal-row { padding:7px 0; }
+
+.modal-status-row {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; padding:12px 16px 16px;
+  border-top:0.5px solid var(--color-border-tertiary);
+}
+.modal-status-badge {
+  display:inline-flex; align-items:center; gap:5px;
+  font-size:12px; font-weight:500;
+  padding:4px 12px; border-radius:20px;
+  border:1px solid transparent;
+}
+
+.modal-section {
+  padding:12px 16px;
+  border-top:0.5px solid var(--color-border-tertiary);
+}
+.modal-section-title {
+  font-size:12px; font-weight:500; color:var(--color-text-tertiary);
+  text-transform:uppercase; letter-spacing:0.04em; margin-bottom:10px;
+}
+
+/* ── Modal transitions ────────────────────────────────────────────────────── */
+.modal-bg-enter-active, .modal-bg-leave-active { transition:opacity 0.22s; }
+.modal-bg-enter-from,   .modal-bg-leave-to     { opacity:0; }
+.modal-card-enter-active { transition:opacity 0.22s, transform 0.22s; }
+.modal-card-leave-active { transition:opacity 0.18s, transform 0.18s; }
+.modal-card-enter-from, .modal-card-leave-to { opacity:0; transform:scale(0.94); }
 </style>
