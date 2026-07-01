@@ -1124,13 +1124,11 @@ watch(() => parentStore.selectedChildId, (newId) => {
 }
 .modal-row {
   display:flex; align-items:center; justify-content:space-between;
-  gap:12px; padding:10px 0;
-  border-bottom:0.5px solid var(--color-border-tertiary);
+  gap:12px; padding:8px 0;
 }
-.modal-row:last-child { border-bottom:none; }
 .modal-row--sep {
-  border-top:1px solid var(--color-border-secondary) !important;
-  margin-top:6px; padding-top:14px;
+  border-top:0.5px solid var(--color-border-secondary);
+  margin-top:8px; padding-top:12px;
 }
 .modal-row-label { font-size:13px; color:var(--color-text-secondary); flex-shrink:0; }
 .modal-row-value { font-size:13px; color:var(--color-text-primary); text-align:right; }
