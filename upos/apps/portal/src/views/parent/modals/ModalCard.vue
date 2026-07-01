@@ -51,7 +51,6 @@ const locale = useLocaleStore()
   justify-content: space-between;
   gap: 12px;
   padding: 18px 18px 14px;
-  border-bottom: 0.5px solid var(--color-border-tertiary);
   flex-shrink: 0;
 }
 .mc-header-left {

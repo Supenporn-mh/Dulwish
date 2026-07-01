@@ -105,8 +105,7 @@ const bStatus = computed(() => BOOKING_STATUS[props.tx.bookingStatus ?? 'confirm
   gap: 12px; padding: 6px 0;
 }
 .mc-row-sep {
-  border-top: 0.5px solid var(--color-border-secondary);
-  margin-top: 8px; padding-top: 12px;
+  margin-top: 8px;
 }
 .mc-key  { font-size: 13px; color: var(--color-text-secondary); flex-shrink: 0; }
 .mc-val  { font-size: 13px; font-weight: 500; color: var(--color-text-primary); text-align: right; }
