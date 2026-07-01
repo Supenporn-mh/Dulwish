@@ -601,24 +601,27 @@ watch(() => parentStore.selectedChildId, (newId) => {
                 <span class="modal-row-label">{{ locale.t('อ้างอิง','Reference') }}</span>
                 <span class="modal-row-value font-mono text-[12px]">{{ modalTx.refNo ?? '-' }}</span>
               </div>
-            </div>
-            <div v-if="modalTx.balanceBefore != null || modalTx.balanceAfter != null" class="modal-balance-section">
-              <div v-if="modalTx.balanceBefore != null" class="modal-row">
-                <span class="modal-row-label">{{ locale.t('ยอดก่อน','Balance before') }}</span>
-                <span class="modal-row-value">{{ fmtAmt(modalTx.balanceBefore!) }}</span>
+              <!-- Balance rows — section separator -->
+              <template v-if="modalTx.balanceBefore != null || modalTx.balanceAfter != null">
+                <div v-if="modalTx.balanceBefore != null" class="modal-row modal-row--sep">
+                  <span class="modal-row-label" style="color:var(--color-primary)">{{ locale.t('ยอดก่อน','Balance before') }}</span>
+                  <span class="modal-row-value">{{ fmtAmt(modalTx.balanceBefore!) }}</span>
+                </div>
+                <div v-if="modalTx.balanceAfter != null" class="modal-row"
+                  :class="{'modal-row--sep': modalTx.balanceBefore == null}">
+                  <span class="modal-row-label" style="color:var(--color-primary)">{{ locale.t('ยอดหลัง','Balance after') }}</span>
+                  <span class="modal-row-value font-medium" style="color:var(--color-success)">{{ fmtAmt(modalTx.balanceAfter!) }}</span>
+                </div>
+              </template>
+              <!-- Status row — section separator -->
+              <div v-if="modalTx.status" class="modal-row modal-row--sep">
+                <span class="modal-row-label">{{ locale.t('สถานะ','Status') }}</span>
+                <span class="modal-status-badge"
+                  :style="`color:${txStatusColor(modalTx.status)};background:${txStatusBg(modalTx.status)};border-color:${txStatusColor(modalTx.status)}`">
+                  <PhCheckCircle :size="13" weight="fill"/>
+                  {{ txStatusLabel(modalTx.status) }}
+                </span>
               </div>
-              <div v-if="modalTx.balanceAfter != null" class="modal-row">
-                <span class="modal-row-label">{{ locale.t('ยอดหลัง','Balance after') }}</span>
-                <span class="modal-row-value font-medium" style="color:var(--color-success)">{{ fmtAmt(modalTx.balanceAfter!) }}</span>
-              </div>
-            </div>
-            <div v-if="modalTx.status" class="modal-status-row">
-              <span class="modal-row-label">{{ locale.t('สถานะ','Status') }}</span>
-              <span class="modal-status-badge"
-                :style="`color:${txStatusColor(modalTx.status)};background:${txStatusBg(modalTx.status)};border-color:${txStatusColor(modalTx.status)}20`">
-                <PhCheckCircle :size="13" weight="fill"/>
-                {{ txStatusLabel(modalTx.status) }}
-              </span>
             </div>
           </template>
 
@@ -1117,34 +1120,26 @@ watch(() => parentStore.selectedChildId, (newId) => {
 .modal-amount-value { font-size:26px; font-weight:500; line-height:1.2; }
 
 .modal-rows {
-  padding:4px 16px 8px;
+  padding:4px 16px 14px;
 }
 .modal-row {
   display:flex; align-items:center; justify-content:space-between;
-  gap:12px; padding:9px 0;
+  gap:12px; padding:10px 0;
   border-bottom:0.5px solid var(--color-border-tertiary);
 }
 .modal-row:last-child { border-bottom:none; }
+.modal-row--sep {
+  border-top:1px solid var(--color-border-secondary) !important;
+  margin-top:6px; padding-top:14px;
+}
 .modal-row-label { font-size:13px; color:var(--color-text-secondary); flex-shrink:0; }
 .modal-row-value { font-size:13px; color:var(--color-text-primary); text-align:right; }
 
-.modal-balance-section {
-  margin:0 16px;
-  padding:4px 0 8px;
-  border-top:0.5px solid var(--color-border-tertiary);
-}
-.modal-balance-section .modal-row { padding:7px 0; }
-
-.modal-status-row {
-  display:flex; align-items:center; justify-content:space-between;
-  gap:12px; padding:12px 16px 16px;
-  border-top:0.5px solid var(--color-border-tertiary);
-}
 .modal-status-badge {
   display:inline-flex; align-items:center; gap:5px;
   font-size:12px; font-weight:500;
-  padding:4px 12px; border-radius:20px;
-  border:1px solid transparent;
+  padding:5px 12px; border-radius:20px;
+  border:1.5px solid transparent;
 }
 
 .modal-section {
