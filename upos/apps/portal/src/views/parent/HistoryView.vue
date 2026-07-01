@@ -308,6 +308,7 @@ const showReviewSheet = ref(false)  // แยกออกจาก reviewFor เ
 const reviewStage     = ref<1 | 2>(1)  // 1=กรอกรีวิว, 2=ยืนยัน
 
 function openReview(t: Transaction) {
+  closeModal()
   reviewFor.value       = t
   reviewRating.value    = ratings[t.id] ?? 0
   reviewNote.value      = notes[t.id]   ?? ''
