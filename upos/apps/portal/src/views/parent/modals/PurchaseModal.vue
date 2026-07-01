@@ -87,7 +87,6 @@ const total    = computed(() => purchaseTotal(items.value))
 
 .mc-items-section {
   padding: 12px 16px;
-  border-top: 0.5px solid var(--color-border-tertiary);
 }
 .mc-section-tag {
   font-size: 11px; font-weight: 500;

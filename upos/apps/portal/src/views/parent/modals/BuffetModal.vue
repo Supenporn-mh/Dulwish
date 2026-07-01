@@ -137,7 +137,6 @@ const subtitle = computed(() => locale.t('รายละเอียดกา�
 
 .mc-items-section {
   padding: 10px 16px 14px;
-  border-top: 0.5px solid var(--color-border-tertiary);
 }
 .mc-section-tag {
   font-size: 11px; font-weight: 500;
@@ -162,8 +161,7 @@ const subtitle = computed(() => locale.t('รายละเอียดกา�
 }
 
 .mc-review {
-  padding: 12px 16px 14px;
-  border-top: 0.5px solid var(--color-border-tertiary);
+  padding: 4px 16px 14px;
 }
 .mc-rated-row { display: flex; align-items: center; gap: 4px; }
 .mc-rated-label { font-size: 12px; font-weight: 500; color: var(--color-warning); margin-left: 4px; }
