@@ -29,7 +29,10 @@ export interface Transaction {
   buffetItems?: string[]
   bookingMeal?: 'breakfast' | 'lunch' | 'dinner'
   bookingItems?: string[]
-  bookingStatus?: 'confirmed' | 'consumed' | 'cancelled'
+  bookingStatus?: 'confirmed' | 'ready' | 'collected' | 'missed' | 'cancelled'
+  mealDate?: string
+  collectedAt?: string
+  cancelledAt?: string
   refundFor?: string
   balanceBefore?: number
   balanceAfter?: number

@@ -379,6 +379,23 @@ async function fetchHistory(childId: string) {
       }))
     : []
 
+  function mapBookingStatus(apiStatus: string, serveDateStr?: string): Transaction['bookingStatus'] {
+    if (apiStatus === 'redeemed') return 'collected'
+    if (apiStatus === 'cancelled' || apiStatus === 'void') return 'cancelled'
+    if (apiStatus === 'expired') return 'missed'
+    if (serveDateStr && (apiStatus === 'confirmed' || apiStatus === 'complete')) {
+      const [y, m, d] = serveDateStr.split('-').map(Number)
+      const serve = new Date(y, m - 1, d)
+      const now = new Date()
+      if (serve.getFullYear() === now.getFullYear()
+        && serve.getMonth() === now.getMonth()
+        && serve.getDate() === now.getDate()) {
+        return 'ready'
+      }
+    }
+    return 'confirmed'
+  }
+
   const bookingTxns: Transaction[] = ordRes.status === 'fulfilled'
     ? (ordRes.value.data?.orders ?? []).map((o: any) => ({
         id:            o.id ?? o._id,
@@ -390,7 +407,10 @@ async function fetchHistory(childId: string) {
         createdAt:     o.createdAt,
         refNo:         o.orderNo,
         bookingMeal:   CODE_TO_MEAL[o.mealPeriodCode ?? ''] ?? 'lunch',
-        bookingStatus: o.status === 'redeemed' ? 'consumed' : (o.status === 'cancelled' ? 'cancelled' : 'confirmed'),
+        bookingStatus: mapBookingStatus(o.status, o.serveDate),
+        mealDate:      o.serveDate,
+        collectedAt:   o.redeemedAt,
+        cancelledAt:   o.cancelledAt,
       }))
     : []
 
