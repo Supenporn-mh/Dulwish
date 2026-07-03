@@ -241,6 +241,7 @@ const orderSchema = new Schema({
   totalAmount:          { type: Number, required: true },
   status:               { type: String, default: 'confirmed', enum: ['pending_payment','confirmed','redeemed','cancelled','expired','select_payment','wait_payment','complete','void'] },
   items:                [orderItemSchema],
+  note:                 { type: String },
   redeemedAt:           { type: Date },
   redeemedByCashierId:  { type: Schema.Types.ObjectId, ref: 'User' },
   cancelledAt:          { type: Date },

@@ -57,7 +57,9 @@ const emit = defineEmits<{
 }>()
 
 const locale = useLocaleStore()
-const { fmtDateTime, deriveSession } = useTxFormat()
+const { fmtDateTime, deriveSession, derivePurchaseItems } = useTxFormat()
+
+const items = computed(() => derivePurchaseItems(props.tx))
 
 const title    = computed(() => locale.t('รายละเอียดการจอง',      'Booking Details'))
 const subtitle = computed(() => locale.t('รายละเอียดการจองอาหาร', 'Food booking details'))
@@ -147,6 +149,21 @@ function fmtMealDate(isoDate: string): string {
       </div>
     </div>
 
+    <!-- Items ordered -->
+    <div v-if="items.length" class="mc-items-section">
+      <p class="mc-section-tag">{{ locale.t('เมนูที่สั่ง', 'Items Ordered') }}</p>
+      <div v-for="item in items" :key="item.name" class="mc-item-row">
+        <span class="mc-item-name">{{ item.name }}</span>
+        <span class="mc-item-qty">×{{ item.qty }}</span>
+      </div>
+    </div>
+
+    <!-- Note -->
+    <div v-if="tx.bookingNote" class="mc-note-section">
+      <p class="mc-section-tag">{{ locale.t('หมายเหตุ', 'Note') }}</p>
+      <p class="mc-note-text">{{ tx.bookingNote }}</p>
+    </div>
+
     <!-- Rate booking — collected only -->
     <div v-if="bStatus === 'collected'" class="mc-review">
       <div v-if="rated" class="mc-rated-row">
@@ -185,6 +202,23 @@ function fmtMealDate(isoDate: string): string {
   font-size: 12px; font-weight: 500;
   padding: 4px 10px; border-radius: 20px;
 }
+
+.mc-items-section { padding: 4px 16px 10px; }
+.mc-section-tag {
+  font-size: 11px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--color-text-tertiary);
+  margin-bottom: 8px;
+}
+.mc-item-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 0;
+}
+.mc-item-name { flex: 1; font-size: 13px; color: var(--color-text-primary); }
+.mc-item-qty  { font-size: 13px; color: var(--color-text-secondary); }
+
+.mc-note-section { padding: 4px 16px 10px; }
+.mc-note-text { font-size: 13px; color: var(--color-text-primary); line-height: 1.5; white-space: pre-wrap; }
 
 .mc-review { padding: 4px 16px 14px; }
 .mc-rated-row { display: flex; align-items: center; gap: 4px; }

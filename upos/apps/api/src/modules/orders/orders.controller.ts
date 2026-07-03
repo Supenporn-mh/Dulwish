@@ -143,7 +143,9 @@ export const ordersController = new Elysia({ prefix: '/orders' })
     if (query.to)      filter.serveDate = { ...filter.serveDate, $lte: query.to }
     if (query.status)  filter.status = query.status
 
-    const orders = await Order.find(filter).sort({ createdAt: -1 }).limit(50).lean()
+    const orders = await Order.find(filter)
+      .populate('items.menuItemId', 'name')
+      .sort({ createdAt: -1 }).limit(50).lean()
     // Enrich with student + meal period names so admin/parent UIs can display
     const studentIds = [...new Set(orders.map(o => String(o.studentUserId)))]
     const periodIds  = [...new Set(orders.map(o => String(o.mealPeriodId)))]
@@ -156,6 +158,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       const p = periods.find(x => String(x._id) === String(o.mealPeriodId))
       return {
         ...o,
+        items: (o.items ?? []).map((i: any) => ({ ...i, name: i.menuItemId?.name ?? '' })),
         studentName: s ? (s.displayName || `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim()) : '',
         studentCode: s?.uid ?? '',
         mealPeriodName: p?.name ?? '',

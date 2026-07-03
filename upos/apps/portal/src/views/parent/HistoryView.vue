@@ -354,7 +354,7 @@ async function submitReview() {
 }
 
 const CODE_TO_MEAL: Record<string, 'breakfast' | 'lunch' | 'dinner'> = {
-  BREAKFAST: 'breakfast', LUNCH: 'lunch', DINNER: 'dinner',
+  BREAK: 'breakfast', LUNCH: 'lunch', DINNER: 'dinner',
 }
 
 // ── Fetch history for a specific child ────────────────────────────────────────
@@ -411,6 +411,11 @@ async function fetchHistory(childId: string) {
         mealDate:      o.serveDate,
         collectedAt:   o.redeemedAt,
         cancelledAt:   o.cancelledAt,
+        items:         (o.items ?? []).map((i: any) => ({
+          name: i.name ?? '-', qty: i.qty, unitPrice: i.unitPrice, lineTotal: i.lineTotal,
+        })),
+        bookingItems:  (o.items ?? []).map((i: any) => i.name ?? '-'),
+        bookingNote:   o.note || undefined,
       }))
     : []
 
