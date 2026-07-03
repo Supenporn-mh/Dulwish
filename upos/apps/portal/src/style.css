@@ -28,6 +28,10 @@ html, body, #app {
   --color-danger-bg:   #FFEBEB;
   --color-warning:     #FF9800;
   --color-warning-bg:  #FFF3E0;
+  --color-accent:      #3C3489;
+  --color-accent-bg:   #EEEDFE;
+  --color-muted:       #666666;
+  --color-muted-bg:    #C8C8C8;
 
   /* Text */
   --color-text-primary:   #111111;

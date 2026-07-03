@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { useLocaleStore } from '@/stores/locale'
 import { useParentStore } from '@/stores/parent'
+import { useTxFormat } from '@/composables/useTxFormat'
 import api from '@/api/axios'
 import {
   PhArrowUp, PhShoppingBag, PhForkKnife, PhArrowCounterClockwise,
@@ -17,6 +18,7 @@ import BuffetModal   from './modals/BuffetModal.vue'
 
 const locale      = useLocaleStore()
 const parentStore = useParentStore()
+const { txStatusLabel } = useTxFormat()
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type FilterKey = 'all' | TxType
@@ -195,6 +197,8 @@ function txIcon(t: TxType)      { return t==='topup' ? PhArrowUp : t==='purchase
 function txIconColor(t: TxType) { return t==='topup'?'#03BA81': t==='purchase'?'#FF9800': t==='buffet'?'#1264E3': t==='booking'?'#3C3489':'#999999' }
 function txIconBg(t: TxType)    { return t==='topup'?'#E0FAF3': t==='purchase'?'#FFF3E0': t==='buffet'?'#EAF1FD': t==='booking'?'#EEEDFE':'#F5F5F5' }
 
+function isDimmedTx(tx: Transaction) { return tx.status === 'voided' || tx.status === 'refunded' }
+
 // Derive purchase items — prefer structured items array, fall back to purchaseItems, then description parse
 function derivePurchaseItems(tx: Transaction): PurchaseItem[] {
   // 1. Structured items array from API (purchase/buffet transactions)
@@ -239,30 +243,6 @@ function fmtDateTime(iso: string) {
   const d = new Date(iso), loc = locale.lang === 'en' ? 'en-GB' : 'th-TH'
   return d.toLocaleDateString(loc, { day:'2-digit', month:'2-digit', year:'numeric' }) + ', ' +
          d.toLocaleTimeString(loc, { hour:'2-digit', minute:'2-digit' })
-}
-
-function txStatusLabel(s: string) {
-  const map: Record<string, { th:string; en:string }> = {
-    complete:  { th:'สำเร็จ',        en:'Complete'  },
-    completed: { th:'สำเร็จ',        en:'Complete'  },
-    success:   { th:'สำเร็จ',        en:'Complete'  },
-    pending:   { th:'รอดำเนินการ',   en:'Pending'   },
-    failed:    { th:'ล้มเหลว',       en:'Failed'    },
-  }
-  const e = map[s.toLowerCase()]
-  return e ? (locale.lang === 'th' ? e.th : e.en) : s
-}
-function txStatusColor(s: string) {
-  const l = s.toLowerCase()
-  if (['complete','completed','success'].includes(l)) return 'var(--color-success)'
-  if (l === 'pending') return 'var(--color-warning)'
-  return 'var(--color-danger)'
-}
-function txStatusBg(s: string) {
-  const l = s.toLowerCase()
-  if (['complete','completed','success'].includes(l)) return 'var(--color-success-bg)'
-  if (l === 'pending') return 'var(--color-warning-bg)'
-  return 'var(--color-danger-bg)'
 }
 
 const modalTxTitle = computed(() => {
@@ -367,6 +347,15 @@ async function fetchHistory(childId: string) {
     api.get('/orders', { params: { student: childId } }),
   ])
 
+  function deriveBuffetStatus(t: any): string {
+    if (t.type !== 'buffet' || t.status !== 'success') return t.status
+    if (!t.buffetRoundStart || !t.buffetRoundEnd || !t.buffetEntryDate) return t.status
+    const now   = new Date()
+    const start = new Date(`${t.buffetEntryDate}T${t.buffetRoundStart}`)
+    const end   = new Date(`${t.buffetEntryDate}T${t.buffetRoundEnd}`)
+    return (now >= start && now <= end) ? 'active' : t.status
+  }
+
   const walletTxns: Transaction[] = txRes.status === 'fulfilled'
     ? (txRes.value.data?.transactions ?? txRes.value.data ?? []).map((t: any) => ({
         ...t,
@@ -375,7 +364,7 @@ async function fetchHistory(childId: string) {
         items:         t.items ?? undefined,
         balanceBefore: t.balanceBefore ?? t.balance_before,
         balanceAfter:  t.balanceAfter  ?? t.balance_after,
-        status:        t.status,
+        status:        deriveBuffetStatus(t),
       }))
     : []
 
@@ -416,6 +405,7 @@ async function fetchHistory(childId: string) {
         })),
         bookingItems:  (o.items ?? []).map((i: any) => i.name ?? '-'),
         bookingNote:   o.note || undefined,
+        reason:        o.cancelReason || undefined,
       }))
     : []
 
@@ -515,16 +505,18 @@ watch(() => parentStore.selectedChildId, (newId) => {
 
             <!-- Transaction row (dashboard style) -->
             <button @click="openModal(tx)" class="tx-row w-full"
-              :style="ti>0?'border-top:0.5px solid var(--color-border-tertiary)':''">
+              :style="`${ti>0?'border-top:0.5px solid var(--color-border-tertiary);':''}${isDimmedTx(tx)?'opacity:0.85;':''}`">
               <!-- Icon circle -->
               <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-                :style="`background:${txIconBg(tx.type)}`">
-                <component :is="txIcon(tx.type)" :size="18" weight="fill" :color="txIconColor(tx.type)"/>
+                :style="isDimmedTx(tx) ? 'background:var(--color-muted-bg)' : `background:${txIconBg(tx.type)}`">
+                <component :is="txIcon(tx.type)" :size="18" weight="fill"
+                  :color="isDimmedTx(tx) ? 'var(--color-muted)' : txIconColor(tx.type)"/>
               </div>
               <!-- Description + meta -->
               <div class="flex-1 min-w-0 text-left">
                 <p class="text-[15px] truncate font-medium" style="color:var(--color-text-primary)">
                   {{ (tx.description && tx.description !== tx.type) ? tx.description : txLabel(tx.type) }}
+                  <span v-if="isDimmedTx(tx)" class="tx-tag">{{ txStatusLabel(tx.status!) }}</span>
                 </p>
                 <p class="text-[12px] mt-0.5" style="color:var(--color-text-secondary)">
                   {{ CHANNEL_LABEL[tx.channel??''] ?? tx.channel ?? '' }}
@@ -536,7 +528,8 @@ watch(() => parentStore.selectedChildId, (newId) => {
                 </p>
               </div>
               <!-- Amount -->
-              <span class="text-[15px] font-medium flex-shrink-0" :style="`color:${amtColor(tx.amount)}`">
+              <span class="text-[15px] font-medium flex-shrink-0"
+                :style="isDimmedTx(tx) ? 'color:var(--color-muted);text-decoration:line-through' : `color:${amtColor(tx.amount)}`">
                 {{ amtText(tx.amount) }}
               </span>
             </button>
@@ -841,6 +834,13 @@ watch(() => parentStore.selectedChildId, (newId) => {
   width: 100%;
 }
 .tx-row:active { background:var(--color-bg-page); }
+.tx-tag {
+  display:inline-block; margin-left:6px;
+  font-size:11px; font-weight:500;
+  padding:2px 8px; border-radius:20px;
+  background:var(--color-muted-bg); color:var(--color-muted);
+  vertical-align:middle;
+}
 
 /* ── Detail panel ─────────────────────────────────────────────────────────── */
 .detail-pane { background:var(--color-bg-surface); border-top:0.5px solid var(--color-border-tertiary); }

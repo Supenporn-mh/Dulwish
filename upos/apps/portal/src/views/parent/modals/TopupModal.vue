@@ -1,19 +1,21 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { PhArrowUp, PhCheckCircle } from '@phosphor-icons/vue'
+import { PhArrowUp } from '@phosphor-icons/vue'
 import { useLocaleStore } from '@/stores/locale'
 import { useTxFormat } from '@/composables/useTxFormat'
 import ModalCard from './ModalCard.vue'
+import ReasonBox from './ReasonBox.vue'
 import type { Transaction } from '@/types/transaction'
 
 const props = defineProps<{ tx: Transaction }>()
 const emit  = defineEmits<{ close: [] }>()
 
 const locale = useLocaleStore()
-const { fmtAmt, fmtDateTime, paymentLabel, channelLabel, txStatusLabel, txStatusColor, txStatusBg } = useTxFormat()
+const { fmtAmt, fmtDateTime, paymentLabel, channelLabel, txStatusLabel, txStatusColor, txStatusBg, txStatusIcon } = useTxFormat()
 
 const title    = computed(() => locale.t('รายละเอียดการเติมเงิน',      'Top-up Details'))
 const subtitle = computed(() => locale.t('รายละเอียดการทำรายการเติมเงิน', 'Top-up transaction details'))
+const isDimmed = computed(() => props.tx.status?.toLowerCase() === 'refunded')
 </script>
 
 <template>
@@ -26,14 +28,17 @@ const subtitle = computed(() => locale.t('รายละเอียดกา�
     @close="emit('close')"
   >
     <!-- Amount -->
-    <div class="mc-amount" style="background:var(--color-success-bg)">
-      <p class="mc-amt-label" style="color:var(--color-success)">
+    <div class="mc-amount" :style="`background:${isDimmed ? 'var(--color-muted-bg)' : 'var(--color-success-bg)'}`">
+      <p class="mc-amt-label" :style="`color:${isDimmed ? 'var(--color-muted)' : 'var(--color-success)'}`">
         {{ locale.t('จำนวนเงิน','Amount') }}
       </p>
-      <p class="mc-amt-value" style="color:var(--color-success)">
+      <p class="mc-amt-value"
+        :style="isDimmed ? 'color:var(--color-muted);text-decoration:line-through' : 'color:var(--color-success)'">
         +{{ fmtAmt(tx.amount) }}
       </p>
     </div>
+
+    <ReasonBox :reason="tx.reason" />
 
     <!-- Info rows -->
     <div class="mc-rows">
@@ -78,10 +83,22 @@ const subtitle = computed(() => locale.t('รายละเอียดกา�
         <span class="mc-key">{{ locale.t('สถานะ','Status') }}</span>
         <span class="mc-badge"
           :style="`color:${txStatusColor(tx.status)};background:${txStatusBg(tx.status)}`">
-          <PhCheckCircle :size="13" weight="fill"/>
+          <component :is="txStatusIcon(tx.status)" :size="13" weight="fill"/>
           {{ txStatusLabel(tx.status) }}
         </span>
       </div>
+
+      <!-- Refunded -->
+      <template v-if="tx.status?.toLowerCase() === 'refunded'">
+        <div class="mc-row">
+          <span class="mc-key">{{ locale.t('คืนเงินเมื่อ','Refunded at') }}</span>
+          <span class="mc-val">{{ fmtDateTime(tx.actionedAt ?? tx.createdAt) }}</span>
+        </div>
+        <div class="mc-row">
+          <span class="mc-key">{{ locale.t('คืนไปที่','Refund to') }}</span>
+          <span class="mc-val">{{ locale.t('ยอดคงเหลือ','Balance') }}</span>
+        </div>
+      </template>
     </div>
   </ModalCard>
 </template>

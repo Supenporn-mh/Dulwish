@@ -580,6 +580,59 @@ await BuffetSession.findByIdAndUpdate(bfSes3._id, { transactionId: txBuf3._id })
 // Student3 — ยอด 0 ใช้ไม่ได้ (ไม่มี session)
 console.log('[Seed] BuffetSessions created')
 
+// ── 24b. VOID / REFUND STATUS DEMO (ครบทุกประเภท: Top-up / Purchase / Buffet) ──
+// แต่ละคู่คือ original transaction (status voided/refunded) + sibling void/refund
+// transaction ที่ผูกกลับผ่าน voidedByTxnId (ตาม pattern จริงที่ admin/buffet
+// controller ใช้) เพื่อให้ Reason / Voided-at-by / Refunded-at-to โชว์ครบใน UI
+
+// Top-up → Refunded (Student1 เติมเงินผิดจำนวน แอดมินคืนเงิน)
+const txTopupToRefund = await Transaction.create({
+  refNo: 'TXN-TOP-0010', walletId: wStudent1._id, type: 'topup',
+  amount: 200, balanceAfter: 700, channel: 'mobile_web', paymentMethod: 'scb_qr',
+  paymentRef: 'MOCK-SEED-0010', status: 'refunded',
+})
+await Transaction.create({
+  refNo: 'TXN-VOID-0010', walletId: wStudent1._id, type: 'void',
+  amount: -200, balanceAfter: 500, channel: 'admin', paymentMethod: 'scb_qr',
+  cashierId: uSuper._id, voidedByTxnId: txTopupToRefund._id, status: 'success',
+  note: 'ผู้ปกครองเติมเงินผิดจำนวน ขอคืนเงิน',
+})
+
+// Purchase → Voided (Student1 สั่งแล้วร้านค้าของหมด แคชเชียร์ยกเลิก)
+const txPurchaseToVoid = await Transaction.create({
+  refNo: 'TXN-PUR-0010', walletId: wStudent1._id, type: 'purchase',
+  amount: -60, balanceAfter: 440, channel: 'mobile', paymentMethod: 'card_wallet',
+  status: 'voided',
+  items: [{ name: 'ข้าวผัดกุ้ง', qty: 1, unitPrice: 60, lineTotal: 60 }],
+})
+await Transaction.create({
+  refNo: 'TXN-VOID-0011', walletId: wStudent1._id, type: 'void',
+  amount: 60, balanceAfter: 500, channel: 'admin', paymentMethod: 'card_wallet',
+  cashierId: uSuper._id, voidedByTxnId: txPurchaseToVoid._id, status: 'success',
+  note: 'สินค้าหมด ไม่สามารถจัดส่งได้ ยกเลิกรายการ',
+})
+
+// Buffet → Refunded (Student2 แตะบัตรผิดคน supervisor void session คืนเงิน)
+const bfSesToRefund = await BuffetSession.create({
+  userId: uStudent2._id, buffetRoundId: bfRound2._id,
+  entryDate: '2025-06-10', priceCharged: 85, payMethod: 'wallet',
+  enteredAt: new Date('2025-06-10T11:40:00Z'), deviceId: 'POS-01',
+  voidedAt: new Date('2025-06-10T12:00:00Z'), voidReason: 'แตะบัตรผิดคน',
+})
+const txBuffetToRefund = await Transaction.create({
+  refNo: 'TXN-BUF-0010', walletId: wStudent2._id, type: 'buffet',
+  amount: -85, balanceAfter: 65, channel: 'pos', cashierId: uCashier._id,
+  status: 'refunded',
+})
+await BuffetSession.findByIdAndUpdate(bfSesToRefund._id, { transactionId: txBuffetToRefund._id })
+await Transaction.create({
+  refNo: 'TXN-VOID-0012', walletId: wStudent2._id, type: 'refund',
+  amount: 85, balanceAfter: 150, channel: 'admin', paymentMethod: 'void',
+  cashierId: uSuper._id, voidedByTxnId: txBuffetToRefund._id, status: 'success',
+  note: 'แตะบัตรผิดคน',
+})
+console.log('[Seed] Void/Refund status demo created (topup/purchase/buffet)')
+
 // ── 25. FEEDBACK  (5 cases: 3 channels × 3 actors × หลาย rating) ─────────────
 await Feedback.insertMany([
   // Kiosk — anonymous (ไม่มี userId)

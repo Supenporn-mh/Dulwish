@@ -114,7 +114,7 @@ const transactionSchema = new Schema({
   relatedOrderId:  { type: Schema.Types.ObjectId, ref: 'Order' },
   relatedBuffetId: { type: Schema.Types.ObjectId, ref: 'BuffetSession' },
   voidedByTxnId:  { type: Schema.Types.ObjectId, ref: 'Transaction' },
-  status:          { type: String, default: 'success', enum: ['pending','success','failed','voided','wait'] },
+  status:          { type: String, default: 'success', enum: ['pending','success','failed','voided','wait','refunded'] },
   note:            { type: String },
   metadata:        { type: Schema.Types.Mixed },
   splits:          [txnSplitSchema],

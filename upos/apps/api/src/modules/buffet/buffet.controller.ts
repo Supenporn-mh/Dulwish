@@ -426,9 +426,15 @@ export const buffetController = new Elysia({ prefix: '/buffet' })
       balanceAfter:  wallet.balance,
       channel:       'admin',
       paymentMethod: 'void',
+      cashierId:     currentUser._id,
+      voidedByTxnId: session.transactionId,
       status:        'success',
-      note:          `Void buffet: ${body.reason}`,
+      note:          body.reason,
     })
+
+    if (session.transactionId) {
+      await Transaction.findByIdAndUpdate(session.transactionId, { status: 'refunded' })
+    }
 
     // soft-delete: เก็บ record ไว้เพื่อ audit แต่ mark ว่า voided
     session.voidedAt   = new Date()

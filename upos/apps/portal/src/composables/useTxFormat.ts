@@ -1,5 +1,26 @@
 import { useLocaleStore } from '@/stores/locale'
 import type { Transaction, PurchaseItem } from '@/types/transaction'
+import {
+  PhCheckCircle, PhClock, PhXCircle, PhArrowsClockwise, PhProhibit, PhLightning,
+} from '@phosphor-icons/vue'
+
+interface TxStatusEntry {
+  th: string; en: string
+  bg: string; text: string
+  icon: any
+}
+
+const TX_STATUS_CONFIG: Record<string, TxStatusEntry> = {
+  complete:  { th: 'สำเร็จ',      en: 'Complete', bg: 'var(--color-success-bg)', text: 'var(--color-success)', icon: PhCheckCircle },
+  completed: { th: 'สำเร็จ',      en: 'Complete', bg: 'var(--color-success-bg)', text: 'var(--color-success)', icon: PhCheckCircle },
+  success:   { th: 'สำเร็จ',      en: 'Complete', bg: 'var(--color-success-bg)', text: 'var(--color-success)', icon: PhCheckCircle },
+  pending:   { th: 'รอดำเนินการ', en: 'Pending',  bg: 'var(--color-warning-bg)', text: 'var(--color-warning)', icon: PhClock },
+  wait:      { th: 'รอดำเนินการ', en: 'Pending',  bg: 'var(--color-warning-bg)', text: 'var(--color-warning)', icon: PhClock },
+  failed:    { th: 'ล้มเหลว',     en: 'Failed',   bg: 'var(--color-danger-bg)',  text: 'var(--color-danger)',  icon: PhXCircle },
+  refunded:  { th: 'คืนเงินแล้ว', en: 'Refunded', bg: 'var(--color-muted-bg)',   text: 'var(--color-muted)',   icon: PhArrowsClockwise },
+  voided:    { th: 'ยกเลิกแล้ว',  en: 'Voided',   bg: 'var(--color-muted-bg)',   text: 'var(--color-muted)',   icon: PhProhibit },
+  active:    { th: 'กำลังใช้งาน', en: 'Active',   bg: 'var(--color-accent-bg)',  text: 'var(--color-accent)',  icon: PhLightning },
+}
 
 export function useTxFormat() {
   const locale = useLocaleStore()
@@ -59,29 +80,20 @@ export function useTxFormat() {
   }
 
   function txStatusLabel(s: string): string {
-    const map: Record<string, { th: string; en: string }> = {
-      complete:  { th: 'สำเร็จ',      en: 'Complete' },
-      completed: { th: 'สำเร็จ',      en: 'Complete' },
-      success:   { th: 'สำเร็จ',      en: 'Complete' },
-      pending:   { th: 'รอดำเนินการ', en: 'Pending'  },
-      failed:    { th: 'ล้มเหลว',     en: 'Failed'   },
-    }
-    const e = map[s.toLowerCase()]
+    const e = TX_STATUS_CONFIG[s.toLowerCase()]
     return e ? (locale.lang === 'th' ? e.th : e.en) : s
   }
 
   function txStatusColor(s: string): string {
-    const l = s.toLowerCase()
-    if (['complete', 'completed', 'success'].includes(l)) return 'var(--color-success)'
-    if (l === 'pending') return 'var(--color-warning)'
-    return 'var(--color-danger)'
+    return TX_STATUS_CONFIG[s.toLowerCase()]?.text ?? 'var(--color-danger)'
   }
 
   function txStatusBg(s: string): string {
-    const l = s.toLowerCase()
-    if (['complete', 'completed', 'success'].includes(l)) return 'var(--color-success-bg)'
-    if (l === 'pending') return 'var(--color-warning-bg)'
-    return 'var(--color-danger-bg)'
+    return TX_STATUS_CONFIG[s.toLowerCase()]?.bg ?? 'var(--color-danger-bg)'
+  }
+
+  function txStatusIcon(s: string): any {
+    return TX_STATUS_CONFIG[s.toLowerCase()]?.icon ?? PhCheckCircle
   }
 
   function derivePurchaseItems(tx: Transaction): PurchaseItem[] {
@@ -128,7 +140,7 @@ export function useTxFormat() {
 
   return {
     fmtAmt, fmtDateTime, sessionLabel, paymentLabel, channelLabel,
-    txStatusLabel, txStatusColor, txStatusBg,
+    txStatusLabel, txStatusColor, txStatusBg, txStatusIcon,
     derivePurchaseItems, deriveSession, deriveVenue, purchaseTotal,
   }
 }

@@ -833,7 +833,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
 
     const txn = await Transaction.findById(params.id)
     if (!txn) { set.status = 404; return { error: { code: 'NOT_FOUND', message: 'Transaction not found' } } }
-    if (txn.status === 'voided') {
+    if (txn.status === 'voided' || txn.status === 'refunded') {
       set.status = 409
       return { error: { code: 'POS_003', message: 'Already voided' } }
     }
@@ -875,7 +875,9 @@ export const adminController = new Elysia({ prefix: '/admin' })
       note: body.reason,
     })
 
-    txn.status = 'voided'
+    // Purchase reversal stays "voided"; every other type reversed through this
+    // generic endpoint reads as a refund (Top-up/Buffet have no Voided state).
+    txn.status = txn.type === 'purchase' ? 'voided' : 'refunded'
     await txn.save()
 
     await AuditLog.create({
@@ -886,7 +888,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
       entityId: String(txn._id),
       reason: body.reason,
       beforeData: { status: 'success' },
-      afterData:  { status: 'voided' },
+      afterData:  { status: txn.status },
     })
 
     return { success: true, txnId: txn._id }

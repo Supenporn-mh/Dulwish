@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia'
 import { authPlugin } from '../../middleware/auth'
-import { Wallet, Transaction, User, ParentStudent } from '../../models'
+import { Wallet, Transaction, User, ParentStudent, BuffetSession } from '../../models'
 
 function genRefNo(prefix = 'TXN') {
   const d = new Date()
@@ -50,7 +50,47 @@ export const walletController = new Elysia({ prefix: '/wallets' })
       .sort({ createdAt: -1 })
       .limit(Number(query.limit ?? 20))
       .lean()
-    return { transactions: txns }
+
+    // Enrich buffet-type transactions with their session's round window so the
+    // frontend can derive an "active" (still within round time) display status.
+    const buffetTxnIds = txns.filter(t => t.type === 'buffet').map(t => t._id)
+    const sessions = buffetTxnIds.length
+      ? await BuffetSession.find({ transactionId: { $in: buffetTxnIds } })
+          .populate('buffetRoundId', 'startTime endTime')
+          .lean()
+      : []
+    const sessionByTxnId = new Map(sessions.map(s => [String(s.transactionId), s]))
+
+    // Enrich voided/refunded transactions with the reason/actor from the
+    // sibling void/refund transaction that references them via voidedByTxnId.
+    const terminalIds = txns.filter(t => t.status === 'voided' || t.status === 'refunded').map(t => t._id)
+    const actionTxns = terminalIds.length
+      ? await Transaction.find({ voidedByTxnId: { $in: terminalIds } })
+          .populate('cashierId', 'firstName lastName')
+          .lean()
+      : []
+    const actionByOrigId = new Map(actionTxns.map(a => [String(a.voidedByTxnId), a]))
+
+    const enriched = txns.map(t => {
+      const session = t.type === 'buffet' ? sessionByTxnId.get(String(t._id)) : undefined
+      const action  = actionByOrigId.get(String(t._id))
+      const cashier = action?.cashierId as any
+      return {
+        ...t,
+        ...(session ? {
+          buffetRoundStart: (session.buffetRoundId as any)?.startTime,
+          buffetRoundEnd:   (session.buffetRoundId as any)?.endTime,
+          buffetEntryDate:  session.entryDate,
+        } : {}),
+        ...(action ? {
+          reason:          action.note,
+          actionedAt:      action.createdAt,
+          actionedByName:  cashier ? `${cashier.firstName ?? ''} ${cashier.lastName ?? ''}`.trim() : undefined,
+        } : {}),
+      }
+    })
+
+    return { transactions: enriched }
   }, {
     query: t.Object({
       limit: t.Optional(t.String()),

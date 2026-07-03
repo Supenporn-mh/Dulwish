@@ -27,6 +27,9 @@ export interface Transaction {
   purchaseItems?: PurchaseItem[]
   buffetSession?: 'breakfast' | 'lunch' | 'dinner'
   buffetItems?: string[]
+  buffetRoundStart?: string
+  buffetRoundEnd?: string
+  buffetEntryDate?: string
   bookingMeal?: 'breakfast' | 'lunch' | 'dinner'
   bookingItems?: string[]
   bookingNote?: string
@@ -38,4 +41,7 @@ export interface Transaction {
   balanceBefore?: number
   balanceAfter?: number
   status?: string
+  reason?: string
+  actionedAt?: string
+  actionedByName?: string
 }

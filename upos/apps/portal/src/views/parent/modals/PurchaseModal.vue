@@ -1,21 +1,23 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { PhShoppingBag, PhCheckCircle } from '@phosphor-icons/vue'
+import { PhShoppingBag } from '@phosphor-icons/vue'
 import { useLocaleStore } from '@/stores/locale'
 import { useTxFormat } from '@/composables/useTxFormat'
 import ModalCard from './ModalCard.vue'
+import ReasonBox from './ReasonBox.vue'
 import type { Transaction } from '@/types/transaction'
 
 const props = defineProps<{ tx: Transaction }>()
 const emit  = defineEmits<{ close: [] }>()
 
 const locale = useLocaleStore()
-const { fmtAmt, fmtDateTime, channelLabel, txStatusLabel, txStatusColor, txStatusBg, derivePurchaseItems, purchaseTotal } = useTxFormat()
+const { fmtAmt, fmtDateTime, channelLabel, txStatusLabel, txStatusColor, txStatusBg, txStatusIcon, derivePurchaseItems, purchaseTotal } = useTxFormat()
 
 const title    = computed(() => locale.t('รายละเอียดการซื้อสินค้า', 'Purchase Details'))
 const subtitle = computed(() => locale.t('รายละเอียดการซื้อสินค้า',  'Purchase transaction details'))
 const items    = computed(() => derivePurchaseItems(props.tx))
 const total    = computed(() => purchaseTotal(items.value))
+const isDimmed = computed(() => ['voided','refunded'].includes(props.tx.status?.toLowerCase() ?? ''))
 </script>
 
 <template>
@@ -28,14 +30,17 @@ const total    = computed(() => purchaseTotal(items.value))
     @close="emit('close')"
   >
     <!-- Amount -->
-    <div class="mc-amount" style="background:var(--color-danger-bg)">
-      <p class="mc-amt-label" style="color:var(--color-danger)">
+    <div class="mc-amount" :style="`background:${isDimmed ? 'var(--color-muted-bg)' : 'var(--color-danger-bg)'}`">
+      <p class="mc-amt-label" :style="`color:${isDimmed ? 'var(--color-muted)' : 'var(--color-danger)'}`">
         {{ locale.t('จำนวนเงิน','Amount') }}
       </p>
-      <p class="mc-amt-value" style="color:var(--color-danger)">
+      <p class="mc-amt-value"
+        :style="isDimmed ? 'color:var(--color-muted);text-decoration:line-through' : 'color:var(--color-danger)'">
         −{{ fmtAmt(Math.abs(tx.amount)) }}
       </p>
     </div>
+
+    <ReasonBox :reason="tx.reason" />
 
     <!-- Items section -->
     <div class="mc-items-section">
@@ -67,10 +72,34 @@ const total    = computed(() => purchaseTotal(items.value))
         <span class="mc-key">{{ locale.t('สถานะ','Status') }}</span>
         <span class="mc-badge"
           :style="`color:${txStatusColor(tx.status)};background:${txStatusBg(tx.status)}`">
-          <PhCheckCircle :size="13" weight="fill"/>
+          <component :is="txStatusIcon(tx.status)" :size="13" weight="fill"/>
           {{ txStatusLabel(tx.status) }}
         </span>
       </div>
+
+      <!-- Voided -->
+      <template v-if="tx.status?.toLowerCase() === 'voided'">
+        <div class="mc-row">
+          <span class="mc-key">{{ locale.t('ยกเลิกเมื่อ','Voided at') }}</span>
+          <span class="mc-val">{{ fmtDateTime(tx.actionedAt ?? tx.createdAt) }}</span>
+        </div>
+        <div class="mc-row">
+          <span class="mc-key">{{ locale.t('ยกเลิกโดย','Voided by') }}</span>
+          <span class="mc-val">{{ tx.actionedByName || '-' }}</span>
+        </div>
+      </template>
+
+      <!-- Refunded -->
+      <template v-if="tx.status?.toLowerCase() === 'refunded'">
+        <div class="mc-row">
+          <span class="mc-key">{{ locale.t('คืนเงินเมื่อ','Refunded at') }}</span>
+          <span class="mc-val">{{ fmtDateTime(tx.actionedAt ?? tx.createdAt) }}</span>
+        </div>
+        <div class="mc-row">
+          <span class="mc-key">{{ locale.t('คืนไปที่','Refund to') }}</span>
+          <span class="mc-val">{{ locale.t('ยอดคงเหลือ','Balance') }}</span>
+        </div>
+      </template>
     </div>
   </ModalCard>
 </template>

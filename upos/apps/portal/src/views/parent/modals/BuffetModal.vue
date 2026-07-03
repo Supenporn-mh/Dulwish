@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { PhForkKnife, PhCheckCircle, PhStar } from '@phosphor-icons/vue'
+import { PhForkKnife, PhStar } from '@phosphor-icons/vue'
 import { useLocaleStore } from '@/stores/locale'
 import { useTxFormat } from '@/composables/useTxFormat'
 import ModalCard from './ModalCard.vue'
+import ReasonBox from './ReasonBox.vue'
 import type { Transaction } from '@/types/transaction'
 
 const props = defineProps<{
@@ -18,10 +19,15 @@ const emit = defineEmits<{
 }>()
 
 const locale = useLocaleStore()
-const { fmtAmt, fmtDateTime, txStatusLabel, txStatusColor, txStatusBg, deriveSession, deriveVenue } = useTxFormat()
+const { fmtAmt, fmtDateTime, txStatusLabel, txStatusColor, txStatusBg, txStatusIcon, deriveSession, deriveVenue } = useTxFormat()
 
 const title    = computed(() => locale.t('รายละเอียดบุฟเฟต์',      'Buffet Details'))
 const subtitle = computed(() => locale.t('รายละเอียดการใช้บุฟเฟต์', 'Buffet session details'))
+const canRate  = computed(() => {
+  const s = props.tx.status?.toLowerCase()
+  return s === 'active' || s === 'complete' || s === 'completed' || s === 'success'
+})
+const isDimmed = computed(() => props.tx.status?.toLowerCase() === 'refunded')
 </script>
 
 <template>
@@ -34,14 +40,17 @@ const subtitle = computed(() => locale.t('รายละเอียดกา�
     @close="emit('close')"
   >
     <!-- Amount -->
-    <div v-if="tx.amount" class="mc-amount" style="background:var(--color-warning-bg)">
-      <p class="mc-amt-label" style="color:var(--color-warning)">
+    <div v-if="tx.amount" class="mc-amount" :style="`background:${isDimmed ? 'var(--color-muted-bg)' : 'var(--color-warning-bg)'}`">
+      <p class="mc-amt-label" :style="`color:${isDimmed ? 'var(--color-muted)' : 'var(--color-warning)'}`">
         {{ locale.t('จำนวนเงิน','Amount') }}
       </p>
-      <p class="mc-amt-value" style="color:var(--color-warning)">
+      <p class="mc-amt-value"
+        :style="isDimmed ? 'color:var(--color-muted);text-decoration:line-through' : 'color:var(--color-warning)'">
         {{ fmtAmt(Math.abs(tx.amount)) }}
       </p>
     </div>
+
+    <ReasonBox :reason="tx.reason" />
 
     <!-- Info rows -->
     <div class="mc-rows">
@@ -63,10 +72,22 @@ const subtitle = computed(() => locale.t('รายละเอียดกา�
         <span class="mc-key">{{ locale.t('สถานะ','Status') }}</span>
         <span class="mc-badge"
           :style="`color:${txStatusColor(tx.status)};background:${txStatusBg(tx.status)}`">
-          <PhCheckCircle :size="13" weight="fill"/>
+          <component :is="txStatusIcon(tx.status)" :size="13" weight="fill"/>
           {{ txStatusLabel(tx.status) }}
         </span>
       </div>
+
+      <!-- Refunded -->
+      <template v-if="tx.status?.toLowerCase() === 'refunded'">
+        <div class="mc-row">
+          <span class="mc-key">{{ locale.t('คืนเงินเมื่อ','Refunded at') }}</span>
+          <span class="mc-val">{{ fmtDateTime(tx.actionedAt ?? tx.createdAt) }}</span>
+        </div>
+        <div class="mc-row">
+          <span class="mc-key">{{ locale.t('คืนไปที่','Refund to') }}</span>
+          <span class="mc-val">{{ locale.t('ยอดคงเหลือ','Balance') }}</span>
+        </div>
+      </template>
     </div>
 
     <!-- Buffet items -->
@@ -87,7 +108,7 @@ const subtitle = computed(() => locale.t('รายละเอียดกา�
     </div>
 
     <!-- Review -->
-    <div class="mc-review">
+    <div v-if="canRate" class="mc-review">
       <div v-if="rated" class="mc-rated-row">
         <PhStar v-for="n in 5" :key="n" :size="16"
           :weight="n <= ratingValue ? 'fill' : 'regular'"

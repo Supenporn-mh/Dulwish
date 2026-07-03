@@ -4,10 +4,11 @@ import { PhCalendarBlank, PhCheckCircle, PhClock, PhXCircle, PhX, PhStar } from 
 import { useLocaleStore } from '@/stores/locale'
 import { useTxFormat } from '@/composables/useTxFormat'
 import ModalCard from './ModalCard.vue'
+import ReasonBox from './ReasonBox.vue'
 import type { Transaction } from '@/types/transaction'
 
-const ACCENT_BG   = '#EEEDFE'
-const ACCENT_TEXT = '#3C3489'
+const ACCENT_BG   = 'var(--color-accent-bg)'
+const ACCENT_TEXT = 'var(--color-accent)'
 
 type BookingStatus = 'confirmed' | 'ready' | 'collected' | 'missed' | 'cancelled'
 
@@ -30,7 +31,7 @@ const STATUS_CONFIG: Record<BookingStatus, StatusConfig> = {
   },
   collected: {
     th: 'รับแล้ว', en: 'Collected',
-    badgeBg: 'var(--color-border-secondary)', badgeText: 'var(--color-text-secondary)',
+    badgeBg: 'var(--color-muted-bg)', badgeText: 'var(--color-muted)',
     icon: PhCheckCircle,
   },
   missed: {
@@ -148,6 +149,8 @@ function fmtMealDate(isoDate: string): string {
         </span>
       </div>
     </div>
+
+    <ReasonBox v-if="bStatus === 'cancelled'" :reason="tx.reason" />
 
     <!-- Items ordered -->
     <div v-if="items.length" class="mc-items-section">
