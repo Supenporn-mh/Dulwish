@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia'
 import bcrypt from 'bcryptjs'
 import { authPlugin } from '../../middleware/auth'
-import { User, Transaction, Wallet, Order, BuffetSession, AuditLog, Policy, EnrollmentCode, Card, ParentStudent, TaxInvoice, GradeLevel } from '../../models'
+import { User, Transaction, Wallet, Order, BuffetSession, AuditLog, Policy, EnrollmentCode, Card, ParentStudent, TaxInvoice, GradeLevel, MenuItem, MealPeriod, Notification } from '../../models'
 
 function genRefNo(prefix = 'TXN') {
   const d = new Date()
@@ -24,6 +24,37 @@ function codeExpiresAt(): Date {
   const d = new Date()
   d.setDate(d.getDate() + 14)
   return d
+}
+
+// ── Booking helpers ─────────────────────────────────────────────────────────
+function pad2(n: number) { return String(n).padStart(2, '0') }
+function localDateStr(d: Date) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` }
+
+// Statuses a booking can still be cancelled from (i.e. not already terminal).
+const CANCELLABLE_BOOKING_STATUSES = ['confirmed', 'pending_payment', 'select_payment', 'wait_payment']
+
+type BookingBucket = 'จองแล้ว' | 'พร้อมรับ' | 'รับแล้ว' | 'ไม่มารับ' | 'ยกเลิก'
+
+function bookingBucket(order: { status: string; serveDate: string }, period?: { startTime: string; endTime: string } | null): BookingBucket {
+  const s = order.status
+  if (s === 'redeemed' || s === 'complete') return 'รับแล้ว'
+  if (s === 'expired') return 'ไม่มารับ'
+  if (s === 'cancelled' || s === 'void') return 'ยกเลิก'
+  // confirmed / pending_payment / select_payment / wait_payment
+  const now = new Date()
+  if (period && order.serveDate === localDateStr(now)) {
+    const cur = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`
+    if (cur >= period.startTime && cur <= period.endTime) return 'พร้อมรับ'
+  }
+  return 'จองแล้ว'
+}
+
+async function notifyBooking(studentUserId: any, title: string, body: string) {
+  await Notification.create({ userId: studentUserId, type: 'order', title, body })
+  const links = await ParentStudent.find({ studentUserId }).lean()
+  for (const l of links) {
+    await Notification.create({ userId: l.parentUserId, type: 'order', title, body })
+  }
 }
 
 export const adminController = new Elysia({ prefix: '/admin' })
@@ -192,8 +223,9 @@ export const adminController = new Elysia({ prefix: '/admin' })
   // ── Audit Logs ─────────────────────────────────────────────────────────────
   .get('/audit', async ({ query }) => {
     const filter: any = {}
-    if (query.action) filter.action = query.action
-    if (query.actor)  filter.actorUserId = query.actor
+    if (query.action)   filter.action      = query.action
+    if (query.actor)    filter.actorUserId = query.actor
+    if (query.entityId) filter.entityId    = query.entityId
     const logs = await AuditLog.find(filter)
       .sort({ createdAt: -1 })
       .limit(Number(query.limit ?? 100))
@@ -201,9 +233,10 @@ export const adminController = new Elysia({ prefix: '/admin' })
     return { logs }
   }, {
     query: t.Object({
-      action: t.Optional(t.String()),
-      actor:  t.Optional(t.String()),
-      limit:  t.Optional(t.String()),
+      action:   t.Optional(t.String()),
+      actor:    t.Optional(t.String()),
+      entityId: t.Optional(t.String()),
+      limit:    t.Optional(t.String()),
     }),
   })
 
@@ -943,6 +976,246 @@ export const adminController = new Elysia({ prefix: '/admin' })
   }, {
     params: t.Object({ id: t.String() }),
     body: t.Object({ status: t.String() }),
+  })
+
+  // ── Bookings: summary counts by Thai status bucket ───────────────────────────
+  // Mirrors GET /orders filter-building: serveDate range + optional filters, then
+  // re-buckets the filtered set instead of returning full rows.
+  .get('/bookings/summary', async ({ query }) => {
+    const filter: any = {}
+    if (query.from) filter.serveDate = { $gte: query.from }
+    if (query.to)   filter.serveDate = { ...filter.serveDate, $lte: query.to }
+    if (query.mealPeriodId) filter.mealPeriodId = query.mealPeriodId
+
+    if (query.search) {
+      const safe = query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const rx   = new RegExp(safe, 'i')
+      const students = await User.find({ role: 'student', $or: [{ firstName: rx }, { lastName: rx }, { uid: rx }] })
+        .select('_id').lean()
+      filter.$or = [
+        { orderNo: rx },
+        { studentUserId: { $in: students.map(s => s._id) } },
+      ]
+    }
+
+    const orders    = await Order.find(filter).select('status serveDate mealPeriodId').lean()
+    const periodIds = [...new Set(orders.map(o => String(o.mealPeriodId)))]
+    const periods   = await MealPeriod.find({ _id: { $in: periodIds } }).select('startTime endTime').lean()
+    const periodMap = new Map(periods.map(p => [String(p._id), p]))
+
+    const counts: Record<BookingBucket, number> = {
+      'จองแล้ว': 0, 'พร้อมรับ': 0, 'รับแล้ว': 0, 'ไม่มารับ': 0, 'ยกเลิก': 0,
+    }
+    for (const o of orders) {
+      counts[bookingBucket(o as any, periodMap.get(String(o.mealPeriodId)))]++
+    }
+    return { counts }
+  }, {
+    query: t.Object({
+      from:         t.Optional(t.String()),
+      to:           t.Optional(t.String()),
+      mealPeriodId: t.Optional(t.String()),
+      search:       t.Optional(t.String()),
+    }),
+  })
+
+  // ── Bookings: bulk cancel with a single PIN check ────────────────────────────
+  .patch('/bookings/bulk-cancel', async ({ body, currentUser, set }) => {
+    if (!currentUser.pinHash) { set.status = 400; return { error: { code: 'PIN_NOT_SET', message: 'ยังไม่ได้ตั้งรหัส PIN' } } }
+    if (!(await bcrypt.compare(body.pin, currentUser.pinHash))) {
+      set.status = 403; return { error: { code: 'PIN_INVALID', message: 'รหัส PIN ไม่ถูกต้อง' } }
+    }
+
+    const cancelled: string[] = []
+    const failed: { id: string; reason: string }[] = []
+
+    for (const id of body.ids) {
+      // Never throw on a single bad id (missing / invalid ObjectId / non-cancellable
+      // status): collect it and continue so one failure can't abort the whole batch.
+      const order = await Order.findById(id).catch(() => null)
+      if (!order) { failed.push({ id, reason: 'ไม่พบการจอง' }); continue }
+      if (!CANCELLABLE_BOOKING_STATUSES.includes(order.status)) {
+        failed.push({ id, reason: `สถานะไม่สามารถยกเลิกได้: ${order.status}` }); continue
+      }
+
+      const wallet = await Wallet.findOne({ userId: order.studentUserId })
+      if (wallet && order.transactionId) {
+        wallet.balance += order.totalAmount
+        wallet.version += 1
+        await wallet.save()
+      }
+
+      const before = order.status
+      order.status = 'cancelled'
+      order.cancelledAt = new Date()
+      order.cancelReason = body.reasonDetail
+      order.cancelReasonCategory = body.reasonCategory
+      await order.save()
+
+      await AuditLog.create({
+        actorUserId: currentUser._id,
+        actorRole:   currentUser.role,
+        action:      'booking_cancelled',
+        entityType:  'Order',
+        entityId:    String(order._id),
+        reason:      body.reasonDetail,
+        beforeData:  { status: before },
+        afterData:   { status: 'cancelled', cancelReasonCategory: body.reasonCategory },
+      })
+
+      if (body.notify) {
+        await notifyBooking(order.studentUserId, 'การจองของคุณถูกยกเลิก', `การจอง ${order.orderNo} ถูกยกเลิก`)
+      }
+      cancelled.push(id)
+    }
+
+    return { success: true, cancelled, failed }
+  }, {
+    body: t.Object({
+      ids:            t.Array(t.String()),
+      reasonCategory: t.String(),
+      reasonDetail:   t.Optional(t.String()),
+      pin:            t.String(),
+      notify:         t.Optional(t.Boolean()),
+    }),
+  })
+
+  // ── Bookings: edit a single booking ──────────────────────────────────────────
+  .patch('/bookings/:id', async ({ params, body, currentUser, set }) => {
+    const order = await Order.findById(params.id)
+    if (!order) { set.status = 404; return { error: { code: 'BOOKING_404', message: 'ไม่พบการจอง' } } }
+
+    const before = {
+      serveDate:    order.serveDate,
+      mealPeriodId: String(order.mealPeriodId),
+      items:        order.items,
+      note:         order.note,
+      totalAmount:  order.totalAmount,
+    }
+
+    if (body.serveDate    !== undefined) order.serveDate    = body.serveDate
+    if (body.mealPeriodId !== undefined) order.mealPeriodId = body.mealPeriodId as any
+    if (body.note         !== undefined) order.note         = body.note
+
+    if (body.items !== undefined) {
+      const menuIds   = body.items.map(i => i.menuItemId)
+      const menuItems = await MenuItem.find({ _id: { $in: menuIds }, active: true }).lean()
+      let total = 0
+      const lineItems: any[] = []
+      for (const item of body.items) {
+        const menu = menuItems.find(m => String(m._id) === item.menuItemId)
+        if (!menu) { set.status = 400; return { error: { code: 'BOOKING_ITEM_001', message: `เมนูไม่พร้อมใช้งาน: ${item.menuItemId}` } } }
+        const lineTotal = menu.price * item.qty
+        total += lineTotal
+        lineItems.push({ menuItemId: menu._id, qty: item.qty, unitPrice: menu.price, lineTotal })
+      }
+
+      const delta = total - order.totalAmount
+      if (delta !== 0 && order.transactionId) {
+        const wallet = await Wallet.findOne({ userId: order.studentUserId })
+        if (wallet) {
+          if (delta > 0 && wallet.balance < delta) {
+            set.status = 400
+            return { error: { code: 'BOOKING_WALLET_001', message: 'ยอดเงินใน wallet ไม่พอสำหรับส่วนต่างที่เพิ่มขึ้น' } }
+          }
+          wallet.balance -= delta
+          wallet.version += 1
+          await wallet.save()
+        }
+      }
+
+      order.items       = lineItems as any
+      order.totalAmount = total
+    }
+
+    await order.save()
+
+    const after = {
+      serveDate:    order.serveDate,
+      mealPeriodId: String(order.mealPeriodId),
+      items:        order.items,
+      note:         order.note,
+      totalAmount:  order.totalAmount,
+    }
+
+    await AuditLog.create({
+      actorUserId: currentUser._id,
+      actorRole:   currentUser.role,
+      action:      'booking_edited',
+      entityType:  'Order',
+      entityId:    String(order._id),
+      beforeData:  before,
+      afterData:   after,
+    })
+
+    if (body.notify) {
+      await notifyBooking(order.studentUserId, 'การจองของคุณถูกแก้ไข', `การจอง ${order.orderNo} ถูกแก้ไขโดยเจ้าหน้าที่`)
+    }
+
+    return { success: true, order }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({
+      serveDate:    t.Optional(t.String()),
+      mealPeriodId: t.Optional(t.String()),
+      items:        t.Optional(t.Array(t.Object({ menuItemId: t.String(), qty: t.Number() }))),
+      note:         t.Optional(t.String()),
+      notify:       t.Optional(t.Boolean()),
+    }),
+  })
+
+  // ── Bookings: cancel a single booking with PIN ───────────────────────────────
+  .patch('/bookings/:id/cancel', async ({ params, body, currentUser, set }) => {
+    const order = await Order.findById(params.id)
+    if (!order) { set.status = 404; return { error: { code: 'BOOKING_404', message: 'ไม่พบการจอง' } } }
+
+    if (!currentUser.pinHash) { set.status = 400; return { error: { code: 'PIN_NOT_SET', message: 'ยังไม่ได้ตั้งรหัส PIN' } } }
+    if (!(await bcrypt.compare(body.pin, currentUser.pinHash))) {
+      set.status = 403; return { error: { code: 'PIN_INVALID', message: 'รหัส PIN ไม่ถูกต้อง' } }
+    }
+
+    if (!CANCELLABLE_BOOKING_STATUSES.includes(order.status)) {
+      set.status = 400; return { error: { code: 'BOOKING_STATUS_001', message: `สถานะไม่สามารถยกเลิกได้: ${order.status}` } }
+    }
+
+    const wallet = await Wallet.findOne({ userId: order.studentUserId })
+    if (wallet && order.transactionId) {
+      wallet.balance += order.totalAmount
+      wallet.version += 1
+      await wallet.save()
+    }
+
+    const before = order.status
+    order.status = 'cancelled'
+    order.cancelledAt = new Date()
+    order.cancelReason = body.reasonDetail
+    order.cancelReasonCategory = body.reasonCategory
+    await order.save()
+
+    await AuditLog.create({
+      actorUserId: currentUser._id,
+      actorRole:   currentUser.role,
+      action:      'booking_cancelled',
+      entityType:  'Order',
+      entityId:    String(order._id),
+      reason:      body.reasonDetail,
+      beforeData:  { status: before },
+      afterData:   { status: 'cancelled', cancelReasonCategory: body.reasonCategory },
+    })
+
+    if (body.notify) {
+      await notifyBooking(order.studentUserId, 'การจองของคุณถูกยกเลิก', `การจอง ${order.orderNo} ถูกยกเลิก`)
+    }
+
+    return { success: true, order }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({
+      reasonCategory: t.String(),
+      reasonDetail:   t.Optional(t.String()),
+      pin:            t.String(),
+      notify:         t.Optional(t.Boolean()),
+    }),
   })
 
   // ── AD1: Create a staff member (admin/supervisor) ────────────────────────────

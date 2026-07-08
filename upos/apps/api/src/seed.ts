@@ -106,12 +106,12 @@ const PW   = 'Demo1234!'
 const uAdmin = await User.create({
   uid: 'ADM-001', role: 'admin', email: 'admin@dulwich.ac.th',
   firstName: 'วิชัย', lastName: 'สิทธิ์โสภณ',
-  passwordHash: hash('Admin1234!'), status: 'active',
+  passwordHash: hash('Admin1234!'), pinHash: hash('1234'), status: 'active',
 })
 const uSuper = await User.create({
   uid: 'SUP-001', role: 'supervisor', email: 'patcha@school.local',
   firstName: 'พัชรา', lastName: 'จันทร์พิมพ์',
-  passwordHash: hash('Super123!'), status: 'active',
+  passwordHash: hash('Super123!'), pinHash: hash('1234'), status: 'active',
 })
 const uCashier = await User.create({
   uid: 'CSH-001', role: 'cashier', email: 'nong@school.local',

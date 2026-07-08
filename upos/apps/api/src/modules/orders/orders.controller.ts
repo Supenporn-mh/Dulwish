@@ -66,6 +66,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
 
     // Wallet deduction
     const studentId = body.student_user_id ?? String(currentUser._id)
+    const student = await User.findById(studentId).select('uid firstName lastName displayName').lean()
     const wallet = await Wallet.findOne({ userId: studentId })
     if (!wallet) { set.status = 400; return { error: { code: 'WALLET_001', message: 'Wallet not found' } } }
     if (wallet.balance - total < -wallet.negativeLimit) {
@@ -110,6 +111,8 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       items: lineItems,
       transactionId: txn._id,
       note: body.note ?? '',
+      studentNameSnap: student ? (student.displayName || `${student.firstName ?? ''} ${student.lastName ?? ''}`.trim()) : undefined,
+      studentCodeSnap: student?.uid,
     })
 
     return { order, transaction: txn }
@@ -150,7 +153,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
     const studentIds = [...new Set(orders.map(o => String(o.studentUserId)))]
     const periodIds  = [...new Set(orders.map(o => String(o.mealPeriodId)))]
     const [students, periods] = await Promise.all([
-      User.find({ _id: { $in: studentIds } }).select('uid firstName lastName displayName').lean(),
+      User.find({ _id: { $in: studentIds } }).select('uid firstName lastName displayName deletedAt').lean(),
       MealPeriod.find({ _id: { $in: periodIds } }).select('code name startTime endTime').lean(),
     ])
     const enriched = orders.map(o => {
@@ -161,6 +164,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         items: (o.items ?? []).map((i: any) => ({ ...i, name: i.menuItemId?.name ?? '' })),
         studentName: s ? (s.displayName || `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim()) : '',
         studentCode: s?.uid ?? '',
+        studentDeletedAt: s?.deletedAt ?? null,
         mealPeriodName: p?.name ?? '',
         mealPeriodCode: p?.code ?? '',
         mealPeriodTime: p ? `${p.startTime}-${p.endTime}` : '',

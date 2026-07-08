@@ -13,6 +13,8 @@ const userSchema = new Schema({
   avatarUrl:       { type: String },
   status:          { type: String, default: 'active', enum: ['active','inactive','suspended'] },
   pdpaAcceptedAt:  { type: Date },
+  deletedAt:       { type: Date },
+  pinHash:         { type: String },
   studentProfile:  {
     gradeLevel:     String,
     className:      String,
@@ -246,6 +248,9 @@ const orderSchema = new Schema({
   redeemedByCashierId:  { type: Schema.Types.ObjectId, ref: 'User' },
   cancelledAt:          { type: Date },
   cancelReason:         { type: String },
+  cancelReasonCategory: { type: String },
+  studentNameSnap:      { type: String },
+  studentCodeSnap:      { type: String },
   transactionId:        { type: Schema.Types.ObjectId, ref: 'Transaction' },
 }, { timestamps: true })
 orderSchema.index({ studentUserId: 1, serveDate: 1 })

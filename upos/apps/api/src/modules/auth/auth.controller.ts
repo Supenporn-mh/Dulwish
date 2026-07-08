@@ -625,3 +625,28 @@ export const authController = new Elysia({ prefix: '/auth' })
     await User.updateOne({ _id: user._id }, { passwordHash })
     return { success: true }
   })
+
+  // ── Set PIN (authenticated) ───────────────────────────────────────────────
+
+  .post('/pin', async ({ body, currentUser, set }) => {
+    const user = await User.findById(currentUser._id).lean()
+    if (!user || !user.passwordHash) {
+      set.status = 404
+      return { error: { code: 'NOT_FOUND', message: 'ไม่พบบัญชีผู้ใช้' } }
+    }
+
+    const valid = await bcrypt.compare(body.currentPassword, user.passwordHash)
+    if (!valid) {
+      set.status = 400
+      return { error: { code: 'WRONG_PASSWORD', message: 'รหัสผ่านไม่ถูกต้อง' } }
+    }
+
+    const pinHash = await bcrypt.hash(body.pin, 10)
+    await User.updateOne({ _id: user._id }, { pinHash })
+    return { success: true }
+  }, {
+    body: t.Object({
+      currentPassword: t.String({ minLength: 1 }),
+      pin:             t.String({ minLength: 4, maxLength: 4, pattern: '^[0-9]{4}$' }),
+    }),
+  })
