@@ -78,11 +78,7 @@
               @click="dateMode = 'created'"
             >วันที่จอง</button>
           </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <input v-model="filterDateFrom" type="date" class="adm-filter-input" style="height:36px" placeholder="จาก" @change="currentPage = 1" />
-            <span style="color:var(--color-text-tertiary);font-size:12px">ถึง</span>
-            <input v-model="filterDateTo" type="date" class="adm-filter-input" style="height:36px" placeholder="ถึง" @change="currentPage = 1" />
-          </div>
+          <BookingDateRangePicker v-model:from="filterDateFrom" v-model:to="filterDateTo" />
         </div>
 
         <button
@@ -244,6 +240,7 @@ import api from '../../../api/axios'
 import BookingEditModal from './booking-history/BookingEditModal.vue'
 import BookingCancelModal from './booking-history/BookingCancelModal.vue'
 import BookingDetailModal from './booking-history/BookingDetailModal.vue'
+import BookingDateRangePicker from './booking-history/BookingDateRangePicker.vue'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 // NOTE: this EnrichedOrder shape is also relied on (by field name only, not by
@@ -444,6 +441,7 @@ const pageSize            = ref(10)
 const currentPage         = ref(1)
 
 watch([filterMealPeriodId, filterDateFrom, filterDateTo, dateMode], () => {
+  currentPage.value = 1
   fetchOrders()
   fetchSummary()
 })
