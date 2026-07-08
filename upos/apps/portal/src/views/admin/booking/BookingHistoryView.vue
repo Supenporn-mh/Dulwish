@@ -78,11 +78,15 @@
               @click="dateMode = 'created'"
             >วันที่จอง</button>
           </div>
-          <input v-model="filterDate" type="date" class="adm-filter-input" style="height:36px" @change="currentPage = 1" />
+          <div style="display:flex;align-items:center;gap:6px">
+            <input v-model="filterDateFrom" type="date" class="adm-filter-input" style="height:36px" placeholder="จาก" @change="currentPage = 1" />
+            <span style="color:var(--color-text-tertiary);font-size:12px">ถึง</span>
+            <input v-model="filterDateTo" type="date" class="adm-filter-input" style="height:36px" placeholder="ถึง" @change="currentPage = 1" />
+          </div>
         </div>
 
         <button
-          v-if="search || filterStatus || filterMealType || filterMealPeriodId || filterDate"
+          v-if="search || filterStatus || filterMealType || filterMealPeriodId || filterDateFrom || filterDateTo"
           class="adm-hdr-btn adm-hdr-btn-ghost"
           style="height:36px"
           @click="clearFilters"
@@ -186,7 +190,7 @@
             </td>
             <td class="center">
               <div class="adm-actions">
-                <button class="adm-action-btn" title="แก้ไข" :disabled="isActionDisabled(row.bucket)" @click="openEdit(row.order)">
+                <button class="adm-action-btn" title="แก้ไข" :disabled="isEditDisabled(row)" @click="openEdit(row.order)">
                   <PhPencilSimple :size="14" />
                 </button>
                 <button class="adm-action-btn danger" title="ยกเลิกการจอง" :disabled="isActionDisabled(row.bucket)" @click="openCancelSingle(row.order)">
@@ -276,6 +280,7 @@ interface MealPeriod {
   name: string
   startTime: string
   endTime: string
+  cutoffMinutes?: number
   active?: boolean
 }
 
@@ -314,11 +319,32 @@ const mealPeriodMap = computed(() => {
   return m
 })
 
+// Local (Bangkok) day boundaries — avoid UTC slice() off-by-one near midnight.
+function localDateISO(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function startOfLocalDay(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d, 0, 0, 0, 0)
+}
+function endOfLocalDay(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d, 23, 59, 59, 999)
+}
+
 async function fetchOrders() {
   loading.value = true
   error.value = null
   try {
-    const { data } = await api.get('/orders')
+    const params: Record<string, string> = {}
+    if (dateMode.value === 'serve') {
+      if (filterDateFrom.value) params.from = filterDateFrom.value
+      if (filterDateTo.value)   params.to   = filterDateTo.value
+    } else {
+      if (filterDateFrom.value) params.createdFrom = startOfLocalDay(filterDateFrom.value).toISOString()
+      if (filterDateTo.value)   params.createdTo   = endOfLocalDay(filterDateTo.value).toISOString()
+    }
+    const { data } = await api.get('/orders', { params })
     orders.value = data.orders ?? []
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ'
@@ -349,9 +375,9 @@ async function fetchSummary() {
     // concept of "มื้อ" (coarse Lunch/Dinner) or a createdAt-mode date filter,
     // so those two toolbar filters are NOT reflected in chip counts (documented
     // limitation — see final report).
-    if (filterDate.value && dateMode.value === 'serve') {
-      params.from = filterDate.value
-      params.to   = filterDate.value
+    if (dateMode.value === 'serve') {
+      if (filterDateFrom.value) params.from = filterDateFrom.value
+      if (filterDateTo.value)   params.to   = filterDateTo.value
     }
     if (filterMealPeriodId.value) params.mealPeriodId = filterMealPeriodId.value
     if (search.value.trim())      params.search = search.value.trim()
@@ -412,11 +438,15 @@ const filterStatus        = ref<'' | Bucket>('')
 const filterMealType      = ref<'' | 'lunch' | 'dinner'>('')
 const filterMealPeriodId  = ref('')
 const dateMode            = ref<'serve' | 'created'>('serve')
-const filterDate          = ref('')
+const filterDateFrom      = ref('')
+const filterDateTo        = ref('')
 const pageSize            = ref(10)
 const currentPage         = ref(1)
 
-watch([filterMealPeriodId, filterDate, dateMode], () => fetchSummary())
+watch([filterMealPeriodId, filterDateFrom, filterDateTo, dateMode], () => {
+  fetchOrders()
+  fetchSummary()
+})
 watch(search, () => {
   clearTimeout(summaryDebounce)
   summaryDebounce = setTimeout(fetchSummary, 300)
@@ -439,9 +469,13 @@ function matchesMealType(order: EnrichedOrder): boolean {
 }
 
 function matchesDate(order: EnrichedOrder): boolean {
-  if (!filterDate.value) return true
+  if (!filterDateFrom.value && !filterDateTo.value) return true
   const src = dateMode.value === 'serve' ? order.serveDate : order.createdAt
-  return !!src && src.slice(0, 10) === filterDate.value
+  if (!src) return false
+  const day = dateMode.value === 'serve' ? src.slice(0, 10) : localDateISO(new Date(src))
+  if (filterDateFrom.value && day < filterDateFrom.value) return false
+  if (filterDateTo.value   && day > filterDateTo.value)   return false
+  return true
 }
 
 const filtered = computed(() => {
@@ -463,7 +497,8 @@ function clearFilters() {
   filterStatus.value = ''
   filterMealType.value = ''
   filterMealPeriodId.value = ''
-  filterDate.value = ''
+  filterDateFrom.value = ''
+  filterDateTo.value = ''
   currentPage.value = 1
 }
 
@@ -487,6 +522,21 @@ function toggleRow(id: string) {
 
 function isActionDisabled(bucket: Bucket): boolean {
   return bucket === 'รับแล้ว' || bucket === 'ไม่มารับ' || bucket === 'ยกเลิก'
+}
+
+// Edit-only guard: past the meal period's own preorder cutoff, editing items
+// no longer makes sense even though the booking itself is still "จองแล้ว".
+function isEditCutoffPassed(order: EnrichedOrder): boolean {
+  const mp = mealPeriodMap.value.get(order.mealPeriodId)
+  if (!mp?.cutoffMinutes || !order.serveDate) return false
+  const cutoffAt = new Date(order.serveDate)
+  cutoffAt.setHours(0, 0, 0, 0)
+  cutoffAt.setMinutes(timeToMinutes(mp.startTime) - mp.cutoffMinutes)
+  return new Date(nowTick.value) >= cutoffAt
+}
+
+function isEditDisabled(row: { order: EnrichedOrder; bucket: Bucket }): boolean {
+  return isActionDisabled(row.bucket) || isEditCutoffPassed(row.order)
 }
 
 // ── Display helpers ───────────────────────────────────────────────────────────

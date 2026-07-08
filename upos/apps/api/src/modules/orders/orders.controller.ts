@@ -144,11 +144,13 @@ export const ordersController = new Elysia({ prefix: '/orders' })
     if (query.student) filter.studentUserId = query.student
     if (query.from)    filter.serveDate = { $gte: query.from }
     if (query.to)      filter.serveDate = { ...filter.serveDate, $lte: query.to }
+    if (query.createdFrom) filter.createdAt = { $gte: new Date(query.createdFrom) }
+    if (query.createdTo)   filter.createdAt = { ...filter.createdAt, $lte: new Date(query.createdTo) }
     if (query.status)  filter.status = query.status
 
     const orders = await Order.find(filter)
       .populate('items.menuItemId', 'name')
-      .sort({ createdAt: -1 }).limit(50).lean()
+      .sort({ createdAt: -1 }).limit(500).lean()
     // Enrich with student + meal period names so admin/parent UIs can display
     const studentIds = [...new Set(orders.map(o => String(o.studentUserId)))]
     const periodIds  = [...new Set(orders.map(o => String(o.mealPeriodId)))]
@@ -173,10 +175,12 @@ export const ordersController = new Elysia({ prefix: '/orders' })
     return { orders: enriched }
   }, {
     query: t.Object({
-      student: t.Optional(t.String()),
-      from:    t.Optional(t.String()),
-      to:      t.Optional(t.String()),
-      status:  t.Optional(t.String()),
+      student:     t.Optional(t.String()),
+      from:        t.Optional(t.String()),
+      to:          t.Optional(t.String()),
+      createdFrom: t.Optional(t.String()),
+      createdTo:   t.Optional(t.String()),
+      status:      t.Optional(t.String()),
     }),
   })
 
