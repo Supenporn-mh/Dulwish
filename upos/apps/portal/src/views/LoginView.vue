@@ -284,7 +284,7 @@ onMounted(async () => {
 const lvLeftStyle = computed(() =>
   branding.value.coverImageUrl
     ? {
-        backgroundImage: `linear-gradient(170deg, rgba(10,28,74,0.85) 0%, rgba(18,100,227,0.75) 100%), url(${branding.value.coverImageUrl})`,
+        backgroundImage: `url(${branding.value.coverImageUrl})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }

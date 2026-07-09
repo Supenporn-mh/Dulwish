@@ -20,7 +20,7 @@
           <div
             class="brand-cover-preview"
             :style="form.coverImageUrl
-              ? { backgroundImage: `linear-gradient(135deg, rgba(10,75,173,0.75), rgba(61,130,240,0.55)), url(${form.coverImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+              ? { backgroundImage: `url(${form.coverImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
               : {}"
           >
             <span class="brand-badge-preview">PREVIEW</span>
