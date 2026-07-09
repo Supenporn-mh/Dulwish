@@ -196,6 +196,15 @@
             </div>
             <div class="txn-field">
               <label class="txn-label">เหตุผลการยกเลิก <span style="color:var(--color-danger)">*</span></label>
+              <div class="txn-reason-chips">
+                <button
+                  v-for="opt in cancelReasons" :key="opt.id"
+                  type="button"
+                  class="txn-reason-chip"
+                  :class="{ 'txn-reason-chip-active': voidForm.reason === opt.label }"
+                  @click="voidForm.reason = opt.label"
+                >{{ opt.label }}</button>
+              </div>
               <input v-model="voidForm.reason" class="txn-input" placeholder="ระบุเหตุผล..." />
             </div>
             <div class="txn-field">
@@ -369,6 +378,25 @@ import { PhGear, PhEye, PhCreditCard, PhReceipt, PhProhibit } from '@phosphor-ic
 import api from '@/api/axios'
 
 const router = useRouter()
+
+// ── Cancel reasons (shared shortcut list from "เหตุผลการยกเลิก") ───────────────
+
+interface CancelReasonOption {
+  id: string
+  label: string
+  isDefault: boolean
+}
+
+const cancelReasons = ref<CancelReasonOption[]>([])
+
+async function fetchCancelReasons() {
+  try {
+    const { data } = await api.get('/booking/cancel-reasons', { params: { activeOnly: true } })
+    cancelReasons.value = data.reasons ?? []
+  } catch {
+    cancelReasons.value = []
+  }
+}
 
 const loading        = ref(false)
 const txns           = ref<any[]>([])
@@ -613,7 +641,10 @@ function clearFilters() {
   fetchTxns()
 }
 
-onMounted(fetchTxns)
+onMounted(() => {
+  fetchTxns()
+  fetchCancelReasons()
+})
 </script>
 
 <style scoped>
@@ -626,6 +657,16 @@ onMounted(fetchTxns)
   min-width:160px;box-sizing:border-box;
 }
 .txn-input:focus { border-color:var(--color-primary); }
+
+.txn-reason-chips { display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px; }
+.txn-reason-chip {
+  padding:8px 14px;border-radius:100px;
+  border:1px solid var(--color-border-tertiary);background:#fff;
+  color:var(--color-text-secondary);font-size:13px;font-family:inherit;cursor:pointer;
+  transition:background 0.15s, border-color 0.15s, color 0.15s;
+}
+.txn-reason-chip:hover { background:var(--color-bg-secondary); }
+.txn-reason-chip-active { border-color:var(--color-danger);background:var(--color-danger-bg);color:var(--color-danger); }
 
 .txn-gear-btn {
   width:32px;height:32px;border-radius:8px;border:1.5px solid #E5E7EB;
