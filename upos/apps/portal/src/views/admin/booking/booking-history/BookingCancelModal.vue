@@ -55,10 +55,10 @@
               <label class="bcm-label">เหตุผลการยกเลิก <span style="color:var(--color-danger)">*</span></label>
               <select v-model="reasonCategory" class="bcm-input bcm-select" :disabled="submitting">
                 <option value="" disabled>เลือกเหตุผล...</option>
-                <option v-for="opt in REASON_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
+                <option v-for="opt in cancelReasons" :key="opt.id" :value="opt.label">{{ opt.label }}</option>
               </select>
             </div>
-            <div v-if="reasonCategory === OTHER_OPTION" class="bcm-field">
+            <div v-if="selectedReasonIsDefault" class="bcm-field">
               <label class="bcm-label">ระบุเหตุผล <span style="color:var(--color-danger)">*</span></label>
               <input v-model="reasonOther" class="bcm-input" :disabled="submitting" placeholder="ระบุเหตุผลการยกเลิก..." />
             </div>
@@ -162,16 +162,24 @@ const emit = defineEmits<{
   cancelled: [payload: CancelledPayload]
 }>()
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Cancel reasons (fetched from admin-managed list) ───────────────────────────
 
-const OTHER_OPTION = 'อื่นๆ (กรอกเอง)'
-const REASON_OPTIONS = [
-  'โรงเรียนหยุดกะทันหัน',
-  'นักเรียนขอยกเลิก',
-  'จองผิดวัน',
-  'จองผิดคน',
-  OTHER_OPTION,
-]
+interface CancelReasonOption {
+  id: string
+  label: string
+  isDefault: boolean
+}
+
+const cancelReasons = ref<CancelReasonOption[]>([])
+
+async function fetchCancelReasons() {
+  try {
+    const { data } = await api.get('/booking/cancel-reasons', { params: { activeOnly: true } })
+    cancelReasons.value = data.reasons ?? []
+  } catch {
+    cancelReasons.value = []
+  }
+}
 
 // ── Local form state ──────────────────────────────────────────────────────────
 
@@ -195,7 +203,12 @@ function resetForm() {
   bulkResult.value = null
 }
 
-watch(() => props.open, (val) => { if (val) resetForm() })
+watch(() => props.open, (val) => {
+  if (val) {
+    resetForm()
+    fetchCancelReasons()
+  }
+})
 
 function onPinInput(e: Event) {
   const target = e.target as HTMLInputElement
@@ -206,10 +219,13 @@ function onPinInput(e: Event) {
 
 const titleSub = computed(() => props.mode === 'single' ? (props.ids[0] ?? '') : `${props.ids.length} รายการ`)
 
+const selectedReason = computed(() => cancelReasons.value.find(r => r.label === reasonCategory.value))
+const selectedReasonIsDefault = computed(() => selectedReason.value?.isDefault ?? false)
+
 const canSubmit = computed(() => {
   if (pin.value.length !== 4) return false
   if (!reasonCategory.value) return false
-  if (reasonCategory.value === OTHER_OPTION && !reasonOther.value.trim()) return false
+  if (selectedReasonIsDefault.value && !reasonOther.value.trim()) return false
   return true
 })
 
@@ -219,6 +235,7 @@ function buildBody() {
   const detail = [reasonOther.value.trim(), reasonDetail.value.trim()].filter(Boolean).join(' — ')
   return {
     reasonCategory: reasonCategory.value,
+    reasonId: selectedReason.value?.id,
     reasonDetail: detail || undefined,
     pin: pin.value,
     notify: notify.value,

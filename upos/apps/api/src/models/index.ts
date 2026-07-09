@@ -249,6 +249,7 @@ const orderSchema = new Schema({
   cancelledAt:          { type: Date },
   cancelReason:         { type: String },
   cancelReasonCategory: { type: String },
+  cancelReasonId:       { type: Schema.Types.ObjectId, ref: 'CancelReason' },
   studentNameSnap:      { type: String },
   studentCodeSnap:      { type: String },
   transactionId:        { type: Schema.Types.ObjectId, ref: 'Transaction' },
@@ -539,6 +540,17 @@ const buffetCategorySchema = new Schema({
 }, { timestamps: true })
 
 export const BuffetCategory = mongoose.model('BuffetCategory', buffetCategorySchema)
+
+// ─── CancelReason ─────────────────────────────────────────────────────────────
+const cancelReasonSchema = new Schema({
+  label:     { type: String, required: true, maxlength: 100 },
+  sortOrder: { type: Number, default: 0 },
+  isDefault: { type: Boolean, default: false },
+  usedCount: { type: Number, default: 0 },
+  hiddenAt:  { type: Date, default: null },
+}, { timestamps: true })
+
+export const CancelReason = mongoose.model('CancelReason', cancelReasonSchema)
 
 // ─── BookingConfig (singleton) ────────────────────────────────────────────────
 const bookingConfigSchema = new Schema({

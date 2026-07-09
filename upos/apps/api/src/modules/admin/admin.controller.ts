@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia'
 import bcrypt from 'bcryptjs'
 import { authPlugin } from '../../middleware/auth'
-import { User, Transaction, Wallet, Order, BuffetSession, AuditLog, Policy, EnrollmentCode, Card, ParentStudent, TaxInvoice, GradeLevel, MenuItem, MealPeriod, Notification } from '../../models'
+import { User, Transaction, Wallet, Order, BuffetSession, AuditLog, Policy, EnrollmentCode, Card, ParentStudent, TaxInvoice, GradeLevel, MenuItem, MealPeriod, Notification, CancelReason } from '../../models'
 
 function genRefNo(prefix = 'TXN') {
   const d = new Date()
@@ -1050,6 +1050,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
       order.cancelledAt = new Date()
       order.cancelReason = body.reasonDetail
       order.cancelReasonCategory = body.reasonCategory
+      if (body.reasonId) order.cancelReasonId = body.reasonId as any
       await order.save()
 
       await AuditLog.create({
@@ -1069,11 +1070,16 @@ export const adminController = new Elysia({ prefix: '/admin' })
       cancelled.push(id)
     }
 
+    if (body.reasonId && cancelled.length > 0) {
+      await CancelReason.findByIdAndUpdate(body.reasonId, { $inc: { usedCount: cancelled.length } }).catch(() => {})
+    }
+
     return { success: true, cancelled, failed }
   }, {
     body: t.Object({
       ids:            t.Array(t.String()),
       reasonCategory: t.String(),
+      reasonId:       t.Optional(t.String()),
       reasonDetail:   t.Optional(t.String()),
       pin:            t.String(),
       notify:         t.Optional(t.Boolean()),
@@ -1190,7 +1196,12 @@ export const adminController = new Elysia({ prefix: '/admin' })
     order.cancelledAt = new Date()
     order.cancelReason = body.reasonDetail
     order.cancelReasonCategory = body.reasonCategory
+    if (body.reasonId) order.cancelReasonId = body.reasonId as any
     await order.save()
+
+    if (body.reasonId) {
+      await CancelReason.findByIdAndUpdate(body.reasonId, { $inc: { usedCount: 1 } }).catch(() => {})
+    }
 
     await AuditLog.create({
       actorUserId: currentUser._id,
@@ -1212,6 +1223,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
     params: t.Object({ id: t.String() }),
     body: t.Object({
       reasonCategory: t.String(),
+      reasonId:       t.Optional(t.String()),
       reasonDetail:   t.Optional(t.String()),
       pin:            t.String(),
       notify:         t.Optional(t.Boolean()),

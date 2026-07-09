@@ -109,7 +109,7 @@ import {
   PhClock, PhCalendarPlus, PhClockCounterClockwise,
   PhCookingPot, PhTag, PhRuler, PhShoppingBag,
   PhChatDots, PhMonitor, PhImage, PhLayout,
-  PhIdentificationBadge,
+  PhIdentificationBadge, PhXCircle,
 } from '@phosphor-icons/vue'
 
 const route  = useRoute()
@@ -178,6 +178,7 @@ const navItems: any[] = [
       { to: '/admin/booking/time-settings', icon: PhClock,                    label: 'ตั้งค่าช่วงเวลา'     },
       { to: '/admin/booking/menu',          icon: PhCalendarPlus,             label: 'เมนูการจอง'          },
       { to: '/admin/booking/history',       icon: PhClockCounterClockwise,    label: 'ประวัติการจอง'       },
+      { to: '/admin/booking/cancel-reasons', icon: PhXCircle,                  label: 'เหตุผลการยกเลิก'     },
     ],
   },
   {
@@ -218,6 +219,7 @@ const pageTitles: Record<string, string> = {
   '/admin/booking/time-settings': 'ตั้งค่าช่วงเวลา',
   '/admin/booking/menu':          'เมนูการจอง',
   '/admin/booking/history':       'ประวัติการจอง',
+  '/admin/booking/cancel-reasons': 'เหตุผลการยกเลิก',
   '/admin/transactions':          'รายการ',
   '/admin/reports':               'รายงาน',
   '/admin/audit':                 'Audit Log',

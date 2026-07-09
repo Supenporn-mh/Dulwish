@@ -1,6 +1,19 @@
 import { Elysia, t } from 'elysia'
 import { authPlugin } from '../../middleware/auth'
-import { Booking, BookingMenu, BookingTimeSlot, BookingConfig, BookingBlackout } from '../../models'
+import { Booking, BookingMenu, BookingTimeSlot, BookingConfig, BookingBlackout, CancelReason } from '../../models'
+
+function serializeCancelReason(r: any) {
+  return {
+    id:        String(r._id),
+    label:     r.label,
+    sortOrder: r.sortOrder,
+    isDefault: r.isDefault,
+    usedCount: r.usedCount,
+    hiddenAt:  r.hiddenAt ?? null,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  }
+}
 
 export const bookingController = new Elysia({ prefix: '/booking' })
   .use(authPlugin())
@@ -345,5 +358,88 @@ export const bookingController = new Elysia({ prefix: '/booking' })
       set.status = 404
       return { error: { code: 'BLACKOUT_001', message: 'Blackout not found' } }
     }
+    return { ok: true }
+  })
+
+  // ── CancelReason CRUD (/booking/cancel-reasons) ───────────────────────────────
+
+  .get('/cancel-reasons', async ({ query }) => {
+    const filter: any = {}
+    if (query.activeOnly === 'true' || query.activeOnly === true) filter.hiddenAt = null
+    const reasons = await CancelReason.find(filter).sort({ sortOrder: 1 }).lean()
+    return { reasons: reasons.map(serializeCancelReason) }
+  }, {
+    query: t.Object({
+      activeOnly: t.Optional(t.Union([t.String(), t.Boolean()])),
+    }),
+  })
+
+  .post('/cancel-reasons', async ({ body, currentUser, set }) => {
+    if (!['admin', 'supervisor'].includes(currentUser.role)) {
+      set.status = 403
+      return { error: { code: 'AUTH_008', message: 'Admin only' } }
+    }
+    const count  = await CancelReason.countDocuments()
+    const reason = await CancelReason.create({
+      label:     body.label,
+      sortOrder: count,
+      isDefault: false,
+      usedCount: 0,
+      hiddenAt:  null,
+    })
+    return { reason: serializeCancelReason(reason) }
+  }, {
+    body: t.Object({
+      label: t.String({ maxLength: 100 }),
+    }),
+  })
+
+  .patch('/cancel-reasons/:id', async ({ params, body, currentUser, set }) => {
+    if (!['admin', 'supervisor'].includes(currentUser.role)) {
+      set.status = 403
+      return { error: { code: 'AUTH_008', message: 'Admin only' } }
+    }
+    const existing = await CancelReason.findById(params.id)
+    if (!existing) {
+      set.status = 404
+      return { error: { code: 'REASON_404', message: 'Cancel reason not found' } }
+    }
+    if (existing.isDefault && (body.label !== undefined || body.hiddenAt !== undefined)) {
+      set.status = 409
+      return { error: { code: 'REASON_DEFAULT', message: 'ไม่สามารถแก้ไขหรือปิดใช้งานเหตุผลเริ่มต้นได้' } }
+    }
+    const update: any = {}
+    if (body.label      !== undefined) update.label      = body.label
+    if (body.sortOrder  !== undefined) update.sortOrder  = body.sortOrder
+    if (body.hiddenAt   !== undefined) update.hiddenAt   = body.hiddenAt
+    const reason = await CancelReason.findByIdAndUpdate(params.id, { $set: update }, { new: true }).lean()
+    return { reason: serializeCancelReason(reason) }
+  }, {
+    body: t.Object({
+      label:     t.Optional(t.String({ maxLength: 100 })),
+      sortOrder: t.Optional(t.Number()),
+      hiddenAt:  t.Optional(t.Union([t.String(), t.Null()])),
+    }),
+  })
+
+  .delete('/cancel-reasons/:id', async ({ params, currentUser, set }) => {
+    if (!['admin', 'supervisor'].includes(currentUser.role)) {
+      set.status = 403
+      return { error: { code: 'AUTH_008', message: 'Admin only' } }
+    }
+    const existing = await CancelReason.findById(params.id)
+    if (!existing) {
+      set.status = 404
+      return { error: { code: 'REASON_404', message: 'Cancel reason not found' } }
+    }
+    if (existing.isDefault) {
+      set.status = 409
+      return { error: { code: 'REASON_DEFAULT', message: 'ไม่สามารถลบเหตุผลเริ่มต้นได้' } }
+    }
+    if (existing.usedCount > 0) {
+      set.status = 409
+      return { error: { code: 'REASON_IN_USE', message: 'เหตุผลนี้ถูกใช้แล้ว ไม่สามารถลบได้' } }
+    }
+    await CancelReason.findByIdAndDelete(params.id)
     return { ok: true }
   })

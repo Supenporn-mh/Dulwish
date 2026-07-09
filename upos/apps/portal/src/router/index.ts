@@ -53,6 +53,7 @@ const router = createRouter({
         { path: 'booking/time-settings',     component: () => import('@/views/admin/booking/TimeSettingsView.vue') },
         { path: 'booking/menu',              component: () => import('@/views/admin/booking/BookingMenuView.vue') },
         { path: 'booking/history',           component: () => import('@/views/admin/booking/BookingHistoryView.vue') },
+        { path: 'booking/cancel-reasons',    component: () => import('@/views/admin/booking/CancelReasonsView.vue') },
         { path: 'booking/schedule',          component: () => import('@/views/admin/booking/BookingScheduleView.vue') },
         { path: 'student-groups',           component: () => import('@/views/admin/StudentGroupsView.vue') },
         { path: 'student-groups/:id',       component: () => import('@/views/admin/GroupDetailView.vue') },

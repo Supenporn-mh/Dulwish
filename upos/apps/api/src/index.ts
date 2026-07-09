@@ -2,6 +2,7 @@ import { Elysia } from 'elysia'
 import { cors } from '@elysiajs/cors'
 import { swagger } from '@elysiajs/swagger'
 import { connectDB } from './db/mongoose'
+import { CancelReason } from './models'
 import { authController }     from './modules/auth/auth.controller'
 import { usersController }    from './modules/users/users.controller'
 import { walletController }   from './modules/wallet/wallet.controller'
@@ -21,6 +22,13 @@ import { deviceController }  from './modules/device/device.controller'
 import { notificationController } from './modules/notification/notification.controller'
 
 await connectDB()
+
+// Guarantee the protected default cancel reason always exists (idempotent, never wipes existing rows).
+await CancelReason.findOneAndUpdate(
+  { isDefault: true },
+  { $setOnInsert: { label: 'อื่นๆ', isDefault: true, sortOrder: 9999, usedCount: 0, hiddenAt: null } },
+  { upsert: true },
+)
 
 const app = new Elysia()
   .use(cors({
