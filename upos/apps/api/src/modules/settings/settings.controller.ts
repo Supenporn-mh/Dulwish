@@ -10,6 +10,7 @@ export const settingsController = new Elysia({ prefix: '/settings' })
     const store = await StoreSettings.findOne({ key: 'default' }).lean()
     return {
       name:          store?.name ?? '',
+      displayName:   (store as any)?.displayName ?? '',
       logoUrl:       store?.logoUrl ?? '',
       coverImageUrl: (store as any)?.coverImageUrl ?? '',
       tagline:       (store as any)?.tagline ?? '',
@@ -227,6 +228,7 @@ export const settingsController = new Elysia({ prefix: '/settings' })
       logoUrl:       t.Optional(t.String()),
       coverImageUrl: t.Optional(t.String()),
       tagline:       t.Optional(t.String()),
+      displayName:   t.Optional(t.String()),
     }),
   })
 

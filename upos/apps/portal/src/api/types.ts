@@ -268,6 +268,7 @@ export interface StoreSettings {
   logoUrl?: string
   coverImageUrl?: string
   tagline?: string
+  displayName?: string
 }
 
 // ── Import row types ──────────────────────────────────────────────────────────

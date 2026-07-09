@@ -514,6 +514,7 @@ const storeSettingsSchema = new Schema({
   logoUrl: { type: String },
   coverImageUrl: { type: String },
   tagline: { type: String },
+  displayName: { type: String }, // school name shown on the Login page — separate from `name` (used on receipts/tax docs)
 })
 
 export const StoreSettings = mongoose.model('StoreSettings', storeSettingsSchema)

@@ -15,7 +15,8 @@
               stroke="none" fill="rgba(255,255,255,0.6)" font-family="Georgia,serif">DULWICH</text>
           </svg>
         </div>
-        <h2 class="lv-school-name">Dulwich College<br>Bangkok</h2>
+        <h2 v-if="branding.displayName" class="lv-school-name">{{ branding.displayName }}</h2>
+        <h2 v-else class="lv-school-name">Dulwich College<br>Bangkok</h2>
         <p class="lv-school-sub">{{ branding.tagline || 'UPOS · Canteen Cashless System' }}</p>
       </div>
     </div>
@@ -272,11 +273,16 @@ import { PhTranslate } from '@phosphor-icons/vue'
 import api from '@/api/axios'
 
 // ── Branding (logo / cover image set in Admin → ตั้งค่าการแสดงผล) ──────────────
-const branding = ref({ tagline: '', logoUrl: '', coverImageUrl: '' })
+const branding = ref({ displayName: '', tagline: '', logoUrl: '', coverImageUrl: '' })
 onMounted(async () => {
   try {
     const { data } = await api.get('/settings/branding')
-    branding.value = { tagline: data.tagline ?? '', logoUrl: data.logoUrl ?? '', coverImageUrl: data.coverImageUrl ?? '' }
+    branding.value = {
+      displayName: data.displayName ?? '',
+      tagline: data.tagline ?? '',
+      logoUrl: data.logoUrl ?? '',
+      coverImageUrl: data.coverImageUrl ?? '',
+    }
   } catch {
     // keep default SVG/gradient branding on failure
   }

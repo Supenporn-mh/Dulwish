@@ -9,11 +9,20 @@
       {{ error }}
     </div>
 
-    <!-- Card 0: Tagline -->
+    <!-- Card 0: ข้อความในหน้า Login -->
     <div class="brand-card">
-      <p class="brand-card-title">Tagline</p>
-      <p class="brand-card-sub">ข้อความใต้ชื่อโรงเรียนในหน้า Login</p>
-      <input v-model="form.tagline" class="brand-name-input" placeholder="เช่น UPOS · Canteen Cashless System" />
+      <p class="brand-card-title">ข้อความในหน้า Login</p>
+      <p class="brand-card-sub">ชื่อและ tagline ที่แสดงคู่กับโลโก้/รูปหน้าปก</p>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <label class="brand-field-label">ชื่อที่แสดง</label>
+          <input v-model="form.displayName" class="brand-name-input" placeholder="เช่น Dulwich College Bangkok" />
+        </div>
+        <div>
+          <label class="brand-field-label">Tagline</label>
+          <input v-model="form.tagline" class="brand-name-input" placeholder="เช่น UPOS · Canteen Cashless System" />
+        </div>
+      </div>
     </div>
 
     <!-- Card 1: รูปภาพหน้าปก -->
@@ -38,7 +47,7 @@
               <div class="brand-shield-circle">
                 <PhShieldCheck :size="24" weight="regular" color="#fff" />
               </div>
-              <div class="brand-preview-name">Dulwich College Bangkok</div>
+              <div class="brand-preview-name">{{ form.displayName || 'Dulwich College Bangkok' }}</div>
               <div class="brand-preview-tagline">{{ form.tagline || 'UPOS · Canteen Cashless System' }}</div>
             </div>
           </div>
@@ -172,7 +181,7 @@ const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
 
-const form = ref({ tagline: '', coverImageUrl: '', logoUrl: '' })
+const form = ref({ displayName: '', tagline: '', coverImageUrl: '', logoUrl: '' })
 
 const coverInput = ref<HTMLInputElement | null>(null)
 const logoInput = ref<HTMLInputElement | null>(null)
@@ -212,7 +221,12 @@ async function save() {
   saving.value = true
   error.value = ''
   try {
-    await updateStoreSettings({ tagline: form.value.tagline, coverImageUrl: form.value.coverImageUrl, logoUrl: form.value.logoUrl })
+    await updateStoreSettings({
+      displayName: form.value.displayName,
+      tagline: form.value.tagline,
+      coverImageUrl: form.value.coverImageUrl,
+      logoUrl: form.value.logoUrl,
+    })
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ'
   } finally {
@@ -221,7 +235,7 @@ async function save() {
 }
 
 function resetDefaults() {
-  form.value = { tagline: '', coverImageUrl: '', logoUrl: '' }
+  form.value = { displayName: '', tagline: '', coverImageUrl: '', logoUrl: '' }
 }
 
 onMounted(async () => {
@@ -229,6 +243,7 @@ onMounted(async () => {
   try {
     const store = await getStoreSettings()
     form.value = {
+      displayName: store.displayName ?? '',
       tagline: store.tagline ?? '',
       coverImageUrl: store.coverImageUrl ?? '',
       logoUrl: store.logoUrl ?? '',
@@ -355,6 +370,7 @@ onMounted(async () => {
   border-radius: 8px; padding: 10px 12px; font-size: 12px;
 }
 
+.brand-field-label { font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 5px; }
 .brand-name-input {
   height: 42px; padding: 0 12px; border-radius: 8px;
   border: 1.5px solid #D0D0D0; font-size: 14px; color: var(--color-text-primary);
