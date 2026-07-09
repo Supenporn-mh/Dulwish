@@ -265,6 +265,8 @@ export interface StoreSettings {
   name: string
   address: string
   taxId: string
+  logoUrl?: string
+  coverImageUrl?: string
 }
 
 // ── Import row types ──────────────────────────────────────────────────────────

@@ -2,10 +2,11 @@
   <div class="lv-root">
 
     <!-- ── LEFT PANEL (desktop only) ──────────────────────────────── -->
-    <div class="lv-left">
+    <div class="lv-left" :style="lvLeftStyle">
       <div class="lv-left-inner">
         <div class="lv-shield">
-          <svg viewBox="0 0 100 130" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2">
+          <img v-if="branding.logoUrl" :src="branding.logoUrl" style="max-width:120px;max-height:120px;object-fit:contain" />
+          <svg v-else viewBox="0 0 100 130" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2">
             <path d="M50 6 L10 24 L10 74 Q10 108 50 124 Q90 108 90 74 L90 24 Z"/>
             <text x="50" y="70" text-anchor="middle" font-size="20" font-weight="700"
               stroke="none" fill="rgba(255,255,255,0.95)" font-family="Georgia,serif">DCB</text>
@@ -38,7 +39,8 @@
 
         <!-- Crest -->
         <div class="lv-crest-wrap">
-          <svg viewBox="0 0 100 130" width="68" height="88" fill="none"
+          <img v-if="branding.logoUrl" :src="branding.logoUrl" style="width:68px;height:88px;object-fit:contain" />
+          <svg v-else viewBox="0 0 100 130" width="68" height="88" fill="none"
             stroke="var(--color-text-primary)" stroke-width="2.2">
             <path d="M50 6 L10 24 L10 74 Q10 108 50 124 Q90 108 90 74 L90 24 Z"/>
             <text x="50" y="70" text-anchor="middle" font-size="20" font-weight="700"
@@ -141,7 +143,8 @@
 
         <!-- Crest -->
         <div class="lv-crest-wrap">
-          <svg viewBox="0 0 100 130" width="68" height="88" fill="none"
+          <img v-if="branding.logoUrl" :src="branding.logoUrl" style="width:68px;height:88px;object-fit:contain" />
+          <svg v-else viewBox="0 0 100 130" width="68" height="88" fill="none"
             stroke="var(--color-text-primary)" stroke-width="2.2">
             <path d="M50 6 L10 24 L10 74 Q10 108 50 124 Q90 108 90 74 L90 24 Z"/>
             <text x="50" y="70" text-anchor="middle" font-size="20" font-weight="700"
@@ -261,12 +264,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useLocaleStore } from '@/stores/locale'
 import { PhTranslate } from '@phosphor-icons/vue'
 import api from '@/api/axios'
+
+// ── Branding (logo / cover image set in Admin → ตั้งค่าการแสดงผล) ──────────────
+const branding = ref({ logoUrl: '', coverImageUrl: '' })
+onMounted(async () => {
+  try {
+    const { data } = await api.get('/settings/branding')
+    branding.value = { logoUrl: data.logoUrl ?? '', coverImageUrl: data.coverImageUrl ?? '' }
+  } catch {
+    // keep default SVG/gradient branding on failure
+  }
+})
+const lvLeftStyle = computed(() =>
+  branding.value.coverImageUrl
+    ? {
+        backgroundImage: `linear-gradient(170deg, rgba(10,28,74,0.85) 0%, rgba(18,100,227,0.75) 100%), url(${branding.value.coverImageUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }
+    : {}
+)
 
 const router = useRouter()
 const route  = useRoute()

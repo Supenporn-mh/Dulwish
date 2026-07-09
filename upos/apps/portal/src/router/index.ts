@@ -40,6 +40,7 @@ const router = createRouter({
         { path: 'reports',      component: () => import('@/views/admin/ReportsView.vue') },
         { path: 'audit',        component: () => import('@/views/admin/AuditView.vue') },
         { path: 'policies',      component: () => import('@/views/admin/PoliciesView.vue') },
+        { path: 'branding',      component: () => import('@/views/admin/BrandingView.vue') },
         { path: 'academic-year', component: () => import('@/views/admin/AcademicYearView.vue') },
         { path: 'buffet',             redirect: 'buffet/rounds' },
         { path: 'buffet/rounds',      component: () => import('@/views/admin/buffet/BuffetRoundsView.vue') },

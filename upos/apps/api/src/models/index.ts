@@ -512,6 +512,7 @@ const storeSettingsSchema = new Schema({
   address: { type: String },
   taxId:   { type: String },
   logoUrl: { type: String },
+  coverImageUrl: { type: String },
 })
 
 export const StoreSettings = mongoose.model('StoreSettings', storeSettingsSchema)

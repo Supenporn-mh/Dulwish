@@ -108,7 +108,7 @@ import {
   PhShieldCheck, PhWallet, PhUsersThree, PhIdentificationCard, PhCalendarCheck,
   PhClock, PhCalendarPlus, PhClockCounterClockwise,
   PhCookingPot, PhTag, PhRuler, PhShoppingBag,
-  PhChatDots, PhMonitor, PhImage, PhLayout,
+  PhChatDots, PhMonitor, PhImage, PhLayout, PhPalette,
   PhIdentificationBadge, PhXCircle,
 } from '@phosphor-icons/vue'
 
@@ -199,6 +199,7 @@ const navItems: any[] = [
   { type: 'link', to: '/admin/reports',      icon: PhChartLine,     label: 'รายงาน'          },
   { type: 'link', to: '/admin/audit',        icon: PhClipboardText, label: 'Audit'           },
   { type: 'link', to: '/admin/policies',     icon: PhGear,          label: 'ตั้งค่า'          },
+  { type: 'link', to: '/admin/branding',     icon: PhPalette,       label: 'ตั้งค่าการแสดงผล' },
   { type: 'link', to: '/admin/academic-year', icon: PhCalendarDots, label: 'ตั้งค่าภาคเรียน' },
 ]
 
@@ -224,6 +225,7 @@ const pageTitles: Record<string, string> = {
   '/admin/reports':               'รายงาน',
   '/admin/audit':                 'Audit Log',
   '/admin/policies':              'ตั้งค่า',
+  '/admin/branding':              'ตั้งค่าการแสดงผล',
   '/admin/academic-year':         'ตั้งค่าภาคเรียน',
   '/admin/buffet/categories':     'ประเภทอาหาร Buffet',
   '/admin/buffet/rounds':         'ตั้งค่าช่วงเวลา Buffet',

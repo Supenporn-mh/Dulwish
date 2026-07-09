@@ -3,6 +3,18 @@ import { authPlugin } from '../../middleware/auth'
 import { WalletPermission, AcademicYear, GradeLevel, StoreSettings, Branch, User, Classroom } from '../../models'
 
 export const settingsController = new Elysia({ prefix: '/settings' })
+
+  // ── Public branding (no auth — the login page needs this before signing in) ──
+
+  .get('/branding', async () => {
+    const store = await StoreSettings.findOne({ key: 'default' }).lean()
+    return {
+      name:          store?.name ?? '',
+      logoUrl:       store?.logoUrl ?? '',
+      coverImageUrl: (store as any)?.coverImageUrl ?? '',
+    }
+  })
+
   .use(authPlugin(['admin', 'supervisor']))
 
   // ── Wallet Permissions ────────────────────────────────────────────────────────
@@ -208,10 +220,11 @@ export const settingsController = new Elysia({ prefix: '/settings' })
     return { store }
   }, {
     body: t.Object({
-      name:    t.Optional(t.String()),
-      address: t.Optional(t.String()),
-      taxId:   t.Optional(t.String()),
-      logoUrl: t.Optional(t.String()),
+      name:          t.Optional(t.String()),
+      address:       t.Optional(t.String()),
+      taxId:         t.Optional(t.String()),
+      logoUrl:       t.Optional(t.String()),
+      coverImageUrl: t.Optional(t.String()),
     }),
   })
 
