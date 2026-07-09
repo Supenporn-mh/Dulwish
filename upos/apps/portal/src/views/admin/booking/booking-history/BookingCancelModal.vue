@@ -53,21 +53,25 @@
             <!-- เหตุผลการยกเลิก -->
             <div class="bcm-field">
               <label class="bcm-label">เหตุผลการยกเลิก <span style="color:var(--color-danger)">*</span></label>
-              <select v-model="reasonCategory" class="bcm-input bcm-select" :disabled="submitting">
-                <option value="" disabled>เลือกเหตุผล...</option>
-                <option v-for="opt in cancelReasons" :key="opt.id" :value="opt.label">{{ opt.label }}</option>
-              </select>
-            </div>
-            <div v-if="selectedReasonIsDefault" class="bcm-field">
-              <label class="bcm-label">ระบุเหตุผล <span style="color:var(--color-danger)">*</span></label>
-              <input v-model="reasonOther" class="bcm-input" :disabled="submitting" placeholder="ระบุเหตุผลการยกเลิก..." />
+              <div class="bcm-reason-chips">
+                <button
+                  v-for="opt in cancelReasons" :key="opt.id"
+                  type="button"
+                  class="bcm-reason-chip"
+                  :class="{ 'bcm-reason-chip-active': reasonCategory === opt.label }"
+                  :disabled="submitting"
+                  @click="selectReason(opt)"
+                >{{ opt.label }}</button>
+              </div>
             </div>
 
             <!-- รายละเอียดเพิ่มเติม -->
             <div class="bcm-field">
-              <label class="bcm-label">รายละเอียดเพิ่มเติม</label>
+              <label class="bcm-label">
+                รายละเอียดเพิ่มเติม <span v-if="selectedReasonIsDefault" style="color:var(--color-danger)">*</span>
+              </label>
               <textarea v-model="reasonDetail" class="bcm-input bcm-textarea" :disabled="submitting"
-                placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)..." />
+                placeholder="รายละเอียดเพิ่มเติม..." />
             </div>
 
             <!-- PIN -->
@@ -184,7 +188,6 @@ async function fetchCancelReasons() {
 // ── Local form state ──────────────────────────────────────────────────────────
 
 const reasonCategory = ref('')
-const reasonOther     = ref('')
 const reasonDetail    = ref('')
 const pin             = ref('')
 const notify          = ref(true)
@@ -194,13 +197,17 @@ const bulkResult      = ref<CancelledPayload | null>(null)
 
 function resetForm() {
   reasonCategory.value = ''
-  reasonOther.value = ''
   reasonDetail.value = ''
   pin.value = ''
   notify.value = true
   submitting.value = false
   apiError.value = null
   bulkResult.value = null
+}
+
+function selectReason(opt: CancelReasonOption) {
+  reasonCategory.value = opt.label
+  reasonDetail.value = opt.isDefault ? '' : opt.label
 }
 
 watch(() => props.open, (val) => {
@@ -225,18 +232,17 @@ const selectedReasonIsDefault = computed(() => selectedReason.value?.isDefault ?
 const canSubmit = computed(() => {
   if (pin.value.length !== 4) return false
   if (!reasonCategory.value) return false
-  if (selectedReasonIsDefault.value && !reasonOther.value.trim()) return false
+  if (selectedReasonIsDefault.value && !reasonDetail.value.trim()) return false
   return true
 })
 
 // ── Submit ────────────────────────────────────────────────────────────────────
 
 function buildBody() {
-  const detail = [reasonOther.value.trim(), reasonDetail.value.trim()].filter(Boolean).join(' — ')
   return {
     reasonCategory: reasonCategory.value,
     reasonId: selectedReason.value?.id,
-    reasonDetail: detail || undefined,
+    reasonDetail: reasonDetail.value.trim() || undefined,
     pin: pin.value,
     notify: notify.value,
   }
@@ -359,6 +365,19 @@ function onBackdropClick() {
 .bcm-input:disabled { background:#F5F5F5; cursor:not-allowed; }
 .bcm-select { cursor:pointer; }
 .bcm-textarea { height:80px; padding:10px 12px; resize:vertical; line-height:1.5; }
+
+.bcm-reason-chips { display:flex; flex-wrap:wrap; gap:8px; }
+.bcm-reason-chip {
+  padding:8px 14px; border-radius:100px;
+  border:1px solid var(--color-border-tertiary); background:#fff;
+  color:var(--color-text-secondary); font-size:13px; font-family:inherit; cursor:pointer;
+  transition:background 0.15s, border-color 0.15s, color 0.15s;
+}
+.bcm-reason-chip:hover:not(:disabled) { background:var(--color-bg-secondary); }
+.bcm-reason-chip:disabled { opacity:0.5; cursor:not-allowed; }
+.bcm-reason-chip-active {
+  border-color:var(--color-danger); background:var(--color-danger-bg); color:var(--color-danger);
+}
 .bcm-hint { font-size:11px; color:var(--color-text-tertiary); }
 .bcm-error { font-size:12px; color:var(--color-danger); }
 
