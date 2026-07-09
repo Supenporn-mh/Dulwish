@@ -178,7 +178,6 @@ const navItems: any[] = [
       { to: '/admin/booking/time-settings', icon: PhClock,                    label: 'ตั้งค่าช่วงเวลา'     },
       { to: '/admin/booking/menu',          icon: PhCalendarPlus,             label: 'เมนูการจอง'          },
       { to: '/admin/booking/history',       icon: PhClockCounterClockwise,    label: 'ประวัติการจอง'       },
-      { to: '/admin/booking/cancel-reasons', icon: PhXCircle,                  label: 'เหตุผลการยกเลิก'     },
     ],
   },
   {
@@ -193,6 +192,7 @@ const navItems: any[] = [
       { to: '/admin/buffet/history',   icon: PhClockCounterClockwise,  label: 'ประวัติการใช้งาน'    },
     ],
   },
+  { type: 'link', to: '/admin/booking/cancel-reasons', icon: PhXCircle, label: 'เหตุผลการยกเลิก' },
   { type: 'link', to: '/admin/feedback',      icon: PhChatDots,      label: 'Feedback'        },
   { type: 'link', to: '/admin/sale-screens',  icon: PhLayout,        label: 'หน้าจอขาย'      },
   { type: 'link', to: '/admin/transactions',  icon: PhReceipt,       label: 'รายการ'          },
