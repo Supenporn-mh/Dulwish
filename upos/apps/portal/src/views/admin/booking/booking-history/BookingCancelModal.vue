@@ -207,7 +207,7 @@ function resetForm() {
 
 function selectReason(opt: CancelReasonOption) {
   reasonCategory.value = opt.label
-  reasonDetail.value = opt.isDefault ? '' : opt.label
+  reasonDetail.value = opt.label
 }
 
 watch(() => props.open, (val) => {

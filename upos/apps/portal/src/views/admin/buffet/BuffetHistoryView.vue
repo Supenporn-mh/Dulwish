@@ -161,6 +161,15 @@
           </div>
           <div class="bfh-field">
             <label class="bfh-label">เหตุผลการยกเลิก <span style="color:var(--color-danger)">*</span></label>
+            <div class="bfh-reason-chips">
+              <button
+                v-for="opt in cancelReasons" :key="opt.id"
+                type="button"
+                class="bfh-reason-chip"
+                :class="{ 'bfh-reason-chip-active': voidReason === opt.label }"
+                @click="voidReason = opt.label"
+              >{{ opt.label }}</button>
+            </div>
             <textarea v-model="voidReason" class="bfh-input bfh-textarea" placeholder="ระบุเหตุผลการยกเลิก..." />
           </div>
           <div class="bfh-field">
@@ -244,8 +253,28 @@ import { ref, computed, onMounted } from 'vue'
 import { PhMagnifyingGlass, PhWarning, PhX, PhPlus, PhUser } from '@phosphor-icons/vue'
 import type { BuffetHistorySession, BuffetHistoryResult, BuffetRound } from '@/api/types'
 import { getBuffetHistory, voidBuffetSession, listBuffetRounds, manualTapBuffet } from '@/api/buffet'
+import api from '../../../api/axios'
 
 const today = new Date().toISOString().split('T')[0]
+
+// ── Cancel reasons (shared shortcut list from "เหตุผลการยกเลิก") ───────────────
+
+interface CancelReasonOption {
+  id: string
+  label: string
+  isDefault: boolean
+}
+
+const cancelReasons = ref<CancelReasonOption[]>([])
+
+async function fetchCancelReasons() {
+  try {
+    const { data } = await api.get('/booking/cancel-reasons', { params: { activeOnly: true } })
+    cancelReasons.value = data.reasons ?? []
+  } catch {
+    cancelReasons.value = []
+  }
+}
 
 const result    = ref<BuffetHistoryResult | null>(null)
 const rounds    = ref<BuffetRound[]>([])
@@ -294,6 +323,7 @@ async function fetchHistory() {
 
 onMounted(async () => {
   rounds.value = await listBuffetRounds()
+  fetchCancelReasons()
   await fetchHistory()
 })
 
@@ -408,6 +438,16 @@ async function doManualTap() {
 .bfh-input { height:42px;padding:0 12px;border-radius:8px;border:1.5px solid #D0D0D0;font-size:14px;color:var(--color-text-primary);outline:none;font-family:inherit;background:#fff;width:100%;box-sizing:border-box;transition:border-color 0.15s; }
 .bfh-input:focus { border-color:var(--color-primary); }
 .bfh-textarea { height:80px;padding:10px 12px;resize:vertical;line-height:1.5; }
+
+.bfh-reason-chips { display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px; }
+.bfh-reason-chip {
+  padding:8px 14px;border-radius:100px;
+  border:1px solid var(--color-border-tertiary);background:#fff;
+  color:var(--color-text-secondary);font-size:13px;font-family:inherit;cursor:pointer;
+  transition:background 0.15s, border-color 0.15s, color 0.15s;
+}
+.bfh-reason-chip:hover { background:var(--color-bg-secondary); }
+.bfh-reason-chip-active { border-color:var(--color-danger);background:var(--color-danger-bg);color:var(--color-danger); }
 .adm-hdr-btn-danger-btn { background:var(--color-danger);color:#fff; }
 .adm-hdr-btn-danger-btn:hover:not(:disabled) { opacity:0.9; }
 .adm-hdr-btn-danger-btn:disabled { opacity:0.4;cursor:not-allowed; }
