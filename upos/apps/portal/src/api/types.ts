@@ -267,6 +267,7 @@ export interface StoreSettings {
   taxId: string
   logoUrl?: string
   coverImageUrl?: string
+  tagline?: string
 }
 
 // ── Import row types ──────────────────────────────────────────────────────────

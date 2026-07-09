@@ -12,6 +12,7 @@ export const settingsController = new Elysia({ prefix: '/settings' })
       name:          store?.name ?? '',
       logoUrl:       store?.logoUrl ?? '',
       coverImageUrl: (store as any)?.coverImageUrl ?? '',
+      tagline:       (store as any)?.tagline ?? '',
     }
   })
 
@@ -225,6 +226,7 @@ export const settingsController = new Elysia({ prefix: '/settings' })
       taxId:         t.Optional(t.String()),
       logoUrl:       t.Optional(t.String()),
       coverImageUrl: t.Optional(t.String()),
+      tagline:       t.Optional(t.String()),
     }),
   })
 
