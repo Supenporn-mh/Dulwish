@@ -1452,7 +1452,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
 
   // ── Visitors ────────────────────────────────────────────────────────────────
   .get('/visitors', async () => {
-    const visitors = await User.find({ role: 'visitor' }).lean()
+    const visitors = await User.find({ role: 'visitor', deletedAt: null }).lean()
     const ids = visitors.map(v => v._id)
     const [wallets, cards] = await Promise.all([
       Wallet.find({ userId: { $in: ids } }).lean(),
@@ -1559,4 +1559,157 @@ export const adminController = new Elysia({ prefix: '/admin' })
   }, {
     params: t.Object({ uid: t.String() }),
     body:   t.Object({ status: t.Union([t.Literal('active'), t.Literal('inactive')]) }),
+  })
+
+  .patch('/visitors/:uid', async ({ params, body, currentUser, set }) => {
+    const visitor = await User.findOne({ uid: params.uid, role: 'visitor', deletedAt: null })
+    if (!visitor) { set.status = 404; return { error: { code: 'VIS_404', message: 'ไม่พบ Visitor' } } }
+
+    const before = { firstName: visitor.firstName, lastName: visitor.lastName, phone: (visitor as any).phone, status: visitor.status }
+    if (body.firstName !== undefined) visitor.firstName = body.firstName
+    if (body.lastName  !== undefined) visitor.lastName  = body.lastName
+    if (body.phone     !== undefined) (visitor as any).phone = body.phone
+    if (body.status    !== undefined) visitor.status    = body.status
+    await visitor.save()
+
+    await AuditLog.create({
+      actorUserId: currentUser._id,
+      actorRole:   currentUser.role,
+      action:      'visitor_update',
+      entityType:  'User',
+      entityId:    String(visitor._id),
+      beforeData:  before,
+      afterData:   body,
+    })
+
+    const [wallet, card] = await Promise.all([
+      Wallet.findOne({ userId: visitor._id }).lean(),
+      Card.findOne({ userId: visitor._id }).lean(),
+    ])
+    const { passwordHash: _ph, ...safe } = visitor.toObject() as any
+    return {
+      visitor: {
+        ...safe,
+        balance:    wallet?.balance ?? 0,
+        cardUid:    card?.cardUid  ?? null,
+        cardStatus: card?.status   ?? null,
+      },
+    }
+  }, {
+    params: t.Object({ uid: t.String() }),
+    body: t.Object({
+      firstName: t.Optional(t.String({ minLength: 1 })),
+      lastName:  t.Optional(t.String({ minLength: 1 })),
+      phone:     t.Optional(t.String()),
+      status:    t.Optional(t.Union([t.Literal('active'), t.Literal('inactive')])),
+    }),
+  })
+
+  .post('/visitors/:uid/topup', async ({ params, body, currentUser, set }) => {
+    const visitor = await User.findOne({ uid: params.uid, role: 'visitor', deletedAt: null }).lean()
+    if (!visitor) { set.status = 404; return { error: { code: 'VIS_404', message: 'ไม่พบ Visitor' } } }
+    const wallet = await Wallet.findOne({ userId: visitor._id })
+    if (!wallet) { set.status = 404; return { error: { code: 'VIS_005', message: 'ไม่พบ Wallet' } } }
+
+    wallet.balance = (wallet.balance ?? 0) + body.amount
+    wallet.version = (wallet.version ?? 0) + 1
+    await wallet.save()
+
+    const txn = await Transaction.create({
+      refNo:         genRefNo('TOP'),
+      walletId:      wallet._id,
+      type:          'topup',
+      amount:        body.amount,
+      balanceAfter:  wallet.balance,
+      channel:       'admin',
+      paymentMethod: body.paymentMethod,
+      cashierId:     currentUser._id,
+      status:        'success',
+      note:          `เติมเงิน Visitor ${params.uid}`,
+    })
+
+    await AuditLog.create({
+      actorUserId: currentUser._id,
+      actorRole:   currentUser.role,
+      action:      'visitor_topup',
+      entityType:  'User',
+      entityId:    String(visitor._id),
+      afterData:   { amount: body.amount, paymentMethod: body.paymentMethod, refNo: txn.refNo },
+    })
+
+    return { ok: true, balance: wallet.balance }
+  }, {
+    params: t.Object({ uid: t.String() }),
+    body: t.Object({
+      amount:        t.Number({ minimum: 1 }),
+      paymentMethod: t.String(),
+    }),
+  })
+
+  .post('/visitors/:uid/refund', async ({ params, body, currentUser, set }) => {
+    const visitor = await User.findOne({ uid: params.uid, role: 'visitor', deletedAt: null }).lean()
+    if (!visitor) { set.status = 404; return { error: { code: 'VIS_404', message: 'ไม่พบ Visitor' } } }
+    const wallet = await Wallet.findOne({ userId: visitor._id })
+    if (!wallet) { set.status = 404; return { error: { code: 'VIS_005', message: 'ไม่พบ Wallet' } } }
+    if (body.amount > (wallet.balance ?? 0)) {
+      set.status = 400
+      return { error: { code: 'VIS_006', message: `คืนเงินได้ไม่เกินยอดคงเหลือ (มี ฿${wallet.balance})` } }
+    }
+
+    wallet.balance = (wallet.balance ?? 0) - body.amount
+    wallet.version = (wallet.version ?? 0) + 1
+    await wallet.save()
+
+    const txn = await Transaction.create({
+      refNo:         genRefNo('RFD'),
+      walletId:      wallet._id,
+      type:          'refund',
+      amount:        -body.amount,
+      balanceAfter:  wallet.balance,
+      channel:       'admin',
+      paymentMethod: body.paymentMethod,
+      cashierId:     currentUser._id,
+      status:        'success',
+      note:          body.reason,
+    })
+
+    await AuditLog.create({
+      actorUserId: currentUser._id,
+      actorRole:   currentUser.role,
+      action:      'visitor_refund',
+      entityType:  'User',
+      entityId:    String(visitor._id),
+      afterData:   { amount: body.amount, paymentMethod: body.paymentMethod, reason: body.reason, refNo: txn.refNo },
+    })
+
+    return { ok: true, balance: wallet.balance }
+  }, {
+    params: t.Object({ uid: t.String() }),
+    body: t.Object({
+      amount:        t.Number({ minimum: 1 }),
+      paymentMethod: t.String(),
+      reason:        t.String(),
+    }),
+  })
+
+  .delete('/visitors/:uid', async ({ params, currentUser, set }) => {
+    const visitor = await User.findOne({ uid: params.uid, role: 'visitor', deletedAt: null })
+    if (!visitor) { set.status = 404; return { error: { code: 'VIS_404', message: 'ไม่พบ Visitor' } } }
+
+    visitor.deletedAt = new Date()
+    visitor.status = 'inactive'
+    await visitor.save()
+
+    await AuditLog.create({
+      actorUserId: currentUser._id,
+      actorRole:   currentUser.role,
+      action:      'visitor_delete',
+      entityType:  'User',
+      entityId:    String(visitor._id),
+      afterData:   { uid: params.uid },
+    })
+
+    return { ok: true }
+  }, {
+    params: t.Object({ uid: t.String() }),
   })
