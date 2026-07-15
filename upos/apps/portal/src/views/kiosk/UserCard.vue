@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import Icon from './Icon.vue'
 
 const props = defineProps<{
   name: string
@@ -21,35 +22,117 @@ const formattedTime = computed(() => {
 </script>
 
 <template>
-  <div class="relative" style="border-radius: var(--radius-lg); background: var(--color-primary); color: #fff; padding: 13px 12px">
-    <div class="font-bold" style="font-size: 16px; color: #fff">{{ name }}</div>
-
-    <div class="mt-1">
-      <div style="font-size: 10px; color: rgba(255,255,255,0.7)">ยอดเงินคงเหลือ (บาท)</div>
-      <div class="font-medium" style="font-size: 22px; color: #fff">฿{{ formattedBalance }}</div>
-    </div>
+  <div class="user-card" :style="{ minHeight: compact ? 'auto' : '120px' }">
+    <div class="uc-name">{{ name }}</div>
+    <div class="uc-lbl">ยอดเงินคงเหลือ (บาท)</div>
+    <div class="uc-amount">฿{{ formattedBalance }}</div>
 
     <template v-if="!compact">
-      <div class="flex items-end justify-between mt-2">
-        <div>
-          <div style="font-size: 10px; color: rgba(255,255,255,0.7)">{{ memberCode }}</div>
-          <div class="flex items-center gap-1 mt-0.5" style="font-size: 10px; color: rgba(255,255,255,0.7)">
-            <i class="ti ti-refresh" style="font-size: 10px" />
-            <span>Updated at {{ formattedTime }}</span>
-          </div>
-        </div>
-        <span
-          class="font-medium"
-          style="font-size: 10px; padding: 2px 8px; border-radius: 20px; background: rgba(255,255,255,0.2); color: #fff"
-        >{{ roleLabel }}</span>
+      <div class="uc-code">{{ memberCode }}</div>
+      <div class="uc-time">
+        <Icon name="clock" :size="10" color="rgba(255,255,255,.65)" />
+        Updated at {{ formattedTime }}
       </div>
 
-      <div
-        class="absolute flex items-center justify-center rounded-full"
-        style="top: 13px; right: 12px; width: 38px; height: 38px; background: rgba(255,255,255,0.2)"
-      >
-        <i class="ti ti-user" style="font-size: 18px; color: rgba(255,255,255,0.8)" />
+      <div class="uc-avatar">
+        <Icon name="person" :size="22" color="rgba(255,255,255,.85)" />
       </div>
+      <div class="uc-badge">{{ roleLabel }}</div>
     </template>
   </div>
 </template>
+
+<style scoped>
+.user-card {
+  background: var(--color-primary);
+  border-radius: 16px;
+  padding: 16px;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+.user-card::before {
+  content: '';
+  position: absolute;
+  right: -20px;
+  top: -20px;
+  width: 120px;
+  height: 120px;
+  background: rgba(255, 255, 255, .06);
+  border-radius: 50%;
+}
+.user-card::after {
+  content: '';
+  position: absolute;
+  right: 30px;
+  bottom: -30px;
+  width: 90px;
+  height: 90px;
+  background: rgba(255, 255, 255, .04);
+  border-radius: 50%;
+}
+.uc-avatar {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+.uc-name {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 2px;
+  position: relative;
+  z-index: 1;
+}
+.uc-lbl {
+  font-size: 10px;
+  opacity: .7;
+  margin-bottom: 3px;
+  position: relative;
+  z-index: 1;
+}
+.uc-amount {
+  font-size: 26px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  position: relative;
+  z-index: 1;
+  letter-spacing: -0.01em;
+}
+.uc-code {
+  font-size: 10px;
+  opacity: .7;
+  margin-bottom: 1px;
+  position: relative;
+  z-index: 1;
+}
+.uc-time {
+  font-size: 9px;
+  opacity: .65;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  z-index: 1;
+}
+.uc-badge {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  background: rgba(255, 255, 255, .18);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  z-index: 1;
+  letter-spacing: 0.02em;
+}
+</style>

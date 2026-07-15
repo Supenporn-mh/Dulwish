@@ -3,6 +3,7 @@ import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useKioskStore } from '@/stores/kiosk'
 import UserCard from '@/components/UserCard.vue'
+import Icon from '@/components/Icon.vue'
 import AutoLogout from '@/components/AutoLogout.vue'
 
 const router = useRouter()
@@ -41,8 +42,9 @@ onMounted(() => {
 <template>
   <div class="w-screen h-screen overflow-hidden flex flex-col" style="background: #F0F2F5">
     <!-- Top bar -->
-    <div class="flex items-center justify-center px-5 pt-5 pb-3 flex-shrink-0">
-      <h1 class="font-bold text-gray-900" style="font-size: 16px">ประวัติการทำรายการ</h1>
+    <div class="relative flex items-center justify-center px-5 pt-4 pb-3 flex-shrink-0 bg-white" style="border-bottom: 0.5px solid #E0E0E5">
+      <span class="absolute" style="left: 20px; font-size: 11px; color: #9A9AB0">ประวัติการทำรายการ</span>
+      <h1 class="font-semibold text-gray-900" style="font-size: 15px">ประวัติการทำรายการ</h1>
     </div>
 
     <!-- Body -->
@@ -83,7 +85,7 @@ onMounted(() => {
     <!-- Bottom -->
     <div class="flex-shrink-0 flex flex-col gap-[5px] px-5 pb-4 pt-2">
       <button class="btn-outline-full flex items-center justify-center gap-1" @click="goBack">
-        <i class="ti ti-chevron-left" style="font-size: 14px" />
+        <Icon name="chevronLeft" :size="14" color="#1264E3" />
         ย้อนกลับ
       </button>
       <div class="text-center text-gray-400" style="font-size: 9px">powered by UPOS</div>

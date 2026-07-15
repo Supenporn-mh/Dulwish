@@ -3,6 +3,7 @@ import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useKioskStore } from '@/stores/kiosk'
 import UserCard from '@/components/UserCard.vue'
+import Icon from '@/components/Icon.vue'
 import AutoLogout from '@/components/AutoLogout.vue'
 
 const router = useRouter()
@@ -37,6 +38,12 @@ const methodLabel = computed(() => (store.selectedMethod === 'promptpay' ? 'พ�
 const qrMM = computed(() => Math.floor(qrCountdown.value / 60))
 const qrSS = computed(() => String(qrCountdown.value % 60).padStart(2, '0'))
 const qrProgressPercent = computed(() => (qrCountdown.value / 300) * 100)
+
+const breadcrumb = computed(() => {
+  if (phase.value === 'amount') return 'กรอกจำนวน'
+  if (phase.value === 'qr') return 'สแกน QR'
+  return 'สำเร็จ'
+})
 
 const formattedSuccessAt = computed(() => {
   if (!successAt.value) return ''
@@ -126,8 +133,9 @@ onUnmounted(() => {
 <template>
   <div class="w-screen h-screen overflow-hidden flex flex-col" style="background: #F0F2F5">
     <!-- Top bar -->
-    <div class="flex items-center justify-center px-5 pt-5 pb-3 flex-shrink-0">
-      <h1 class="font-bold" style="font-size: 16px; color: #1264E3">เติมเงิน</h1>
+    <div class="relative flex items-center justify-center px-5 pt-4 pb-3 flex-shrink-0 bg-white" style="border-bottom: 0.5px solid #E0E0E5">
+      <span class="absolute" style="left: 20px; font-size: 11px; color: #9A9AB0">{{ breadcrumb }}</span>
+      <h1 class="font-semibold" style="font-size: 15px; color: #1264E3">เติมเงิน</h1>
     </div>
 
     <!-- ═ Screen 4: Amount entry ═ -->
@@ -175,7 +183,7 @@ onUnmounted(() => {
 
       <div class="flex-shrink-0 flex items-center gap-2 px-5 pb-4 pt-2">
         <button class="back-link" @click="goBackFromAmount">
-          <i class="ti ti-chevron-left" style="font-size: 13px" />
+          <Icon name="chevronLeft" :size="13" color="#1264E3" />
           ย้อนกลับ
         </button>
         <button v-if="!canConfirm" class="btn-confirm-disabled" disabled>ยืนยัน</button>
@@ -201,7 +209,7 @@ onUnmounted(() => {
             class="flex items-center justify-center rounded-lg"
             style="width: 100px; height: 100px; border: 2px solid #1264E3; background: #F8FAFF"
           >
-            <i class="ti ti-qrcode text-brand-primary" style="font-size: 48px" />
+            <Icon name="qrcode" :size="48" color="#1264E3" />
           </div>
           <div class="text-gray-500" style="font-size: 10px">สแกนด้วยพร้อมเพย์หรือแอปธนาคาร</div>
           <div class="font-medium text-brand-primary" style="font-size: 18px">฿{{ displayAmount }}</div>
@@ -224,7 +232,10 @@ onUnmounted(() => {
       </div>
 
       <div class="flex-shrink-0 px-5 pb-4 pt-2">
-        <button class="btn-outline-full" @click="backFromQr">ย้อนกลับ</button>
+        <button class="btn-outline-full flex items-center justify-center gap-1" @click="backFromQr">
+          <Icon name="chevronLeft" :size="14" color="#1264E3" />
+          ย้อนกลับ
+        </button>
       </div>
     </template>
 
@@ -242,7 +253,7 @@ onUnmounted(() => {
 
         <div class="rounded-xl bg-white flex flex-col items-center gap-2 py-6" style="border: 0.5px solid #E0E0E0">
           <div class="rounded-full bg-brand-success flex items-center justify-center" style="width: 48px; height: 48px">
-            <i class="ti ti-circle-check text-white" style="font-size: 24px" />
+            <Icon name="checkCircle" :size="24" color="#fff" />
           </div>
           <div class="font-medium" style="font-size: 16px; color: #0A4BAD">เติมเงินสำเร็จ</div>
           <div class="text-gray-500" style="font-size: 10px">{{ formattedSuccessAt }}</div>

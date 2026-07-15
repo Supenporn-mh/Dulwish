@@ -3,6 +3,7 @@ import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useKioskStore } from '@/stores/kiosk'
 import UserCard from './UserCard.vue'
+import Icon from './Icon.vue'
 
 const router = useRouter()
 const store  = useKioskStore()
@@ -108,6 +109,13 @@ function backToMethod() {
   router.push('/kiosk/topup')
 }
 
+const breadcrumb = computed(() => {
+  if (phase.value === 'method') return 'เลือกวิธีเติมเงิน'
+  if (phase.value === 'amount') return 'กรอกจำนวน'
+  if (phase.value === 'qr') return 'สแกน QR'
+  return 'สำเร็จ'
+})
+
 const formattedSuccess = computed(() => {
   if (!successAt.value) return ''
   return successAt.value.toLocaleString('th-TH', {
@@ -124,8 +132,9 @@ if (!user.value) router.replace('/kiosk/idle')
   <div class="w-full h-full flex flex-col overflow-y-auto" style="background: var(--color-bg-secondary)">
 
     <!-- Top bar -->
-    <div class="flex items-center justify-center px-5 pt-5 pb-3 flex-shrink-0">
-      <h1 class="font-bold" style="font-size: 16px; color: var(--color-primary)">เติมเงิน</h1>
+    <div class="relative flex items-center justify-center px-5 pt-4 pb-3 flex-shrink-0" style="background: var(--color-bg-surface); border-bottom: 0.5px solid #E0E0E5">
+      <span class="absolute" style="left: 20px; font-size: 11px; color: var(--color-text-tertiary)">{{ breadcrumb }}</span>
+      <h1 class="font-semibold" style="font-size: 15px; color: var(--color-primary)">เติมเงิน</h1>
     </div>
 
     <!-- Profile card -->
@@ -144,35 +153,42 @@ if (!user.value) router.replace('/kiosk/idle')
     <div v-if="phase === 'method'" class="flex-1 px-5 pb-8">
       <h2 class="mb-3" style="font-size: 13px; font-weight: 500; color: var(--color-text-primary)">เลือกวิธีการเติมเงิน</h2>
 
-      <div class="flex flex-col" style="border-radius: var(--radius-lg); border: 1px solid var(--color-border-tertiary); overflow: hidden">
-        <template v-for="(item, idx) in [
-          { id: 'promptpay', label: 'พร้อมเพย์', icon: 'ti-qrcode' },
-          { id: 'alipay',    label: 'Alipay',    icon: 'ti-credit-card' },
-          { id: 'history',   label: 'ประวัติการทำรายการ', icon: 'ti-receipt' },
-          { id: 'feedback',  label: 'ส่งความเห็น', icon: 'ti-mood-smile' },
+      <div class="flex flex-col" style="gap: 8px">
+        <template v-for="item in [
+          { id: 'promptpay', label: 'พร้อมเพย์', icon: 'qrcode' },
+          { id: 'alipay',    label: 'Alipay',    icon: 'card' },
         ]" :key="item.id">
-          <button
-            @click="selectItem(item.id)"
-            class="flex items-center gap-3 px-3 py-3 active:scale-[0.99] transition-transform"
-            style="background: var(--color-bg-surface); cursor: pointer; text-align: left"
-          >
-            <div
-              class="flex-shrink-0 flex items-center justify-center"
-              style="width: 28px; height: 28px; border-radius: 8px; background: var(--color-primary-tint)"
-            >
-              <i :class="`ti ${item.icon}`" style="font-size: 15px; color: var(--color-primary)" />
+          <button @click="selectItem(item.id)" class="menu-row">
+            <div class="m-icon">
+              <Icon :name="item.icon" :size="20" color="var(--color-primary)" />
             </div>
-            <div class="flex-1" style="font-size: 12px; font-weight: 500; color: var(--color-text-primary)">
+            <div class="flex-1" style="font-size: 14px; font-weight: 500; color: var(--color-text-primary)">
               {{ item.label }}
             </div>
-            <i class="ti ti-chevron-right" style="font-size: 14px; color: var(--color-text-tertiary)" />
+            <Icon name="chevronRight" :size="18" color="var(--color-text-tertiary)" />
           </button>
-          <div v-if="idx < 3" style="height: 0.5px; background: var(--color-border-tertiary)" />
+        </template>
+
+        <div style="height: 0.5px; background: #E0E0E5; margin: 2px 0" />
+
+        <template v-for="item in [
+          { id: 'history',   label: 'ประวัติการทำรายการ', icon: 'receipt' },
+          { id: 'feedback',  label: 'ส่งความเห็น', icon: 'smile' },
+        ]" :key="item.id">
+          <button @click="selectItem(item.id)" class="menu-row">
+            <div class="m-icon">
+              <Icon :name="item.icon" :size="20" color="var(--color-primary)" />
+            </div>
+            <div class="flex-1" style="font-size: 14px; font-weight: 500; color: var(--color-text-primary)">
+              {{ item.label }}
+            </div>
+            <Icon name="chevronRight" :size="18" color="var(--color-text-tertiary)" />
+          </button>
         </template>
       </div>
 
       <button @click="goBack" class="btn-lg btn-secondary w-full mt-4" style="background: #fff">
-        <i class="ti ti-chevron-left" style="font-size: 14px" />
+        <Icon name="chevronLeft" :size="16" />
         ย้อนกลับ
       </button>
     </div>
@@ -229,7 +245,7 @@ if (!user.value) router.replace('/kiosk/idle')
           class="flex items-center gap-1"
           style="font-size: 13px; font-weight: 500; color: var(--color-primary); background: none; border: none; cursor: pointer"
         >
-          <i class="ti ti-chevron-left" style="font-size: 13px" />
+          <Icon name="chevronLeft" :size="14" color="var(--color-primary)" />
           ย้อนกลับ
         </button>
         <button
@@ -253,7 +269,7 @@ if (!user.value) router.replace('/kiosk/idle')
           class="w-[100px] h-[100px] flex flex-col items-center justify-center"
           style="border-radius: 8px; border: 2px solid var(--color-primary); background: #F8FAFF"
         >
-          <i class="ti ti-qrcode" style="font-size: 48px; color: var(--color-primary)" />
+          <Icon name="qrcode" :size="48" color="var(--color-primary)" />
         </div>
 
         <div class="text-center">
@@ -296,7 +312,7 @@ if (!user.value) router.replace('/kiosk/idle')
       </div>
 
       <button @click="goBack" class="btn-lg btn-secondary w-full" style="background: #fff">
-        <i class="ti ti-chevron-left" style="font-size: 14px" />
+        <Icon name="chevronLeft" :size="14" />
         ย้อนกลับ
       </button>
     </div>
@@ -305,7 +321,7 @@ if (!user.value) router.replace('/kiosk/idle')
     <div v-else-if="phase === 'success'" class="flex-1 flex flex-col px-5 pb-6 gap-4">
       <div class="card flex flex-col items-center py-10 px-6 gap-3">
         <div class="rounded-full flex items-center justify-center" style="width: 48px; height: 48px; background: var(--color-success)">
-          <i class="ti ti-circle-check" style="font-size: 24px; color: #fff" />
+          <Icon name="checkCircle" :size="24" color="#fff" />
         </div>
 
         <h2 class="font-bold text-center" style="font-size: 16px; color: #0A4BAD">
@@ -335,3 +351,31 @@ if (!user.value) router.replace('/kiosk/idle')
 
   </div>
 </template>
+
+<style scoped>
+.menu-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-bg-surface);
+  border-radius: 12px;
+  border: 0.5px solid #E0E0E5;
+  padding: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .15s, background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.menu-row:hover { border-color: var(--color-primary); background: var(--color-primary-tint); }
+.menu-row:active { background: #daeaff; }
+.m-icon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--color-primary-tint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>

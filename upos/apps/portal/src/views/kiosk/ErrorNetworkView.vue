@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import Icon from './Icon.vue'
 
 const router = useRouter()
 
@@ -15,7 +16,7 @@ function close() {
 <template>
   <div class="w-full h-full flex flex-col items-center justify-center gap-[10px] px-8" style="background: var(--color-bg-page)">
     <div class="rounded-full flex items-center justify-center" style="width: 48px; height: 48px; background: var(--color-danger)">
-      <i class="ti ti-alert-triangle" style="font-size: 24px; color: #fff" />
+      <Icon name="warning" :size="24" color="#fff" />
     </div>
     <div class="font-medium" style="font-size: 14px; color: var(--color-text-primary)">เกิดข้อผิดพลาด</div>
     <div class="font-medium text-center" style="font-size: 11px; color: var(--color-danger)">ไม่สามารถเชื่อมต่ออินเทอร์เน็ตได้</div>

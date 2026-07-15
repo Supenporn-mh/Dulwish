@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useKioskStore } from '@/stores/kiosk'
 import UserCard from './UserCard.vue'
+import Icon from './Icon.vue'
 
 const router = useRouter()
 const store = useKioskStore()
@@ -44,8 +45,9 @@ function goBack() {
 <template>
   <div class="w-full h-full flex flex-col overflow-hidden" style="background: var(--color-bg-secondary)">
     <!-- Top bar -->
-    <div class="flex items-center justify-center px-5 pt-5 pb-3 flex-shrink-0">
-      <h1 class="font-bold" style="font-size: 16px; color: var(--color-text-primary)">ประวัติการทำรายการ</h1>
+    <div class="relative flex items-center justify-center px-5 pt-4 pb-3 flex-shrink-0" style="background: var(--color-bg-surface); border-bottom: 0.5px solid #E0E0E5">
+      <span class="absolute" style="left: 20px; font-size: 11px; color: var(--color-text-tertiary)">ประวัติการทำรายการ</span>
+      <h1 class="font-semibold" style="font-size: 15px; color: var(--color-text-primary)">ประวัติการทำรายการ</h1>
     </div>
 
     <!-- Body -->
@@ -82,7 +84,7 @@ function goBack() {
     <!-- Bottom -->
     <div class="flex-shrink-0 flex flex-col gap-[5px] px-5 pb-4 pt-2">
       <button class="btn-lg btn-secondary w-full" style="background: #fff" @click="goBack">
-        <i class="ti ti-chevron-left" style="font-size: 14px" />
+        <Icon name="chevronLeft" :size="14" />
         ย้อนกลับ
       </button>
       <div class="text-center" style="font-size: 9px; color: var(--color-text-tertiary)">powered by UPOS</div>

@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useKioskStore } from '@/stores/kiosk'
+import Icon from '@/components/Icon.vue'
 
 const router = useRouter()
 const store = useKioskStore()
@@ -43,9 +44,10 @@ function demoTeacher() {
 <template>
   <div class="w-screen h-screen overflow-hidden flex flex-col bg-white">
     <!-- Top bar -->
-    <div class="relative flex items-center justify-center px-5 pt-5 pb-3 flex-shrink-0">
-      <h1 class="font-bold" style="font-size: 16px; color: #1264E3">เติมเงิน</h1>
-      <div class="absolute right-5 text-gray-400" style="font-size: 12px; font-weight: 500">TH | EN</div>
+    <div class="relative flex items-center justify-center px-5 pt-4 pb-3 flex-shrink-0 bg-white" style="border-bottom: 0.5px solid #E0E0E5">
+      <span class="absolute" style="left: 20px; font-size: 11px; color: #9A9AB0">แตะบัตร</span>
+      <h1 class="font-semibold" style="font-size: 15px; color: #1264E3">เติมเงิน</h1>
+      <div class="absolute right-5 text-gray-400" style="font-size: 11px; font-weight: 500">TH | EN</div>
     </div>
 
     <!-- Content -->
@@ -57,10 +59,12 @@ function demoTeacher() {
         class="mt-2 flex items-center justify-center rounded-lg bg-brand-tint"
         style="width: 36px; height: 26px"
       >
-        <i class="ti ti-wifi text-brand-primary" style="font-size: 16px" />
+        <Icon name="wifi" :size="16" color="#1264E3" />
       </div>
 
-      <i class="ti ti-device-desktop-analytics text-brand-primary mt-4" style="font-size: 52px" />
+      <div class="mt-4">
+        <Icon name="monitor" :size="52" color="#1264E3" />
+      </div>
 
       <!-- Error message -->
       <div
