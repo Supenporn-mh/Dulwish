@@ -11,6 +11,21 @@ const store = useKioskStore()
 const user = computed(() => store.currentUser)
 const wallet = computed(() => store.wallet)
 
+function t(th: string, en: string) {
+  return store.locale === 'en' ? en : th
+}
+
+const TX_TYPE_EN: Record<string, string> = {
+  'ซื้ออาหาร': 'Food Purchase',
+  'เติมเงิน QR': 'Top-up via QR',
+  'ซื้อขนม': 'Snack Purchase',
+  'ซื้อเครื่องดื่ม': 'Drink Purchase',
+}
+
+function displayType(type: string): string {
+  return store.locale === 'en' ? (TX_TYPE_EN[type] ?? type) : type
+}
+
 interface TxItem {
   id: number
   type: string
@@ -46,8 +61,8 @@ function goBack() {
   <div class="w-full h-full flex flex-col overflow-hidden" style="background: var(--color-bg-secondary)">
     <!-- Top bar -->
     <div class="relative flex items-center justify-center px-5 pt-4 pb-3 flex-shrink-0" style="background: var(--color-bg-surface); border-bottom: 0.5px solid #E0E0E5">
-      <span class="absolute" style="left: 20px; font-size: 11px; color: var(--color-text-tertiary)">ประวัติการทำรายการ</span>
-      <h1 class="font-semibold" style="font-size: 15px; color: var(--color-text-primary)">ประวัติการทำรายการ</h1>
+      <span class="absolute" style="left: 20px; font-size: 11px; color: var(--color-text-tertiary)">{{ t('ประวัติการทำรายการ', 'Transaction History') }}</span>
+      <h1 class="font-semibold" style="font-size: 15px; color: var(--color-text-primary)">{{ t('ประวัติการทำรายการ', 'Transaction History') }}</h1>
     </div>
 
     <!-- Body -->
@@ -60,7 +75,7 @@ function goBack() {
         :updated-at="new Date()"
       />
 
-      <div class="text-center" style="font-size: 11px; color: var(--color-text-secondary)">รายการล่าสุด 10 รายการ</div>
+      <div class="text-center" style="font-size: 11px; color: var(--color-text-secondary)">{{ t('รายการล่าสุด 10 รายการ', 'Last 10 transactions') }}</div>
 
       <div class="overflow-hidden" style="border-radius: var(--radius-lg); border: 0.5px solid var(--color-border-tertiary); background: var(--color-bg-surface)">
         <div
@@ -70,7 +85,7 @@ function goBack() {
           :style="idx < transactions.length - 1 ? 'border-bottom: 0.5px solid var(--color-border-tertiary)' : ''"
         >
           <div class="min-w-0">
-            <div class="font-medium truncate" style="font-size: 11px; color: var(--color-text-primary)">{{ tx.type }}</div>
+            <div class="font-medium truncate" style="font-size: 11px; color: var(--color-text-primary)">{{ displayType(tx.type) }}</div>
             <div class="mt-0.5" style="font-size: 9px; color: var(--color-text-tertiary)">{{ tx.date }}</div>
           </div>
           <div
@@ -85,7 +100,7 @@ function goBack() {
     <div class="flex-shrink-0 flex flex-col gap-[5px] px-5 pb-4 pt-2">
       <button class="btn-lg btn-secondary w-full" style="background: #fff" @click="goBack">
         <Icon name="chevronLeft" :size="14" />
-        ย้อนกลับ
+        {{ t('ย้อนกลับ', 'Back') }}
       </button>
       <div class="text-center" style="font-size: 9px; color: var(--color-text-tertiary)">powered by UPOS</div>
     </div>

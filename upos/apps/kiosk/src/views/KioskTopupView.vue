@@ -27,18 +27,23 @@ const NUMPAD_ROWS = [['7', '8', '9'], ['4', '5', '6'], ['1', '2', '3'], ['0', '0
 const user = computed(() => store.currentUser)
 const wallet = computed(() => store.wallet)
 
-const displayName = computed(() => user.value?.nameTh || user.value?.name || 'ผู้ใช้')
+function t(th: string, en: string) {
+  return store.locale === 'en' ? en : th
+}
+
+const displayName = computed(() => {
+  if (store.locale === 'en') return user.value?.name || user.value?.nameTh || t('ผู้ใช้', 'User')
+  return user.value?.nameTh || user.value?.name || t('ผู้ใช้', 'User')
+})
 
 const numericAmount = computed(() => parseInt(inputStr.value || '0', 10))
 const displayAmount = computed(() => numericAmount.value.toLocaleString('th-TH', { minimumFractionDigits: 2 }))
 const canConfirm = computed(() => numericAmount.value >= MIN_AMOUNT && numericAmount.value <= MAX_AMOUNT)
 
-const METHOD_LABELS: Record<string, string> = {
-  promptpay: 'พร้อมเพย์',
-  alipay: 'Alipay',
-  wechat: 'WeChat Pay',
-}
-const methodLabel = computed(() => METHOD_LABELS[store.selectedMethod] ?? store.selectedMethod)
+const methodLabel = computed(() => {
+  if (store.selectedMethod === 'promptpay') return t('พร้อมเพย์', 'PromptPay')
+  return store.selectedMethod === 'alipay' ? 'Alipay' : 'WeChat Pay'
+})
 
 const qrMM = computed(() => Math.floor(qrCountdown.value / 60))
 const qrSS = computed(() => String(qrCountdown.value % 60).padStart(2, '0'))
@@ -46,13 +51,13 @@ const qrProgressPercent = computed(() => (qrCountdown.value / 300) * 100)
 
 const breadcrumb = computed(() => {
   if (phase.value === 'amount') return ''
-  if (phase.value === 'qr') return 'สแกน QR'
-  return 'สำเร็จ'
+  if (phase.value === 'qr') return t('สแกน QR', 'Scan QR')
+  return t('สำเร็จ', 'Success')
 })
 
 const formattedSuccessAt = computed(() => {
   if (!successAt.value) return ''
-  return successAt.value.toLocaleString('th-TH', {
+  return successAt.value.toLocaleString(store.locale === 'en' ? 'en-GB' : 'th-TH', {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   })
 })
@@ -140,7 +145,7 @@ onUnmounted(() => {
     <!-- Top bar -->
     <div class="relative flex items-center justify-center px-5 pt-4 pb-3 flex-shrink-0 bg-white" style="border-bottom: 0.5px solid #E0E0E5">
       <span v-if="breadcrumb" class="absolute" style="left: 20px; font-size: 11px; color: #9A9AB0">{{ breadcrumb }}</span>
-      <h1 class="font-semibold" style="font-size: 15px; color: #1264E3">เติมเงิน</h1>
+      <h1 class="font-semibold" style="font-size: 15px; color: #1264E3">{{ t('เติมเงิน', 'Top Up') }}</h1>
     </div>
 
     <!-- ═ Screen 4: Amount entry ═ -->
@@ -161,7 +166,7 @@ onUnmounted(() => {
           >{{ numericAmount > 0 ? displayAmount : '0.00' }}</span>
           <span class="text-gray-400" style="font-size: 14px; flex-shrink: 0">฿</span>
         </div>
-        <div class="text-gray-400" style="font-size: 10px">เติมเงินสูงสุด {{ MAX_AMOUNT.toLocaleString() }} บาท / ครั้ง</div>
+        <div class="text-gray-400" style="font-size: 10px">{{ t(`เติมเงินสูงสุด ${MAX_AMOUNT.toLocaleString()} บาท / ครั้ง`, `Max ฿${MAX_AMOUNT.toLocaleString()} per top-up`) }}</div>
 
         <div class="flex gap-1.5 flex-wrap">
           <button
@@ -189,10 +194,10 @@ onUnmounted(() => {
       <div class="flex-shrink-0 flex items-center gap-2.5 px-3.5 pb-4 pt-1">
         <button class="back-link" @click="goBackFromAmount">
           <Icon name="chevronLeft" :size="15" color="#1264E3" />
-          ย้อนกลับ
+          {{ t('ย้อนกลับ', 'Back') }}
         </button>
-        <button v-if="!canConfirm" class="btn-confirm-disabled" disabled>ยืนยัน</button>
-        <button v-else class="btn-confirm-active" @click="confirmAmount">ยืนยัน</button>
+        <button v-if="!canConfirm" class="btn-confirm-disabled" disabled>{{ t('ยืนยัน', 'Confirm') }}</button>
+        <button v-else class="btn-confirm-active" @click="confirmAmount">{{ t('ยืนยัน', 'Confirm') }}</button>
       </div>
     </template>
 
@@ -207,7 +212,7 @@ onUnmounted(() => {
           :updated-at="new Date()"
         />
 
-        <div class="text-gray-700 text-center" style="font-size: 12px; font-weight: 500">สแกน QR Code เพื่อชำระเงิน</div>
+        <div class="text-gray-700 text-center" style="font-size: 12px; font-weight: 500">{{ t('สแกน QR Code เพื่อชำระเงิน', 'Scan QR Code to Pay') }}</div>
 
         <div class="rounded-xl bg-white flex flex-col items-center gap-2 py-5" style="border: 0.5px solid #E0E0E0">
           <div
@@ -216,30 +221,30 @@ onUnmounted(() => {
           >
             <Icon name="qrcode" :size="48" color="#1264E3" />
           </div>
-          <div class="text-gray-500" style="font-size: 10px">สแกนด้วยพร้อมเพย์หรือแอปธนาคาร</div>
+          <div class="text-gray-500" style="font-size: 10px">{{ t('สแกนด้วยพร้อมเพย์หรือแอปธนาคาร', 'Scan with PromptPay or your banking app') }}</div>
           <div class="font-medium text-brand-primary" style="font-size: 18px">฿{{ displayAmount }}</div>
-          <div class="text-gray-400" style="font-size: 9px">หมดอายุใน {{ qrMM }}:{{ qrSS }} นาที</div>
+          <div class="text-gray-400" style="font-size: 9px">{{ t(`หมดอายุใน ${qrMM}:${qrSS} นาที`, `Expires in ${qrMM}:${qrSS} min`) }}</div>
           <div class="w-full rounded-full bg-brand-tint overflow-hidden" style="height: 3px">
             <div class="h-full bg-brand-primary rounded-full transition-all duration-1000 ease-linear" :style="`width: ${qrProgressPercent}%`" />
           </div>
         </div>
 
         <div class="text-gray-400 text-center" style="font-size: 9px">
-          {{ isProcessing ? 'กำลังดำเนินการ...' : 'รอการยืนยันจากธนาคาร...' }}
+          {{ isProcessing ? t('กำลังดำเนินการ...', 'Processing...') : t('รอการยืนยันจากธนาคาร...', 'Waiting for bank confirmation...') }}
         </div>
 
         <!-- Demo triggers (no real payment gateway in this environment) -->
         <div class="flex items-center justify-center gap-4 mt-1">
-          <button class="text-brand-primary underline disabled:opacity-40" style="font-size: 10px" :disabled="isProcessing" @click="simulatePaymentSuccess">จำลอง: ชำระสำเร็จ</button>
-          <button class="text-brand-danger underline disabled:opacity-40" style="font-size: 10px" :disabled="isProcessing" @click="simulateNetworkError">จำลอง: ไม่มีอินเทอร์เน็ต</button>
-          <button class="text-brand-danger underline disabled:opacity-40" style="font-size: 10px" :disabled="isProcessing" @click="simulateServiceError">จำลอง: 503</button>
+          <button class="text-brand-primary underline disabled:opacity-40" style="font-size: 10px" :disabled="isProcessing" @click="simulatePaymentSuccess">{{ t('จำลอง: ชำระสำเร็จ', 'Simulate: Success') }}</button>
+          <button class="text-brand-danger underline disabled:opacity-40" style="font-size: 10px" :disabled="isProcessing" @click="simulateNetworkError">{{ t('จำลอง: ไม่มีอินเทอร์เน็ต', 'Simulate: No internet') }}</button>
+          <button class="text-brand-danger underline disabled:opacity-40" style="font-size: 10px" :disabled="isProcessing" @click="simulateServiceError">{{ t('จำลอง: 503', 'Simulate: 503') }}</button>
         </div>
       </div>
 
       <div class="flex-shrink-0 px-5 pb-4 pt-2">
         <button class="btn-outline-full flex items-center justify-center gap-1" @click="backFromQr">
           <Icon name="chevronLeft" :size="14" color="#1264E3" />
-          ย้อนกลับ
+          {{ t('ย้อนกลับ', 'Back') }}
         </button>
       </div>
     </template>
@@ -260,15 +265,15 @@ onUnmounted(() => {
           <div class="rounded-full bg-brand-success flex items-center justify-center" style="width: 48px; height: 48px">
             <Icon name="checkCircle" :size="24" color="#fff" />
           </div>
-          <div class="font-medium" style="font-size: 16px; color: #0A4BAD">เติมเงินสำเร็จ</div>
+          <div class="font-medium" style="font-size: 16px; color: #0A4BAD">{{ t('เติมเงินสำเร็จ', 'Top-up Successful') }}</div>
           <div class="text-gray-500" style="font-size: 10px">{{ formattedSuccessAt }}</div>
-          <div class="text-gray-500" style="font-size: 10px">วิธี: {{ methodLabel }}</div>
+          <div class="text-gray-500" style="font-size: 10px">{{ t('วิธี', 'Method') }}: {{ methodLabel }}</div>
           <div class="font-medium text-brand-success" style="font-size: 22px">฿{{ paidAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 }) }}</div>
         </div>
       </div>
 
       <div class="flex-shrink-0 px-5 pb-4 pt-2">
-        <button class="btn-primary-full" @click="backToHome">กลับไปหน้าเติมเงิน</button>
+        <button class="btn-primary-full" @click="backToHome">{{ t('กลับไปหน้าเติมเงิน', 'Back to Top Up') }}</button>
       </div>
     </template>
 

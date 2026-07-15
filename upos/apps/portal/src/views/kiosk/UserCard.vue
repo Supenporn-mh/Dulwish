@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import Icon from './Icon.vue'
+import { useKioskStore } from '@/stores/kiosk'
 
 const props = defineProps<{
   name: string
@@ -10,6 +11,23 @@ const props = defineProps<{
   updatedAt?: Date | null
   compact?: boolean
 }>()
+
+const store = useKioskStore()
+
+const ROLE_LABEL_EN: Record<string, string> = {
+  'นักเรียน': 'Student',
+  'ครู': 'Teacher',
+  'เจ้าหน้าที่': 'Staff',
+}
+
+const displayRoleLabel = computed(() =>
+  store.locale === 'en' ? (ROLE_LABEL_EN[props.roleLabel] ?? props.roleLabel) : props.roleLabel
+)
+
+const balanceLabel = computed(() => {
+  if (store.locale === 'en') return props.compact ? 'Balance' : 'Balance (THB)'
+  return props.compact ? 'ยอดคงเหลือ' : 'ยอดเงินคงเหลือ (บาท)'
+})
 
 const formattedBalance = computed(() =>
   props.balance.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -24,7 +42,7 @@ const formattedTime = computed(() => {
 <template>
   <div class="user-card" :class="{ compact }" :style="{ minHeight: compact ? 'auto' : '120px' }">
     <div class="uc-name">{{ name }}</div>
-    <div class="uc-lbl">{{ compact ? 'ยอดคงเหลือ' : 'ยอดเงินคงเหลือ (บาท)' }}</div>
+    <div class="uc-lbl">{{ balanceLabel }}</div>
     <div class="uc-amount">฿{{ formattedBalance }}</div>
 
     <template v-if="!compact">
@@ -37,7 +55,7 @@ const formattedTime = computed(() => {
       <div class="uc-avatar">
         <Icon name="person" :size="22" color="rgba(255,255,255,.85)" />
       </div>
-      <div class="uc-badge">{{ roleLabel }}</div>
+      <div class="uc-badge">{{ displayRoleLabel }}</div>
     </template>
   </div>
 </template>

@@ -6,6 +6,10 @@ import { useKioskStore } from '@/stores/kiosk'
 const router = useRouter()
 const store = useKioskStore()
 
+function t(th: string, en: string) {
+  return store.locale === 'en' ? en : th
+}
+
 const progressPercent = computed(() =>
   (store.autoLogoutSeconds / 30) * 100
 )
@@ -58,14 +62,14 @@ onUnmounted(() => {
     <!-- Countdown label -->
     <div class="flex items-center justify-center gap-3 bg-white border-t border-gray-100 py-2 px-6">
       <span class="text-gray-500" style="font-size: 11px; font-weight: 500">
-        กำลังออกจากระบบใน
+        {{ t('กำลังออกจากระบบใน', 'Logging out in') }}
       </span>
       <span
         class="font-bold tabular-nums"
         style="font-size: 12px"
         :style="{ color: progressColor }"
       >
-        {{ store.autoLogoutSeconds }} วินาที
+        {{ store.autoLogoutSeconds }} {{ t('วินาที', 's') }}
       </span>
 
       <button
@@ -73,7 +77,7 @@ onUnmounted(() => {
         style="font-size: 11px; border-color: #D1D5DB"
         @click="handleActivity"
       >
-        ยังอยู่นะ
+        {{ t('ยังอยู่นะ', "I'm still here") }}
       </button>
     </div>
   </div>

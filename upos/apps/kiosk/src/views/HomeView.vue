@@ -12,15 +12,22 @@ const store = useKioskStore()
 const user = computed(() => store.currentUser)
 const wallet = computed(() => store.wallet)
 
-const displayName = computed(() => user.value?.nameTh || user.value?.name || 'ผู้ใช้')
+function t(th: string, en: string) {
+  return store.locale === 'en' ? en : th
+}
 
-const MENU_ITEMS = [
-  { key: 'promptpay', label: 'พร้อมเพย์', icon: 'qrcode' },
+const displayName = computed(() => {
+  if (store.locale === 'en') return user.value?.name || user.value?.nameTh || t('ผู้ใช้', 'User')
+  return user.value?.nameTh || user.value?.name || t('ผู้ใช้', 'User')
+})
+
+const MENU_ITEMS = computed(() => [
+  { key: 'promptpay', label: t('พร้อมเพย์', 'PromptPay'), icon: 'qrcode' },
   { key: 'alipay', label: 'Alipay', icon: 'card' },
   { key: 'wechat', label: 'WeChat Pay', icon: 'wechat' },
-  { key: 'history', label: 'ประวัติการทำรายการ', icon: 'receipt' },
-  { key: 'feedback', label: 'ประเมินความพึงพอใจ', icon: 'smile' },
-]
+  { key: 'history', label: t('ประวัติการทำรายการ', 'Transaction History'), icon: 'receipt' },
+  { key: 'feedback', label: t('ประเมินความพึงพอใจ', 'Satisfaction Survey'), icon: 'smile' },
+])
 
 const FEEDBACK_FORM_URL = 'https://okontekconnect.sg.larksuite.com/share/base/form/shrlgI0kruWBrrAJOdGlQLpeiFc'
 
@@ -45,8 +52,8 @@ function goBack() {
   <div class="w-screen h-screen overflow-hidden flex flex-col" style="background: #F0F0F5">
     <!-- Top bar -->
     <div class="relative flex items-center justify-center px-5 pt-4 pb-3 flex-shrink-0 bg-white" style="border-bottom: 0.5px solid #E0E0E5">
-      <span class="absolute" style="left: 20px; font-size: 11px; color: #9A9AB0">เลือกวิธีการชำระเงิน</span>
-      <h1 class="font-semibold" style="font-size: 15px; color: #1264E3">เติมเงิน</h1>
+      <span class="absolute" style="left: 20px; font-size: 11px; color: #9A9AB0">{{ t('เลือกวิธีการชำระเงิน', 'Select Payment Method') }}</span>
+      <h1 class="font-semibold" style="font-size: 15px; color: #1264E3">{{ t('เติมเงิน', 'Top Up') }}</h1>
     </div>
 
     <!-- Body -->
@@ -60,7 +67,7 @@ function goBack() {
       />
 
       <div>
-        <div class="mb-2" style="font-size: 13px; font-weight: 600; color: #1A1A2E">เลือกวิธีการชำระเงิน</div>
+        <div class="mb-2" style="font-size: 13px; font-weight: 600; color: #1A1A2E">{{ t('เลือกวิธีการชำระเงิน', 'Select Payment Method') }}</div>
 
         <div class="flex flex-col" style="gap: 8px">
           <button
@@ -83,7 +90,7 @@ function goBack() {
     <div class="flex-shrink-0 px-5 pb-4 pt-2">
       <button class="btn-outline-full flex items-center justify-center gap-1" @click="goBack">
         <Icon name="chevronLeft" :size="14" color="#1264E3" />
-        ย้อนกลับ
+        {{ t('ย้อนกลับ', 'Back') }}
       </button>
     </div>
 

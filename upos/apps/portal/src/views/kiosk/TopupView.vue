@@ -21,6 +21,10 @@ let   qrTimer: ReturnType<typeof setInterval> | null = null
 const user   = computed(() => store.currentUser)
 const wallet = computed(() => store.wallet)
 
+function t(th: string, en: string) {
+  return store.locale === 'en' ? en : th
+}
+
 // ── Amount ────────────────────────────────────────────────────────────────
 const displayAmount = computed(() => {
   const n = parseInt(inputStr.value || '0', 10)
@@ -36,12 +40,10 @@ const qrSS      = computed(() => String(qrCountdown.value % 60).padStart(2, '0')
 const qrExpired = computed(() => qrCountdown.value <= 0)
 
 // ── Methods ───────────────────────────────────────────────────────────────
-const METHOD_LABELS: Record<string, string> = {
-  promptpay: 'พร้อมเพย์',
-  alipay: 'Alipay',
-  wechat: 'WeChat Pay',
-}
-const methodLabel = computed(() => METHOD_LABELS[store.selectedMethod] ?? store.selectedMethod)
+const methodLabel = computed(() => {
+  if (store.selectedMethod === 'promptpay') return t('พร้อมเพย์', 'PromptPay')
+  return store.selectedMethod === 'alipay' ? 'Alipay' : 'WeChat Pay'
+})
 
 const FEEDBACK_FORM_URL = 'https://okontekconnect.sg.larksuite.com/share/base/form/shrlgI0kruWBrrAJOdGlQLpeiFc'
 
@@ -115,19 +117,27 @@ function backToMethod() {
 }
 
 const breadcrumb = computed(() => {
-  if (phase.value === 'method') return 'เลือกวิธีการชำระเงิน'
+  if (phase.value === 'method') return t('เลือกวิธีการชำระเงิน', 'Select Payment Method')
   if (phase.value === 'amount') return ''
-  if (phase.value === 'qr') return 'สแกน QR'
-  return 'สำเร็จ'
+  if (phase.value === 'qr') return t('สแกน QR', 'Scan QR')
+  return t('สำเร็จ', 'Success')
 })
 
 const formattedSuccess = computed(() => {
   if (!successAt.value) return ''
-  return successAt.value.toLocaleString('th-TH', {
+  return successAt.value.toLocaleString(store.locale === 'en' ? 'en-GB' : 'th-TH', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
 })
+
+const menuItems = computed(() => [
+  { id: 'promptpay', label: t('พร้อมเพย์', 'PromptPay'), icon: 'qrcode' },
+  { id: 'alipay',    label: 'Alipay', icon: 'card' },
+  { id: 'wechat',    label: 'WeChat Pay', icon: 'wechat' },
+  { id: 'history',   label: t('ประวัติการทำรายการ', 'Transaction History'), icon: 'receipt' },
+  { id: 'feedback',  label: t('ประเมินความพึงพอใจ', 'Satisfaction Survey'), icon: 'smile' },
+])
 
 onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })
 if (!user.value) router.replace('/kiosk/idle')
@@ -139,7 +149,7 @@ if (!user.value) router.replace('/kiosk/idle')
     <!-- Top bar -->
     <div class="relative flex items-center justify-center px-5 pt-4 pb-3 flex-shrink-0" style="background: var(--color-bg-surface); border-bottom: 0.5px solid #E0E0E5">
       <span v-if="breadcrumb" class="absolute" style="left: 20px; font-size: 11px; color: var(--color-text-tertiary)">{{ breadcrumb }}</span>
-      <h1 class="font-semibold" style="font-size: 15px; color: var(--color-primary)">เติมเงิน</h1>
+      <h1 class="font-semibold" style="font-size: 15px; color: var(--color-primary)">{{ t('เติมเงิน', 'Top Up') }}</h1>
     </div>
 
     <!-- Profile card -->
@@ -156,16 +166,10 @@ if (!user.value) router.replace('/kiosk/idle')
 
     <!-- ══ METHOD (Screen 2) ══════════════════════════════════════════ -->
     <div v-if="phase === 'method'" class="flex-1 px-5 pb-8">
-      <h2 class="mb-3" style="font-size: 13px; font-weight: 500; color: var(--color-text-primary)">เลือกวิธีการชำระเงิน</h2>
+      <h2 class="mb-3" style="font-size: 13px; font-weight: 500; color: var(--color-text-primary)">{{ t('เลือกวิธีการชำระเงิน', 'Select Payment Method') }}</h2>
 
       <div class="flex flex-col" style="gap: 8px">
-        <template v-for="item in [
-          { id: 'promptpay', label: 'พร้อมเพย์', icon: 'qrcode' },
-          { id: 'alipay',    label: 'Alipay',    icon: 'card' },
-          { id: 'wechat',    label: 'WeChat Pay', icon: 'wechat' },
-          { id: 'history',   label: 'ประวัติการทำรายการ', icon: 'receipt' },
-          { id: 'feedback',  label: 'ประเมินความพึงพอใจ', icon: 'smile' },
-        ]" :key="item.id">
+        <template v-for="item in menuItems" :key="item.id">
           <button @click="selectItem(item.id)" class="menu-row">
             <div class="m-icon">
               <Icon :name="item.icon" :size="20" color="var(--color-primary)" />
@@ -180,7 +184,7 @@ if (!user.value) router.replace('/kiosk/idle')
 
       <button @click="goBack" class="btn-lg btn-secondary w-full mt-4" style="background: #fff">
         <Icon name="chevronLeft" :size="16" />
-        ย้อนกลับ
+        {{ t('ย้อนกลับ', 'Back') }}
       </button>
     </div>
 
@@ -193,7 +197,7 @@ if (!user.value) router.replace('/kiosk/idle')
         <span style="font-size: 14px; color: var(--color-text-tertiary); flex-shrink: 0">฿</span>
       </div>
       <div style="font-size: 10px; color: var(--color-text-tertiary)">
-        เติมเงินสูงสุด 5,000 บาท / ครั้ง
+        {{ t('เติมเงินสูงสุด 5,000 บาท / ครั้ง', 'Max ฿5,000 per top-up') }}
       </div>
 
       <!-- Quick chips -->
@@ -237,7 +241,7 @@ if (!user.value) router.replace('/kiosk/idle')
           style="font-size: 13px; font-weight: 600; color: var(--color-primary); background: none; border: none; cursor: pointer; flex-shrink: 0"
         >
           <Icon name="chevronLeft" :size="15" color="var(--color-primary)" />
-          ย้อนกลับ
+          {{ t('ย้อนกลับ', 'Back') }}
         </button>
         <button
           @click="confirmAmount"
@@ -247,14 +251,14 @@ if (!user.value) router.replace('/kiosk/idle')
           :style="canConfirm
             ? 'background: var(--color-primary); color: #fff; border: none; cursor: pointer;'
             : 'background: #DCDCDC; color: #A0A0A0; border: none; cursor: not-allowed;'"
-        >ยืนยัน</button>
+        >{{ t('ยืนยัน', 'Confirm') }}</button>
       </div>
     </div>
 
     <!-- ══ QR (Screen 3) ══════════════════════════════════════════════ -->
     <div v-else-if="phase === 'qr'" class="flex-1 flex flex-col px-5 pb-6 gap-4">
       <div class="card flex flex-col items-center py-8 px-6 gap-3">
-        <div style="font-size: 12px; font-weight: 500; color: var(--color-text-primary)">สแกน QR Code เพื่อชำระเงิน</div>
+        <div style="font-size: 12px; font-weight: 500; color: var(--color-text-primary)">{{ t('สแกน QR Code เพื่อชำระเงิน', 'Scan QR Code to Pay') }}</div>
 
         <div
           class="w-[100px] h-[100px] flex flex-col items-center justify-center"
@@ -264,13 +268,13 @@ if (!user.value) router.replace('/kiosk/idle')
         </div>
 
         <div class="text-center">
-          <p style="font-size: 10px; color: var(--color-text-secondary)">สแกนด้วยพร้อมเพย์หรือแอปธนาคาร</p>
+          <p style="font-size: 10px; color: var(--color-text-secondary)">{{ t('สแกนด้วยพร้อมเพย์หรือแอปธนาคาร', 'Scan with PromptPay or your banking app') }}</p>
           <p class="font-medium" style="font-size: 18px; color: var(--color-primary)">
             ฿{{ numericAmount.toLocaleString() }}
           </p>
           <p class="mt-1" style="font-size: 9px; color: var(--color-text-tertiary)">
-            <template v-if="!qrExpired">หมดอายุใน {{ qrMM }}:{{ qrSS }} นาที</template>
-            <span v-else style="font-weight: 600; color: var(--color-danger)">QR หมดอายุ — กลับไปเลือกใหม่</span>
+            <template v-if="!qrExpired">{{ t(`หมดอายุใน ${qrMM}:${qrSS} นาที`, `Expires in ${qrMM}:${qrSS} min`) }}</template>
+            <span v-else style="font-weight: 600; color: var(--color-danger)">{{ t('QR หมดอายุ — กลับไปเลือกใหม่', 'QR expired — please try again') }}</span>
           </p>
         </div>
 
@@ -279,7 +283,7 @@ if (!user.value) router.replace('/kiosk/idle')
         </div>
 
         <p style="font-size: 9px; color: var(--color-text-tertiary)">
-          {{ isProcessing ? 'กำลังดำเนินการ...' : 'รอการยืนยันจากธนาคาร...' }}
+          {{ isProcessing ? t('กำลังดำเนินการ...', 'Processing...') : t('รอการยืนยันจากธนาคาร...', 'Waiting for bank confirmation...') }}
         </p>
       </div>
 
@@ -291,20 +295,20 @@ if (!user.value) router.replace('/kiosk/idle')
       >
         <span v-if="isProcessing" class="flex items-center gap-2">
           <span class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-          กำลังดำเนินการ...
+          {{ t('กำลังดำเนินการ...', 'Processing...') }}
         </span>
-        <span v-else>จำลองการชำระเงิน</span>
+        <span v-else>{{ t('จำลองการชำระเงิน', 'Simulate Payment') }}</span>
       </button>
 
       <!-- Demo triggers (no real payment gateway in this environment) -->
       <div class="flex items-center justify-center gap-4">
-        <button style="font-size: 10px; color: var(--color-danger); text-decoration: underline" :disabled="isProcessing" @click="simulateNetworkError">จำลอง: ไม่มีอินเทอร์เน็ต</button>
-        <button style="font-size: 10px; color: var(--color-danger); text-decoration: underline" :disabled="isProcessing" @click="simulateServiceError">จำลอง: 503</button>
+        <button style="font-size: 10px; color: var(--color-danger); text-decoration: underline" :disabled="isProcessing" @click="simulateNetworkError">{{ t('จำลอง: ไม่มีอินเทอร์เน็ต', 'Simulate: No internet') }}</button>
+        <button style="font-size: 10px; color: var(--color-danger); text-decoration: underline" :disabled="isProcessing" @click="simulateServiceError">{{ t('จำลอง: 503', 'Simulate: 503') }}</button>
       </div>
 
       <button @click="goBack" class="btn-lg btn-secondary w-full" style="background: #fff">
         <Icon name="chevronLeft" :size="14" />
-        ย้อนกลับ
+        {{ t('ย้อนกลับ', 'Back') }}
       </button>
     </div>
 
@@ -316,16 +320,16 @@ if (!user.value) router.replace('/kiosk/idle')
         </div>
 
         <h2 class="font-bold text-center" style="font-size: 16px; color: #0A4BAD">
-          เติมเงินสำเร็จ
+          {{ t('เติมเงินสำเร็จ', 'Top-up Successful') }}
         </h2>
 
         <div class="w-full mt-2 space-y-2">
           <div class="flex justify-between items-baseline">
-            <span style="font-size: 10px; color: var(--color-text-secondary)">วันที่และเวลาที่ทำรายการ:</span>
+            <span style="font-size: 10px; color: var(--color-text-secondary)">{{ t('วันที่และเวลาที่ทำรายการ:', 'Date & time:') }}</span>
             <span class="font-medium" style="font-size: 10px; color: var(--color-text-primary)">{{ formattedSuccess }}</span>
           </div>
           <div class="flex justify-between items-baseline">
-            <span style="font-size: 10px; color: var(--color-text-secondary)">วิธีการเติมเงิน:</span>
+            <span style="font-size: 10px; color: var(--color-text-secondary)">{{ t('วิธีการเติมเงิน:', 'Payment method:') }}</span>
             <span class="font-medium" style="font-size: 10px; color: var(--color-text-primary)">{{ methodLabel }}</span>
           </div>
         </div>
@@ -336,7 +340,7 @@ if (!user.value) router.replace('/kiosk/idle')
       </div>
 
       <button @click="backToMethod" class="btn-lg btn-primary w-full">
-        กลับไปหน้าเติมเงิน
+        {{ t('กลับไปหน้าเติมเงิน', 'Back to Top Up') }}
       </button>
     </div>
 

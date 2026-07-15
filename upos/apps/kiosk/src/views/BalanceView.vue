@@ -13,7 +13,26 @@ const user = computed(() => store.currentUser)
 const wallet = computed(() => store.wallet)
 const transactions = computed(() => store.transactions)
 
-const displayName = computed(() => user.value?.nameTh || user.value?.name || 'ผู้ใช้')
+function t(th: string, en: string) {
+  return store.locale === 'en' ? en : th
+}
+
+const displayName = computed(() => {
+  if (store.locale === 'en') return user.value?.name || user.value?.nameTh || t('ผู้ใช้', 'User')
+  return user.value?.nameTh || user.value?.name || t('ผู้ใช้', 'User')
+})
+
+const TX_DESC_EN: Record<string, string> = {
+  'อาหารกลางวัน - ข้าวผัด': 'Lunch - Fried Rice',
+  'ขนม - คุกกี้ช็อกโกแลต': 'Snack - Chocolate Cookie',
+  'เติมเงินผ่าน QR Code': 'Top-up via QR Code',
+  'อาหารเช้า - โจ๊ก': 'Breakfast - Congee',
+  'เครื่องดื่ม - น้ำผลไม้': 'Drink - Fruit Juice',
+}
+
+function displayDescription(desc: string): string {
+  return store.locale === 'en' ? (TX_DESC_EN[desc] ?? desc) : desc
+}
 
 function formatAmount(amount: number): string {
   const sign = amount >= 0 ? '+' : '-'
@@ -22,7 +41,7 @@ function formatAmount(amount: number): string {
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleString('th-TH', {
+    return new Date(iso).toLocaleString(store.locale === 'en' ? 'en-GB' : 'th-TH', {
       day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
     })
   } catch {
@@ -43,8 +62,8 @@ onMounted(() => {
   <div class="w-screen h-screen overflow-hidden flex flex-col" style="background: #F0F2F5">
     <!-- Top bar -->
     <div class="relative flex items-center justify-center px-5 pt-4 pb-3 flex-shrink-0 bg-white" style="border-bottom: 0.5px solid #E0E0E5">
-      <span class="absolute" style="left: 20px; font-size: 11px; color: #9A9AB0">ประวัติการทำรายการ</span>
-      <h1 class="font-semibold text-gray-900" style="font-size: 15px">ประวัติการทำรายการ</h1>
+      <span class="absolute" style="left: 20px; font-size: 11px; color: #9A9AB0">{{ t('ประวัติการทำรายการ', 'Transaction History') }}</span>
+      <h1 class="font-semibold text-gray-900" style="font-size: 15px">{{ t('ประวัติการทำรายการ', 'Transaction History') }}</h1>
     </div>
 
     <!-- Body -->
@@ -57,10 +76,10 @@ onMounted(() => {
         :updated-at="new Date()"
       />
 
-      <div class="text-gray-500 text-center" style="font-size: 11px">รายการล่าสุด 10 รายการ</div>
+      <div class="text-gray-500 text-center" style="font-size: 11px">{{ t('รายการล่าสุด 10 รายการ', 'Last 10 transactions') }}</div>
 
       <div v-if="transactions.length === 0" class="flex-1 flex items-center justify-center text-gray-400" style="font-size: 11px">
-        ไม่มีรายการ
+        {{ t('ไม่มีรายการ', 'No transactions') }}
       </div>
 
       <div v-else class="rounded-xl overflow-hidden bg-white" style="border: 0.5px solid #E0E0E0">
@@ -71,7 +90,7 @@ onMounted(() => {
           :style="idx < transactions.length - 1 ? 'border-bottom: 0.5px solid #E0E0E0' : ''"
         >
           <div class="min-w-0">
-            <div class="font-medium text-gray-900 truncate" style="font-size: 11px">{{ tx.description }}</div>
+            <div class="font-medium text-gray-900 truncate" style="font-size: 11px">{{ displayDescription(tx.description) }}</div>
             <div class="text-gray-400 mt-0.5" style="font-size: 9px">{{ formatDate(tx.createdAt) }}</div>
           </div>
           <div
@@ -86,7 +105,7 @@ onMounted(() => {
     <div class="flex-shrink-0 flex flex-col gap-[5px] px-5 pb-4 pt-2">
       <button class="btn-outline-full flex items-center justify-center gap-1" @click="goBack">
         <Icon name="chevronLeft" :size="14" color="#1264E3" />
-        ย้อนกลับ
+        {{ t('ย้อนกลับ', 'Back') }}
       </button>
       <div class="text-center text-gray-400" style="font-size: 9px">powered by UPOS</div>
     </div>

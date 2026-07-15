@@ -49,6 +49,12 @@ export const useKioskStore = defineStore('kiosk', () => {
   const wallet = ref<KioskWallet | null>(null)
   const error = ref('')
   const selectedMethod = ref<'promptpay' | 'alipay' | 'wechat'>('promptpay')
+  const locale = ref<'th' | 'en'>((localStorage.getItem('kiosk-locale') as 'th' | 'en') || 'th')
+
+  function toggleLocale() {
+    locale.value = locale.value === 'th' ? 'en' : 'th'
+    localStorage.setItem('kiosk-locale', locale.value)
+  }
 
   async function readCard(uid: string): Promise<boolean> {
     error.value = ''
@@ -111,5 +117,5 @@ export const useKioskStore = defineStore('kiosk', () => {
     }
   }
 
-  return { currentUser, wallet, error, selectedMethod, readCard, clearSession, updateBalance }
+  return { currentUser, wallet, error, selectedMethod, locale, toggleLocale, readCard, clearSession, updateBalance }
 })

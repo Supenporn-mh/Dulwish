@@ -44,6 +44,12 @@ export const useKioskStore = defineStore('kiosk', () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const selectedMethod = ref<'promptpay' | 'alipay' | 'wechat'>('promptpay')
+  const locale = ref<'th' | 'en'>((localStorage.getItem('kiosk-locale') as 'th' | 'en') || 'th')
+
+  function toggleLocale() {
+    locale.value = locale.value === 'th' ? 'en' : 'th'
+    localStorage.setItem('kiosk-locale', locale.value)
+  }
 
   function clearAutoLogout() {
     if (autoLogoutTimer.value) {
@@ -192,6 +198,8 @@ export const useKioskStore = defineStore('kiosk', () => {
     isLoading,
     error,
     selectedMethod,
+    locale,
+    toggleLocale,
     readCard,
     clearSession,
     startAutoLogout,
