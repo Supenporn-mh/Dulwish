@@ -59,18 +59,20 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="w-screen h-screen overflow-hidden relative flex flex-col bg-[#F2F2F7]">
-    <!-- Main content area -->
-    <div class="flex-1 overflow-hidden">
-      <RouterView />
-    </div>
+  <div class="w-screen h-screen overflow-hidden flex items-center justify-center" style="background: #D9DEE5">
+    <div class="w-full max-w-[430px] h-full relative flex flex-col overflow-hidden bg-[#F2F2F7]">
+      <!-- Main content area -->
+      <div class="flex-1 overflow-hidden">
+        <RouterView />
+      </div>
 
-    <!-- Countdown bar — only shown on non-idle screens -->
-    <div v-if="!isIdleScreen" class="flex-shrink-0 h-1 bg-[#C6C6C8] w-full">
-      <div
-        class="h-full bg-[#1264E3] transition-all duration-1000 ease-linear"
-        :style="{ width: barWidth }"
-      />
+      <!-- Countdown bar — only shown on non-idle screens -->
+      <div v-if="!isIdleScreen" class="flex-shrink-0 h-1 bg-[#C6C6C8] w-full">
+        <div
+          class="h-full bg-[#1264E3] transition-all duration-1000 ease-linear"
+          :style="{ width: barWidth }"
+        />
+      </div>
     </div>
   </div>
 </template>

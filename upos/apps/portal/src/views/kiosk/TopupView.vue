@@ -27,7 +27,7 @@ const displayAmount = computed(() => {
 })
 const numericAmount = computed(() => parseInt(inputStr.value || '0', 10))
 const canConfirm    = computed(() => numericAmount.value >= 20 && numericAmount.value <= 5000)
-const QUICK         = [50, 100, 200, 500, 1000]
+const QUICK         = [50, 100, 200, 500]
 
 // ── QR countdown ──────────────────────────────────────────────────────────
 const qrMM      = computed(() => Math.floor(qrCountdown.value / 60))
