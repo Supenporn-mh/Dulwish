@@ -178,7 +178,7 @@ onUnmounted(() => {
           >{{ q }}</button>
         </div>
 
-        <div class="flex-1 overflow-hidden" style="border-radius: 10px; background: #fff; border: 0.5px solid #E0E0E5">
+        <div class="overflow-hidden" style="border-radius: 10px; background: #fff; border: 0.5px solid #E0E0E5">
           <div v-for="(row, ri) in NUMPAD_ROWS" :key="ri" class="grid grid-cols-3" :style="ri > 0 ? 'border-top: 0.5px solid #E0E0E5' : ''">
             <button
               v-for="key in row"
@@ -189,15 +189,15 @@ onUnmounted(() => {
             >{{ key }}</button>
           </div>
         </div>
-      </div>
 
-      <div class="flex-shrink-0 flex items-center gap-2.5 px-3.5 pb-4 pt-1">
-        <button class="back-link" @click="goBackFromAmount">
-          <Icon name="chevronLeft" :size="15" color="#1264E3" />
-          {{ t('ย้อนกลับ', 'Back') }}
-        </button>
-        <button v-if="!canConfirm" class="btn-confirm-disabled" disabled>{{ t('ยืนยัน', 'Confirm') }}</button>
-        <button v-else class="btn-confirm-active" @click="confirmAmount">{{ t('ยืนยัน', 'Confirm') }}</button>
+        <div class="flex-shrink-0 flex items-center gap-2.5 pb-4">
+          <button class="back-link" @click="goBackFromAmount">
+            <Icon name="chevronLeft" :size="15" color="#1264E3" />
+            {{ t('ย้อนกลับ', 'Back') }}
+          </button>
+          <button v-if="!canConfirm" class="btn-confirm-disabled" disabled>{{ t('ยืนยัน', 'Confirm') }}</button>
+          <button v-else class="btn-confirm-active" @click="confirmAmount">{{ t('ยืนยัน', 'Confirm') }}</button>
+        </div>
       </div>
     </template>
 

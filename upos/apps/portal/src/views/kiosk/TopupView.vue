@@ -215,7 +215,7 @@ if (!user.value) router.replace('/kiosk/idle')
       </div>
 
       <!-- Numpad -->
-      <div class="flex-1 overflow-hidden" style="border-radius: 10px; background: var(--color-bg-surface); border: 0.5px solid #E0E0E5">
+      <div class="overflow-hidden" style="border-radius: 10px; background: var(--color-bg-surface); border: 0.5px solid #E0E0E5">
         <template v-for="(row, ri) in [['7','8','9'],['4','5','6'],['1','2','3'],['0','00','C']]" :key="ri">
           <div class="flex" :style="ri > 0 ? 'border-top: 0.5px solid #E0E0E5' : ''">
             <button
