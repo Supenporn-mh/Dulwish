@@ -42,7 +42,7 @@ function goBack() {
 </script>
 
 <template>
-  <div class="w-full h-full flex flex-col overflow-hidden" style="background: var(--color-bg-page)">
+  <div class="w-full h-full flex flex-col overflow-hidden" style="background: var(--color-bg-secondary)">
     <!-- Top bar -->
     <div class="flex items-center justify-center px-5 pt-5 pb-3 flex-shrink-0">
       <h1 class="font-bold" style="font-size: 16px; color: var(--color-text-primary)">ประวัติการทำรายการ</h1>
@@ -60,7 +60,7 @@ function goBack() {
 
       <div class="text-center" style="font-size: 11px; color: var(--color-text-secondary)">รายการล่าสุด 10 รายการ</div>
 
-      <div class="overflow-hidden" style="border-radius: var(--radius-lg); border: 0.5px solid var(--color-border-tertiary)">
+      <div class="overflow-hidden" style="border-radius: var(--radius-lg); border: 0.5px solid var(--color-border-tertiary); background: var(--color-bg-surface)">
         <div
           v-for="(tx, idx) in transactions"
           :key="tx.id"

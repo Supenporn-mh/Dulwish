@@ -38,7 +38,7 @@ function goBack() {
 </script>
 
 <template>
-  <div class="w-screen h-screen overflow-hidden flex flex-col bg-white">
+  <div class="w-screen h-screen overflow-hidden flex flex-col" style="background: #F0F2F5">
     <!-- Top bar -->
     <div class="flex items-center justify-center px-5 pt-5 pb-3 flex-shrink-0">
       <h1 class="font-bold" style="font-size: 16px; color: #1264E3">เติมเงิน</h1>
@@ -57,10 +57,10 @@ function goBack() {
       <div>
         <div class="text-gray-700 mb-2" style="font-size: 13px; font-weight: 500">เลือกวิธีการเติมเงิน</div>
 
-        <div class="rounded-xl border border-gray-200 overflow-hidden">
+        <div class="rounded-xl border border-gray-200 overflow-hidden bg-white">
           <template v-for="item in MENU" :key="item.key">
             <button
-              class="w-full flex items-center gap-3 px-3 py-3 active:bg-gray-50"
+              class="w-full flex items-center gap-3 px-3 py-3 bg-white active:bg-gray-50"
               @click="selectItem(item.key)"
             >
               <div

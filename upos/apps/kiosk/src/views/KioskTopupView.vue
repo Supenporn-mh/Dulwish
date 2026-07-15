@@ -124,7 +124,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="w-screen h-screen overflow-hidden flex flex-col bg-white">
+  <div class="w-screen h-screen overflow-hidden flex flex-col" style="background: #F0F2F5">
     <!-- Top bar -->
     <div class="flex items-center justify-center px-5 pt-5 pb-3 flex-shrink-0">
       <h1 class="font-bold" style="font-size: 16px; color: #1264E3">เติมเงิน</h1>

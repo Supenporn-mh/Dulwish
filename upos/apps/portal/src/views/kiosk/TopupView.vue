@@ -121,7 +121,7 @@ if (!user.value) router.replace('/kiosk/idle')
 </script>
 
 <template>
-  <div class="w-full h-full flex flex-col overflow-y-auto" style="background: var(--color-bg-page)">
+  <div class="w-full h-full flex flex-col overflow-y-auto" style="background: var(--color-bg-secondary)">
 
     <!-- Top bar -->
     <div class="flex items-center justify-center px-5 pt-5 pb-3 flex-shrink-0">

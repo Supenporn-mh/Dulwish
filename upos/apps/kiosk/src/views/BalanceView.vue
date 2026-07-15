@@ -39,7 +39,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="w-screen h-screen overflow-hidden flex flex-col bg-white">
+  <div class="w-screen h-screen overflow-hidden flex flex-col" style="background: #F0F2F5">
     <!-- Top bar -->
     <div class="flex items-center justify-center px-5 pt-5 pb-3 flex-shrink-0">
       <h1 class="font-bold text-gray-900" style="font-size: 16px">ประวัติการทำรายการ</h1>
@@ -61,7 +61,7 @@ onMounted(() => {
         ไม่มีรายการ
       </div>
 
-      <div v-else class="rounded-xl overflow-hidden" style="border: 0.5px solid #E0E0E0">
+      <div v-else class="rounded-xl overflow-hidden bg-white" style="border: 0.5px solid #E0E0E0">
         <div
           v-for="(tx, idx) in transactions"
           :key="tx.id"
