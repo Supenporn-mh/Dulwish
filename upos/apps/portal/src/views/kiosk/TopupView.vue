@@ -153,7 +153,7 @@ if (!user.value) router.replace('/kiosk/idle')
     </div>
 
     <!-- Profile card -->
-    <div class="px-5 pb-4 flex-shrink-0">
+    <div class="px-5 pt-4 pb-4 flex-shrink-0">
       <UserCard
         :name="user?.name ?? ''"
         :member-code="user?.uid ?? ''"

@@ -67,7 +67,7 @@ onMounted(() => {
     </div>
 
     <!-- Body -->
-    <div class="flex-1 overflow-y-auto px-5 flex flex-col gap-3 min-h-0">
+    <div class="flex-1 overflow-y-auto px-5 pt-4 flex flex-col gap-3 min-h-0">
       <UserCard
         :name="displayName"
         :member-code="user?.id ?? ''"

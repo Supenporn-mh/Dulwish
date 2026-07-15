@@ -150,7 +150,7 @@ onUnmounted(() => {
 
     <!-- ═ Screen 4: Amount entry ═ -->
     <template v-if="phase === 'amount'">
-      <div class="flex-1 overflow-y-auto px-3.5 flex flex-col gap-2.5 min-h-0">
+      <div class="flex-1 overflow-y-auto px-3.5 pt-4 flex flex-col gap-2.5 min-h-0">
         <UserCard
           :name="displayName"
           :member-code="user?.id ?? ''"
@@ -203,7 +203,7 @@ onUnmounted(() => {
 
     <!-- ═ Screen 3: QR scan ═ -->
     <template v-else-if="phase === 'qr'">
-      <div class="flex-1 overflow-y-auto px-5 flex flex-col gap-3 min-h-0">
+      <div class="flex-1 overflow-y-auto px-5 pt-4 flex flex-col gap-3 min-h-0">
         <UserCard
           :name="displayName"
           :member-code="user?.id ?? ''"
@@ -251,7 +251,7 @@ onUnmounted(() => {
 
     <!-- ═ Screen 5: Success ═ -->
     <template v-else-if="phase === 'success'">
-      <div class="flex-1 overflow-y-auto px-5 flex flex-col gap-3 min-h-0">
+      <div class="flex-1 overflow-y-auto px-5 pt-4 flex flex-col gap-3 min-h-0">
         <UserCard
           :name="displayName"
           :member-code="user?.id ?? ''"
