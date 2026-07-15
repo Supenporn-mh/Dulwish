@@ -18,7 +18,7 @@ function close() {
     <div class="text-center" style="font-size: 10px; color: var(--color-text-secondary)">กรุณารับเงินคืน และติดต่อผู้ดูแลระบบ</div>
 
     <div class="w-full max-w-xs mt-2">
-      <button class="btn-lg btn-secondary w-full" @click="close">ปิด</button>
+      <button class="btn-lg btn-secondary w-full" style="background: #fff" @click="close">ปิด</button>
     </div>
   </div>
 </template>

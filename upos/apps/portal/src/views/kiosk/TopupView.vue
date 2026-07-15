@@ -171,7 +171,7 @@ if (!user.value) router.replace('/kiosk/idle')
         </template>
       </div>
 
-      <button @click="goBack" class="btn-lg btn-secondary w-full mt-4">
+      <button @click="goBack" class="btn-lg btn-secondary w-full mt-4" style="background: #fff">
         <i class="ti ti-chevron-left" style="font-size: 14px" />
         ย้อนกลับ
       </button>
@@ -294,6 +294,11 @@ if (!user.value) router.replace('/kiosk/idle')
         <button style="font-size: 10px; color: var(--color-danger); text-decoration: underline" :disabled="isProcessing" @click="simulateNetworkError">จำลอง: ไม่มีอินเทอร์เน็ต</button>
         <button style="font-size: 10px; color: var(--color-danger); text-decoration: underline" :disabled="isProcessing" @click="simulateServiceError">จำลอง: 503</button>
       </div>
+
+      <button @click="goBack" class="btn-lg btn-secondary w-full" style="background: #fff">
+        <i class="ti ti-chevron-left" style="font-size: 14px" />
+        ย้อนกลับ
+      </button>
     </div>
 
     <!-- ══ SUCCESS (Screen 5) ══════════════════════════════════════════ -->

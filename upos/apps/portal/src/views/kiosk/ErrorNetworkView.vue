@@ -23,7 +23,7 @@ function close() {
 
     <div class="w-full max-w-xs flex flex-col gap-2 mt-2">
       <button class="btn-lg btn-primary w-full" @click="retry">ลองอีกครั้ง</button>
-      <button class="btn-lg btn-secondary w-full" @click="close">ปิด</button>
+      <button class="btn-lg btn-secondary w-full" style="background: #fff" @click="close">ปิด</button>
     </div>
   </div>
 </template>

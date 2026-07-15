@@ -81,7 +81,7 @@ function goBack() {
 
     <!-- Bottom -->
     <div class="flex-shrink-0 flex flex-col gap-[5px] px-5 pb-4 pt-2">
-      <button class="btn-lg btn-secondary w-full" @click="goBack">
+      <button class="btn-lg btn-secondary w-full" style="background: #fff" @click="goBack">
         <i class="ti ti-chevron-left" style="font-size: 14px" />
         ย้อนกลับ
       </button>
