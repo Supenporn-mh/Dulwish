@@ -7,6 +7,13 @@ export interface KioskUser {
   grade: string
   classRoom: string
   role: 'student' | 'teacher' | 'staff'
+  roleLabel?: string
+}
+
+const ROLE_LABEL_FALLBACK: Record<string, string> = {
+  student: 'นักเรียน',
+  teacher: 'ครู',
+  staff: 'เจ้าหน้าที่',
 }
 
 export interface KioskWallet {
@@ -20,6 +27,7 @@ const MOCK_STUDENT: KioskUser = {
   grade: 'K1',
   classRoom: 'A',
   role: 'student',
+  roleLabel: ROLE_LABEL_FALLBACK.student,
 }
 
 const MOCK_WALLET: KioskWallet = {
@@ -33,12 +41,14 @@ const MOCK_TEACHER: KioskUser = {
   grade: '-',
   classRoom: '-',
   role: 'teacher',
+  roleLabel: ROLE_LABEL_FALLBACK.teacher,
 }
 
 export const useKioskStore = defineStore('kiosk', () => {
   const currentUser = ref<KioskUser | null>(null)
   const wallet = ref<KioskWallet | null>(null)
   const error = ref('')
+  const selectedMethod = ref<'promptpay' | 'alipay'>('promptpay')
 
   async function readCard(uid: string): Promise<boolean> {
     error.value = ''
@@ -77,6 +87,9 @@ export const useKioskStore = defineStore('kiosk', () => {
         error.value = 'ไม่พบข้อมูลบัตร'
         return false
       }
+      if (!currentUser.value.roleLabel) {
+        currentUser.value.roleLabel = data.user?.role_label || ROLE_LABEL_FALLBACK[currentUser.value.role] || currentUser.value.role
+      }
       return true
     } catch {
       // Network error — use demo fallback
@@ -98,5 +111,5 @@ export const useKioskStore = defineStore('kiosk', () => {
     }
   }
 
-  return { currentUser, wallet, error, readCard, clearSession, updateBalance }
+  return { currentUser, wallet, error, selectedMethod, readCard, clearSession, updateBalance }
 })

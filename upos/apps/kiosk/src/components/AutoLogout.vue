@@ -43,9 +43,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="fixed bottom-0 left-0 right-0 z-50">
+  <div class="w-full flex-shrink-0">
     <!-- Progress bar -->
-    <div class="relative h-3 bg-white/20">
+    <div class="relative h-1 bg-gray-200">
       <div
         class="h-full transition-all duration-1000 ease-linear"
         :style="{
@@ -56,20 +56,21 @@ onUnmounted(() => {
     </div>
 
     <!-- Countdown label -->
-    <div class="flex items-center justify-center gap-3 bg-black/30 backdrop-blur-sm py-3 px-6">
-      <span class="text-white/70 text-kiosk-sm font-medium">
+    <div class="flex items-center justify-center gap-3 bg-white border-t border-gray-100 py-2 px-6">
+      <span class="text-gray-500" style="font-size: 11px; font-weight: 500">
         กำลังออกจากระบบใน
       </span>
       <span
-        class="font-bold text-kiosk-base tabular-nums"
+        class="font-bold tabular-nums"
+        style="font-size: 12px"
         :style="{ color: progressColor }"
       >
         {{ store.autoLogoutSeconds }} วินาที
       </span>
 
       <button
-        class="ml-6 px-5 py-1.5 rounded-full border-2 border-white/50 text-white text-kiosk-sm
-               hover:bg-white/20 active:bg-white/30 transition-colors"
+        class="ml-6 px-4 py-1 rounded-full border text-gray-600 active:bg-gray-100 transition-colors"
+        style="font-size: 11px; border-color: #D1D5DB"
         @click="handleActivity"
       >
         ยังอยู่นะ

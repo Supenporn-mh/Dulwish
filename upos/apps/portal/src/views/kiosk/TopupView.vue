@@ -2,23 +2,16 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useKioskStore } from '@/stores/kiosk'
-import UserProfileCard from '@/components/UserProfileCard.vue'
-import {
-  PhQrCode, PhClockCounterClockwise, PhCaretRight,
-  PhCheckCircle, PhWarningCircle, PhArrowLeft, PhArrowsClockwise,
-} from '@phosphor-icons/vue'
+import UserCard from './UserCard.vue'
 
 const router = useRouter()
 const store  = useKioskStore()
 
-type Phase     = 'method' | 'amount' | 'qr' | 'success'
-type ErrorType = 'service' | 'network' | null
+type Phase = 'method' | 'amount' | 'qr' | 'success'
 
 const phase          = ref<Phase>('method')
 const inputStr       = ref('0')
-const selectedMethod = ref('promptpay')
 const isProcessing   = ref(false)
-const errorType      = ref<ErrorType>(null)
 const successAt      = ref<Date | null>(null)
 const paidAmount     = ref(0)
 const qrCountdown    = ref(300)
@@ -43,7 +36,7 @@ const qrExpired = computed(() => qrCountdown.value <= 0)
 
 // ── Methods ───────────────────────────────────────────────────────────────
 const methodLabel = computed(() =>
-  selectedMethod.value === 'promptpay' ? 'PromptPay' : selectedMethod.value
+  store.selectedMethod === 'promptpay' ? 'พร้อมเพย์' : 'Alipay'
 )
 
 // ── Numpad ────────────────────────────────────────────────────────────────
@@ -62,12 +55,14 @@ function goBack() {
   if (qrTimer) clearInterval(qrTimer)
   if (phase.value === 'amount') { phase.value = 'method'; inputStr.value = '0'; return }
   if (phase.value === 'qr')    { phase.value = 'amount'; return }
-  router.push('/kiosk/home')
+  store.clearSession()
+  router.push('/kiosk/idle')
 }
 
-function selectMethod(id: string) {
-  if (id === 'history') { router.push('/kiosk/balance'); return }
-  selectedMethod.value = id
+function selectItem(id: string) {
+  if (id === 'history')  { router.push('/kiosk/balance');  return }
+  if (id === 'feedback') { router.push('/kiosk/feedback'); return }
+  store.selectedMethod = id as 'promptpay' | 'alipay'
   phase.value = 'amount'
 }
 
@@ -97,8 +92,21 @@ async function simulatePayment() {
   phase.value        = 'success'
 }
 
-function dismissError()  { errorType.value = null }
-function retryPayment()  { errorType.value = null; isProcessing.value = false }
+function simulateNetworkError() {
+  if (qrTimer) clearInterval(qrTimer)
+  router.push('/kiosk/error/network')
+}
+
+function simulateServiceError() {
+  if (qrTimer) clearInterval(qrTimer)
+  router.push('/kiosk/error/503')
+}
+
+function backToMethod() {
+  inputStr.value = '0'
+  phase.value = 'method'
+  router.push('/kiosk/topup')
+}
 
 const formattedSuccess = computed(() => {
   if (!successAt.value) return ''
@@ -113,90 +121,71 @@ if (!user.value) router.replace('/kiosk/idle')
 </script>
 
 <template>
-  <div class="w-full min-h-full flex flex-col overflow-y-auto" style="background: var(--color-bg-page)">
+  <div class="w-full h-full flex flex-col overflow-y-auto" style="background: var(--color-bg-page)">
 
-    <!-- Navbar -->
-    <header class="relative flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
-      <button
-        v-if="phase !== 'success'"
-        @click="goBack"
-        class="flex items-center gap-1 text-[14px] font-medium z-10"
-        style="color: var(--color-primary); background: none; border: none; cursor: pointer;"
-      >
-        <PhArrowLeft :size="18" weight="bold" />
-        กลับ
-      </button>
-      <div v-else class="w-10" />
-      <h1 class="text-heading-lg font-semibold absolute left-1/2 -translate-x-1/2"
-          style="color: var(--color-text-primary)">เติมเงิน</h1>
-      <div class="w-10" />
-    </header>
+    <!-- Top bar -->
+    <div class="flex items-center justify-center px-5 pt-5 pb-3 flex-shrink-0">
+      <h1 class="font-bold" style="font-size: 16px; color: var(--color-primary)">เติมเงิน</h1>
+    </div>
 
     <!-- Profile card -->
     <div class="px-5 pb-4 flex-shrink-0">
-      <UserProfileCard
+      <UserCard
         :name="user?.name ?? ''"
-        :uid="user?.uid ?? ''"
-        :role="user?.role ?? 'student'"
-        :balance="wallet?.balance"
-        :grade="user?.grade"
-        :class-name="user?.classRoom"
+        :member-code="user?.uid ?? ''"
+        :balance="wallet?.balance ?? 0"
+        :role-label="user?.roleLabel ?? ''"
         :updated-at="new Date()"
+        :compact="phase === 'amount' || phase === 'success'"
       />
     </div>
 
-    <!-- ══ METHOD ══════════════════════════════════════════════════════ -->
+    <!-- ══ METHOD (Screen 2) ══════════════════════════════════════════ -->
     <div v-if="phase === 'method'" class="flex-1 px-5 pb-8">
-      <h2 class="text-heading-xl mb-5" style="color: var(--color-text-primary)">เลือกวิธีการเติมเงิน</h2>
+      <h2 class="mb-3" style="font-size: 13px; font-weight: 500; color: var(--color-text-primary)">เลือกวิธีการเติมเงิน</h2>
 
-      <div class="flex flex-col gap-3">
-        <!-- PromptPay -->
-        <button
-          @click="selectMethod('promptpay')"
-          class="flex items-center gap-4 px-4 py-[14px] rounded-[14px] active:scale-[0.98] transition-transform"
-          style="background: var(--color-bg-surface); border: 1.5px solid var(--color-border-tertiary); cursor: pointer; text-align: left;"
-        >
-          <div class="w-11 h-11 rounded-[10px] flex items-center justify-center flex-shrink-0"
-               style="background: var(--color-success-bg)">
-            <PhQrCode :size="22" weight="fill" style="color: var(--color-success)" />
-          </div>
-          <div class="flex-1">
-            <p class="text-[16px] font-semibold" style="color: var(--color-text-primary)">PromptPay</p>
-            <p class="text-[12px]" style="color: var(--color-text-secondary)">สแกน QR จ่ายได้เลย</p>
-          </div>
-          <PhCaretRight :size="16" weight="bold" style="color: var(--color-border-secondary)" />
-        </button>
-
-        <!-- History -->
-        <button
-          @click="selectMethod('history')"
-          class="flex items-center gap-4 px-4 py-[14px] rounded-[14px] active:scale-[0.98] transition-transform"
-          style="background: var(--color-bg-surface); border: 1.5px solid var(--color-border-tertiary); cursor: pointer; text-align: left;"
-        >
-          <div class="w-11 h-11 rounded-[10px] flex items-center justify-center flex-shrink-0"
-               style="background: var(--color-primary-tint)">
-            <PhClockCounterClockwise :size="22" weight="fill" style="color: var(--color-primary)" />
-          </div>
-          <div class="flex-1">
-            <p class="text-[16px] font-semibold" style="color: var(--color-text-primary)">ประวัติการทำรายการ</p>
-            <p class="text-[12px]" style="color: var(--color-text-secondary)">ดูรายการเติมเงินย้อนหลัง</p>
-          </div>
-          <PhCaretRight :size="16" weight="bold" style="color: var(--color-border-secondary)" />
-        </button>
+      <div class="flex flex-col" style="border-radius: var(--radius-lg); border: 1px solid var(--color-border-tertiary); overflow: hidden">
+        <template v-for="(item, idx) in [
+          { id: 'promptpay', label: 'พร้อมเพย์', icon: 'ti-qrcode' },
+          { id: 'alipay',    label: 'Alipay',    icon: 'ti-credit-card' },
+          { id: 'history',   label: 'ประวัติการทำรายการ', icon: 'ti-receipt' },
+          { id: 'feedback',  label: 'ส่งความเห็น', icon: 'ti-mood-smile' },
+        ]" :key="item.id">
+          <button
+            @click="selectItem(item.id)"
+            class="flex items-center gap-3 px-3 py-3 active:scale-[0.99] transition-transform"
+            style="background: var(--color-bg-surface); cursor: pointer; text-align: left"
+          >
+            <div
+              class="flex-shrink-0 flex items-center justify-center"
+              style="width: 28px; height: 28px; border-radius: 8px; background: var(--color-primary-tint)"
+            >
+              <i :class="`ti ${item.icon}`" style="font-size: 15px; color: var(--color-primary)" />
+            </div>
+            <div class="flex-1" style="font-size: 12px; font-weight: 500; color: var(--color-text-primary)">
+              {{ item.label }}
+            </div>
+            <i class="ti ti-chevron-right" style="font-size: 14px; color: var(--color-text-tertiary)" />
+          </button>
+          <div v-if="idx < 3" style="height: 0.5px; background: var(--color-border-tertiary)" />
+        </template>
       </div>
+
+      <button @click="goBack" class="btn-lg btn-secondary w-full mt-4">
+        <i class="ti ti-chevron-left" style="font-size: 14px" />
+        ย้อนกลับ
+      </button>
     </div>
 
-    <!-- ══ AMOUNT ══════════════════════════════════════════════════════ -->
+    <!-- ══ AMOUNT (Screen 4) ══════════════════════════════════════════ -->
     <div v-else-if="phase === 'amount'" class="flex-1 flex flex-col pb-4">
 
       <!-- Display -->
-      <div class="mx-5 mb-2 rounded-[14px] px-5 py-4 flex items-center justify-between"
-           style="background: var(--color-bg-secondary)">
-        <span class="text-[40px] font-bold tabular-nums leading-none"
-              style="color: var(--color-text-primary)">{{ displayAmount }}</span>
-        <span class="text-[22px] font-medium" style="color: var(--color-text-tertiary)">฿</span>
+      <div class="mx-5 mb-2 flex items-center justify-between px-5 py-4" style="border-radius: 8px; border: 0.5px solid var(--color-border-tertiary); background: var(--color-bg-surface)">
+        <span class="font-bold tabular-nums leading-none" :style="numericAmount > 0 ? 'font-size: 22px; color: var(--color-primary)' : 'font-size: 22px; color: var(--color-text-tertiary)'">{{ displayAmount }}</span>
+        <span style="font-size: 12px; color: var(--color-text-tertiary)">฿</span>
       </div>
-      <p class="px-5 text-[12px] mb-3" style="color: var(--color-text-tertiary)">
+      <p class="px-5 mb-3" style="font-size: 9px; color: var(--color-text-tertiary)">
         เติมเงินสูงสุด 5,000 บาท / ครั้ง
       </p>
 
@@ -206,28 +195,27 @@ if (!user.value) router.replace('/kiosk/idle')
           v-for="q in QUICK"
           :key="q"
           @click="setQuick(q)"
-          class="flex-shrink-0 px-4 h-9 rounded-full text-[14px] font-semibold transition-colors"
+          class="flex-shrink-0 px-4 h-9 rounded-full transition-colors"
+          style="font-size: 13px; font-weight: 600"
           :style="numericAmount === q
-            ? 'background: var(--color-primary); color: #fff; border: 1.5px solid var(--color-primary)'
-            : 'background: transparent; color: var(--color-primary); border: 1.5px solid var(--color-primary)'"
+            ? 'background: var(--color-primary); color: #fff; border: 1px solid var(--color-primary)'
+            : 'background: transparent; color: var(--color-primary); border: 1px solid var(--color-primary)'"
         >{{ q }}</button>
       </div>
 
       <!-- Numpad -->
-      <div class="flex-1 mx-5 rounded-[14px] overflow-hidden"
-           style="background: var(--color-bg-surface); border: 0.5px solid var(--color-border-tertiary); min-height: 240px;">
+      <div class="flex-1 mx-5 overflow-hidden" style="border-radius: 8px; background: var(--color-bg-surface); border: 0.5px solid var(--color-border-tertiary); min-height: 200px">
         <template v-for="(row, ri) in [['7','8','9'],['4','5','6'],['1','2','3'],['0','00','C']]" :key="ri">
-          <div class="flex"
-               :style="ri > 0 ? 'border-top: 0.5px solid var(--color-border-tertiary)' : ''">
+          <div class="flex" :style="ri > 0 ? 'border-top: 0.5px solid var(--color-border-tertiary)' : ''">
             <button
               v-for="(key, ki) in row"
               :key="key"
               @click="numpadPress(key)"
-              class="flex-1 flex items-center justify-center text-[26px] font-medium py-4 transition-opacity active:opacity-50"
+              class="flex-1 flex items-center justify-center py-[11px] transition-opacity active:opacity-50"
               :style="[
                 ki > 0 ? 'border-left: 0.5px solid var(--color-border-tertiary)' : '',
                 key === 'C' ? 'color: var(--color-danger)' : 'color: var(--color-text-primary)',
-                'background: transparent; border-top: none; border-bottom: none; cursor: pointer;'
+                'font-size: 17px; font-weight: 500; background: transparent; cursor: pointer;'
               ].join(';')"
             >{{ key }}</button>
           </div>
@@ -238,16 +226,17 @@ if (!user.value) router.replace('/kiosk/idle')
       <div class="flex items-center gap-3 px-5 pt-4">
         <button
           @click="goBack"
-          class="flex items-center gap-1 text-[14px] font-medium"
-          style="color: var(--color-primary); background: none; border: none; cursor: pointer;"
+          class="flex items-center gap-1"
+          style="font-size: 13px; font-weight: 500; color: var(--color-primary); background: none; border: none; cursor: pointer"
         >
-          <PhArrowLeft :size="16" weight="bold" />
-          กลับ
+          <i class="ti ti-chevron-left" style="font-size: 13px" />
+          ย้อนกลับ
         </button>
         <button
           @click="confirmAmount"
           :disabled="!canConfirm"
-          class="flex-1 h-[50px] rounded-full text-[16px] font-semibold transition-all"
+          class="flex-1 transition-all"
+          style="height: 44px; border-radius: 8px; font-size: 16px; font-weight: 500"
           :style="canConfirm
             ? 'background: var(--color-primary); color: #fff; border: none; cursor: pointer;'
             : 'background: var(--color-bg-secondary); color: var(--color-text-tertiary); border: none; cursor: not-allowed;'"
@@ -255,28 +244,36 @@ if (!user.value) router.replace('/kiosk/idle')
       </div>
     </div>
 
-    <!-- ══ QR ══════════════════════════════════════════════════════════ -->
+    <!-- ══ QR (Screen 3) ══════════════════════════════════════════════ -->
     <div v-else-if="phase === 'qr'" class="flex-1 flex flex-col px-5 pb-6 gap-4">
-      <div class="card flex flex-col items-center py-8 px-6 gap-5">
-        <div class="w-[200px] h-[200px] rounded-[12px] flex flex-col items-center justify-center gap-3"
-             style="border: 2px dashed var(--color-border-secondary); background: var(--color-bg-secondary)">
-          <PhQrCode :size="72" weight="thin" style="color: var(--color-text-tertiary)" />
-          <span class="text-[11px] font-medium" style="color: var(--color-text-tertiary)">SCAN QR CODE</span>
+      <div class="card flex flex-col items-center py-8 px-6 gap-3">
+        <div style="font-size: 12px; font-weight: 500; color: var(--color-text-primary)">สแกน QR Code เพื่อชำระเงิน</div>
+
+        <div
+          class="w-[100px] h-[100px] flex flex-col items-center justify-center"
+          style="border-radius: 8px; border: 2px solid var(--color-primary); background: #F8FAFF"
+        >
+          <i class="ti ti-qrcode" style="font-size: 48px; color: var(--color-primary)" />
         </div>
 
         <div class="text-center">
-          <p class="text-[13px]" style="color: var(--color-text-secondary)">จำนวนเงิน</p>
-          <p class="text-[38px] font-extrabold" style="color: var(--color-primary)">
-            ฿{{ numericAmount.toLocaleString() }}.00
+          <p style="font-size: 10px; color: var(--color-text-secondary)">สแกนด้วยพร้อมเพย์หรือแอปธนาคาร</p>
+          <p class="font-medium" style="font-size: 18px; color: var(--color-primary)">
+            ฿{{ numericAmount.toLocaleString() }}
           </p>
-          <p class="text-[12px] mt-1 flex items-center justify-center gap-1">
-            <template v-if="!qrExpired">
-              <PhArrowsClockwise :size="12" weight="bold" style="color: var(--color-text-tertiary)" />
-              <span style="color: var(--color-text-tertiary)">หมดอายุใน {{ qrMM }}:{{ qrSS }}</span>
-            </template>
-            <span v-else class="font-semibold" style="color: var(--color-danger)">QR หมดอายุ — กลับไปเลือกใหม่</span>
+          <p class="mt-1" style="font-size: 9px; color: var(--color-text-tertiary)">
+            <template v-if="!qrExpired">หมดอายุใน {{ qrMM }}:{{ qrSS }} นาที</template>
+            <span v-else style="font-weight: 600; color: var(--color-danger)">QR หมดอายุ — กลับไปเลือกใหม่</span>
           </p>
         </div>
+
+        <div class="w-full rounded-full overflow-hidden" style="height: 3px; background: var(--color-primary-tint)">
+          <div class="h-full rounded-full transition-all duration-1000 ease-linear" :style="`width: ${(qrCountdown / 300) * 100}%; background: var(--color-primary)`" />
+        </div>
+
+        <p style="font-size: 9px; color: var(--color-text-tertiary)">
+          {{ isProcessing ? 'กำลังดำเนินการ...' : 'รอการยืนยันจากธนาคาร...' }}
+        </p>
       </div>
 
       <button
@@ -291,95 +288,45 @@ if (!user.value) router.replace('/kiosk/idle')
         </span>
         <span v-else>จำลองการชำระเงิน</span>
       </button>
+
+      <!-- Demo triggers (no real payment gateway in this environment) -->
+      <div class="flex items-center justify-center gap-4">
+        <button style="font-size: 10px; color: var(--color-danger); text-decoration: underline" :disabled="isProcessing" @click="simulateNetworkError">จำลอง: ไม่มีอินเทอร์เน็ต</button>
+        <button style="font-size: 10px; color: var(--color-danger); text-decoration: underline" :disabled="isProcessing" @click="simulateServiceError">จำลอง: 503</button>
+      </div>
     </div>
 
-    <!-- ══ SUCCESS ══════════════════════════════════════════════════════ -->
+    <!-- ══ SUCCESS (Screen 5) ══════════════════════════════════════════ -->
     <div v-else-if="phase === 'success'" class="flex-1 flex flex-col px-5 pb-6 gap-4">
       <div class="card flex flex-col items-center py-10 px-6 gap-3">
-        <PhCheckCircle :size="72" weight="fill" style="color: var(--color-success)" />
+        <div class="rounded-full flex items-center justify-center" style="width: 48px; height: 48px; background: var(--color-success)">
+          <i class="ti ti-circle-check" style="font-size: 24px; color: #fff" />
+        </div>
 
-        <h2 class="text-heading-xl font-bold text-center" style="color: var(--color-text-primary)">
+        <h2 class="font-bold text-center" style="font-size: 16px; color: #0A4BAD">
           เติมเงินสำเร็จ
         </h2>
 
         <div class="w-full mt-2 space-y-2">
           <div class="flex justify-between items-baseline">
-            <span class="text-body-sm" style="color: var(--color-text-secondary)">วันที่และเวลาที่ทำรายการ:</span>
-            <span class="text-body-sm font-medium" style="color: var(--color-text-primary)">{{ formattedSuccess }}</span>
+            <span style="font-size: 10px; color: var(--color-text-secondary)">วันที่และเวลาที่ทำรายการ:</span>
+            <span class="font-medium" style="font-size: 10px; color: var(--color-text-primary)">{{ formattedSuccess }}</span>
           </div>
           <div class="flex justify-between items-baseline">
-            <span class="text-body-sm" style="color: var(--color-text-secondary)">วิธีการเติมเงิน:</span>
-            <span class="text-body-sm font-medium" style="color: var(--color-text-primary)">{{ methodLabel }}</span>
+            <span style="font-size: 10px; color: var(--color-text-secondary)">วิธีการเติมเงิน:</span>
+            <span class="font-medium" style="font-size: 10px; color: var(--color-text-primary)">{{ methodLabel }}</span>
           </div>
         </div>
 
-        <p class="text-[44px] font-extrabold mt-3" style="color: var(--color-success)">
+        <p class="font-extrabold mt-3" style="font-size: 22px; color: var(--color-success)">
           ฿{{ paidAmount.toLocaleString() }}.00
         </p>
       </div>
 
-      <button
-        @click="router.push('/kiosk/home')"
-        class="w-full h-[52px] rounded-full text-[16px] font-semibold"
-        style="background: var(--color-primary); color: #fff; border: none; cursor: pointer;"
-      >
-        กลับไปหน้าหลัก
+      <button @click="backToMethod" class="btn-lg btn-primary w-full">
+        กลับไปหน้าเติมเงิน
       </button>
     </div>
-
-    <!-- ══ ERROR MODAL ══════════════════════════════════════════════════ -->
-    <Teleport to="body">
-      <div
-        v-if="errorType"
-        class="fixed inset-0 z-50 flex items-center justify-center px-6"
-        style="background: rgba(0,0,0,0.45); backdrop-filter: blur(4px)"
-        @click.self="dismissError"
-      >
-        <div class="card w-full max-w-[340px] py-8 px-6 flex flex-col items-center gap-4 text-center">
-
-          <div class="w-16 h-16 rounded-full flex items-center justify-center"
-               style="background: var(--color-danger-bg)">
-            <PhWarningCircle :size="36" weight="fill" style="color: var(--color-danger)" />
-          </div>
-
-          <h2 class="text-heading-lg font-bold" style="color: var(--color-text-primary)">เกิดข้อผิดพลาด</h2>
-
-          <!-- 503 Service Error -->
-          <template v-if="errorType === 'service'">
-            <p class="text-body-md font-semibold" style="color: var(--color-danger)">503 Service Unavailable</p>
-            <p class="text-body-sm" style="color: var(--color-text-secondary)">
-              กรุณารับเงินคืน และติดต่อผู้ดูแลระบบ
-            </p>
-            <button
-              @click="dismissError"
-              class="w-full h-[48px] rounded-full text-[15px] font-semibold mt-1"
-              style="border: 1.5px solid var(--color-primary); color: var(--color-primary); background: transparent; cursor: pointer;"
-            >ปิด</button>
-          </template>
-
-          <!-- Network Error -->
-          <template v-else-if="errorType === 'network'">
-            <p class="text-body-md font-semibold" style="color: var(--color-danger)">ไม่สามารถเชื่อมต่ออินเทอร์เน็ตได้</p>
-            <p class="text-body-sm" style="color: var(--color-text-secondary)">
-              กรุณารับเงินคืน<br>และลองทำรายการใหม่อีกครั้ง
-            </p>
-            <div class="flex flex-col gap-2 w-full mt-1">
-              <button
-                @click="retryPayment"
-                class="w-full h-[48px] rounded-full text-[15px] font-semibold"
-                style="background: var(--color-primary); color: #fff; border: none; cursor: pointer;"
-              >ลองอีกครั้ง</button>
-              <button
-                @click="dismissError"
-                class="w-full h-[48px] rounded-full text-[15px] font-semibold"
-                style="border: 1.5px solid var(--color-primary); color: var(--color-primary); background: transparent; cursor: pointer;"
-              >ปิด</button>
-            </div>
-          </template>
-
-        </div>
-      </div>
-    </Teleport>
 
   </div>
 </template>

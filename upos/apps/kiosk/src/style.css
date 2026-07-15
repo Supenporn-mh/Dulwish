@@ -31,4 +31,30 @@
   .kiosk-card {
     @apply rounded-kiosk bg-white/10 backdrop-blur-sm border border-white/20 p-6;
   }
+
+  .btn-primary-full {
+    @apply w-full rounded-lg font-bold bg-brand-primary text-white border-none transition-all duration-150 active:scale-95 select-none;
+    height: 44px;
+  }
+
+  .btn-outline-full {
+    @apply w-full rounded-lg font-bold bg-white text-brand-primary transition-all duration-150 active:scale-95 select-none;
+    height: 44px;
+    border: 1.5px solid #1264E3;
+  }
+
+  .btn-confirm-disabled {
+    @apply flex-1 rounded-lg font-bold bg-[#DCDCDC] text-[#A0A0A0] cursor-not-allowed select-none;
+    height: 44px;
+  }
+
+  .btn-confirm-active {
+    @apply flex-1 rounded-lg font-bold bg-brand-primary text-white cursor-pointer transition-all duration-150 active:scale-95 select-none;
+    height: 44px;
+  }
+
+  .back-link {
+    @apply inline-flex items-center gap-1 text-brand-primary font-medium flex-shrink-0 select-none;
+    font-size: 13px;
+  }
 }

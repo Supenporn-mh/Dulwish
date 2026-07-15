@@ -34,6 +34,18 @@ const router = createRouter({
       component: () => import('@/views/FeedbackView.vue'),
       meta: { requiresAuth: false },
     },
+    {
+      path: '/error/network',
+      name: 'error-network',
+      component: () => import('@/views/ErrorNetworkView.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
+      path: '/error/503',
+      name: 'error-503',
+      component: () => import('@/views/ErrorServiceView.vue'),
+      meta: { requiresAuth: false },
+    },
   ],
 })
 

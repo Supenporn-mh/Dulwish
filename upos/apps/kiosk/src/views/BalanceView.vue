@@ -2,47 +2,35 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useKioskStore } from '@/stores/kiosk'
+import UserCard from '@/components/UserCard.vue'
 import AutoLogout from '@/components/AutoLogout.vue'
 
 const router = useRouter()
 const store = useKioskStore()
 
+const user = computed(() => store.currentUser)
 const wallet = computed(() => store.wallet)
 const transactions = computed(() => store.transactions)
 
-const formattedBalance = computed(() => {
-  const bal = wallet.value?.balance ?? 0
-  return bal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-})
+const displayName = computed(() => user.value?.nameTh || user.value?.name || 'ผู้ใช้')
 
 function formatAmount(amount: number): string {
-  const sign = amount >= 0 ? '+' : ''
-  return `${sign}฿${Math.abs(amount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const sign = amount >= 0 ? '+' : '-'
+  return `${sign}${Math.abs(amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`
 }
 
-function formatTime(iso: string): string {
+function formatDate(iso: string): string {
   try {
-    const d = new Date(iso)
-    return d.toLocaleString('th-TH', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return new Date(iso).toLocaleString('th-TH', {
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
     })
   } catch {
     return iso
   }
 }
 
-function typeIcon(type: string): string {
-  if (type === 'purchase') return '🛒'
-  if (type === 'topup') return '💰'
-  if (type === 'refund') return '↩️'
-  return '📄'
-}
-
-function printReceipt() {
-  window.print()
+function goBack() {
+  router.push('/home')
 }
 
 onMounted(() => {
@@ -51,96 +39,56 @@ onMounted(() => {
 </script>
 
 <template>
-  <div
-    class="w-screen h-screen overflow-hidden flex flex-col
-           bg-gradient-to-br from-dulwich-800 via-dulwich-700 to-dulwich-900"
-  >
-    <!-- Top accent bar -->
-    <div class="w-full h-2 bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-400 flex-shrink-0" />
-
-    <!-- Header -->
-    <div class="flex items-center gap-6 px-10 py-6 flex-shrink-0">
-      <button
-        class="w-16 h-16 rounded-full bg-white/10 border-2 border-white/30 flex items-center
-               justify-center text-white text-kiosk-xl hover:bg-white/20 active:scale-95
-               transition-all"
-        @click="router.push('/home')"
-      >
-        ←
-      </button>
-      <div>
-        <div class="text-white font-black text-kiosk-2xl">ประวัติรายการ</div>
-        <div class="text-white/60 text-kiosk-base">Transaction History</div>
-      </div>
+  <div class="w-screen h-screen overflow-hidden flex flex-col bg-white">
+    <!-- Top bar -->
+    <div class="flex items-center justify-center px-5 pt-5 pb-3 flex-shrink-0">
+      <h1 class="font-bold text-gray-900" style="font-size: 16px">ประวัติการทำรายการ</h1>
     </div>
 
-    <!-- Balance summary -->
-    <div class="px-10 flex-shrink-0">
-      <div class="rounded-kiosk bg-white/10 border border-white/20 p-6 flex items-center justify-between">
-        <div>
-          <div class="text-white/70 text-kiosk-base">ยอดเงินคงเหลือ</div>
-          <div class="text-white font-black tabular-nums" style="font-size: 4rem; line-height: 1;">
-            ฿{{ formattedBalance }}
-          </div>
-        </div>
-        <button
-          class="kiosk-btn-primary px-8 py-4"
-          @click="printReceipt"
-        >
-          🖨 พิมพ์ใบเสร็จ
-        </button>
-      </div>
-    </div>
+    <!-- Body -->
+    <div class="flex-1 overflow-y-auto px-5 flex flex-col gap-3 min-h-0">
+      <UserCard
+        :name="displayName"
+        :member-code="user?.id ?? ''"
+        :balance="wallet?.balance ?? 0"
+        :role-label="user?.roleLabel ?? ''"
+        :updated-at="new Date()"
+      />
 
-    <!-- Transactions list -->
-    <div class="flex-1 overflow-y-auto px-10 py-4 min-h-0">
-      <div
-        v-if="transactions.length === 0"
-        class="flex flex-col items-center justify-center h-full gap-4 text-white/50"
-      >
-        <div style="font-size: 4rem;">📭</div>
-        <div class="text-kiosk-lg">ไม่มีรายการ</div>
+      <div class="text-gray-500 text-center" style="font-size: 11px">รายการล่าสุด 10 รายการ</div>
+
+      <div v-if="transactions.length === 0" class="flex-1 flex items-center justify-center text-gray-400" style="font-size: 11px">
+        ไม่มีรายการ
       </div>
 
-      <div v-else class="flex flex-col gap-4">
+      <div v-else class="rounded-xl overflow-hidden" style="border: 0.5px solid #E0E0E0">
         <div
-          v-for="tx in transactions"
+          v-for="(tx, idx) in transactions"
           :key="tx.id"
-          class="flex items-center gap-5 rounded-kiosk border border-white/15
-                 p-5 transition-colors"
-          style="background: rgba(255,255,255,0.07)"
+          class="flex items-center justify-between px-3 py-3"
+          :style="idx < transactions.length - 1 ? 'border-bottom: 0.5px solid #E0E0E0' : ''"
         >
-          <!-- Type icon -->
+          <div class="min-w-0">
+            <div class="font-medium text-gray-900 truncate" style="font-size: 11px">{{ tx.description }}</div>
+            <div class="text-gray-400 mt-0.5" style="font-size: 9px">{{ formatDate(tx.createdAt) }}</div>
+          </div>
           <div
-            class="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 text-4xl
-                   border-2"
-            :class="tx.type === 'topup'
-              ? 'bg-green-500/20 border-green-400/40'
-              : tx.type === 'refund'
-                ? 'bg-blue-500/20 border-blue-400/40'
-                : 'bg-red-500/20 border-red-400/40'"
-          >
-            {{ typeIcon(tx.type) }}
-          </div>
-
-          <!-- Description -->
-          <div class="flex-1 min-w-0">
-            <div class="text-white font-bold text-kiosk-base truncate">{{ tx.description }}</div>
-            <div class="text-white/50 text-kiosk-sm">{{ formatTime(tx.createdAt) }}</div>
-          </div>
-
-          <!-- Amount -->
-          <div
-            class="font-black text-kiosk-lg tabular-nums flex-shrink-0"
-            :class="tx.amount >= 0 ? 'text-green-400' : 'text-red-400'"
-          >
-            {{ formatAmount(tx.amount) }}
-          </div>
+            class="font-medium flex-shrink-0"
+            :style="tx.amount >= 0 ? 'font-size: 11px; color: #03BA81' : 'font-size: 11px; color: #FF5252'"
+          >{{ formatAmount(tx.amount) }}</div>
         </div>
       </div>
     </div>
 
-    <!-- Auto logout bar -->
+    <!-- Bottom -->
+    <div class="flex-shrink-0 flex flex-col gap-[5px] px-5 pb-4 pt-2">
+      <button class="btn-outline-full flex items-center justify-center gap-1" @click="goBack">
+        <i class="ti ti-chevron-left" style="font-size: 14px" />
+        ย้อนกลับ
+      </button>
+      <div class="text-center text-gray-400" style="font-size: 9px">powered by UPOS</div>
+    </div>
+
     <AutoLogout />
   </div>
 </template>

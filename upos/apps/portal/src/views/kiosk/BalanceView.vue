@@ -2,16 +2,13 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useKioskStore } from '@/stores/kiosk'
+import UserCard from './UserCard.vue'
 
 const router = useRouter()
 const store = useKioskStore()
 
+const user = computed(() => store.currentUser)
 const wallet = computed(() => store.wallet)
-
-const balanceDisplay = computed(() => {
-  if (!wallet.value) return '฿0.00'
-  return `฿${wallet.value.balance.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`
-})
 
 interface TxItem {
   id: number
@@ -34,82 +31,61 @@ const transactions = ref<TxItem[]>([
   { id: 10, type: 'ซื้อขนม', amount: -35, date: '22 พ.ค. 10:00', positive: false },
 ])
 
-function goBack() {
-  router.push('/kiosk/home')
+function formatAmount(tx: TxItem): string {
+  const sign = tx.positive ? '+' : '-'
+  return `${sign}${Math.abs(tx.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`
 }
 
-function handlePrint() {
-  window.print()
+function goBack() {
+  router.push('/kiosk/topup')
 }
 </script>
 
 <template>
-  <div class="w-full h-full flex flex-col bg-[#F2F2F7] overflow-hidden">
+  <div class="w-full h-full flex flex-col overflow-hidden" style="background: var(--color-bg-page)">
     <!-- Top bar -->
-    <div class="bg-white flex items-center gap-3 px-4 pt-6 pb-4 flex-shrink-0">
-      <button @click="goBack" class="ios-btn-ghost flex items-center gap-1 text-[17px]">
-        <svg width="10" height="16" viewBox="0 0 10 16" fill="none">
-          <path d="M8.5 1L1.5 8l7 7" stroke="#1264E3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        กลับ
-      </button>
-      <h1 class="ios-navbar-title flex-1 text-center">ประวัติการใช้งาน</h1>
-      <!-- Spacer to balance back button -->
-      <div class="w-[60px]" />
+    <div class="flex items-center justify-center px-5 pt-5 pb-3 flex-shrink-0">
+      <h1 class="font-bold" style="font-size: 16px; color: var(--color-text-primary)">ประวัติการทำรายการ</h1>
     </div>
 
-    <!-- Balance card -->
-    <div class="ios-card mx-4 mt-4 p-6 text-center flex-shrink-0">
-      <p class="text-[15px] text-[#6E6E73]">ยอดเงิน</p>
-      <p class="text-[52px] font-black text-[#1264E3] leading-none mt-1 tabular-nums">
-        {{ balanceDisplay }}
-      </p>
-    </div>
+    <!-- Body -->
+    <div class="flex-1 overflow-y-auto px-5 flex flex-col gap-3 min-h-0">
+      <UserCard
+        :name="user?.name ?? ''"
+        :member-code="user?.uid ?? ''"
+        :balance="wallet?.balance ?? 0"
+        :role-label="user?.roleLabel ?? ''"
+        :updated-at="new Date()"
+      />
 
-    <!-- Section header -->
-    <div class="ios-section-header">ประวัติ 10 รายการ</div>
+      <div class="text-center" style="font-size: 11px; color: var(--color-text-secondary)">รายการล่าสุด 10 รายการ</div>
 
-    <!-- Transactions list -->
-    <div class="flex-1 overflow-y-auto pb-4">
-      <div class="ios-card mx-4">
+      <div class="overflow-hidden" style="border-radius: var(--radius-lg); border: 0.5px solid var(--color-border-tertiary)">
         <div
           v-for="(tx, idx) in transactions"
           :key="tx.id"
-          class="ios-list-row flex items-center gap-4"
-          :class="{ 'border-b-0': idx === transactions.length - 1 }"
+          class="flex items-center justify-between px-3 py-3"
+          :style="idx < transactions.length - 1 ? 'border-bottom: 0.5px solid var(--color-border-tertiary)' : ''"
         >
-          <!-- Colored dot -->
-          <div
-            class="w-3 h-3 rounded-full flex-shrink-0"
-            :class="tx.positive ? 'bg-[#34C759]' : 'bg-[#FF3B30]'"
-          />
-
-          <!-- Description + date -->
-          <div class="flex-1 min-w-0">
-            <p class="text-[17px] text-[#000000] font-medium truncate">{{ tx.type }}</p>
-            <p class="text-[13px] text-[#6E6E73] mt-0.5">{{ tx.date }}</p>
+          <div class="min-w-0">
+            <div class="font-medium truncate" style="font-size: 11px; color: var(--color-text-primary)">{{ tx.type }}</div>
+            <div class="mt-0.5" style="font-size: 9px; color: var(--color-text-tertiary)">{{ tx.date }}</div>
           </div>
-
-          <!-- Amount -->
-          <span
-            class="text-[17px] font-semibold tabular-nums flex-shrink-0"
-            :class="tx.positive ? 'text-[#34C759]' : 'text-[#FF3B30]'"
-          >
-            {{ tx.positive ? '+' : '' }}{{ tx.amount.toLocaleString('th-TH') }}
-          </span>
+          <div
+            class="font-medium flex-shrink-0"
+            :style="tx.positive ? 'font-size: 11px; color: var(--color-success)' : 'font-size: 11px; color: var(--color-danger)'"
+          >{{ formatAmount(tx) }}</div>
         </div>
       </div>
+    </div>
 
-      <!-- Print button -->
-      <button @click="handlePrint" class="ios-btn-secondary mx-4 mt-4 w-[calc(100%-32px)]">
-        🖨 พิมพ์ใบเสร็จ
+    <!-- Bottom -->
+    <div class="flex-shrink-0 flex flex-col gap-[5px] px-5 pb-4 pt-2">
+      <button class="btn-lg btn-secondary w-full" @click="goBack">
+        <i class="ti ti-chevron-left" style="font-size: 14px" />
+        ย้อนกลับ
       </button>
+      <div class="text-center" style="font-size: 9px; color: var(--color-text-tertiary)">powered by UPOS</div>
     </div>
   </div>
 </template>
-
-<style scoped>
-::-webkit-scrollbar {
-  display: none;
-}
-</style>

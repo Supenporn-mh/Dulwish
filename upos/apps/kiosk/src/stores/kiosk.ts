@@ -8,9 +8,16 @@ export interface KioskUser {
   name: string
   nameTh?: string
   role: 'student' | 'staff' | 'teacher'
+  roleLabel?: string
   grade?: string
   class?: string
   cardUid: string
+}
+
+const ROLE_LABEL_FALLBACK: Record<string, string> = {
+  student: 'นักเรียน',
+  teacher: 'ครู',
+  staff: 'เจ้าหน้าที่',
 }
 
 export interface Wallet {
@@ -36,6 +43,7 @@ export const useKioskStore = defineStore('kiosk', () => {
   const autoLogoutInterval = ref<ReturnType<typeof setInterval> | null>(null)
   const isLoading = ref(false)
   const error = ref<string | null>(null)
+  const selectedMethod = ref<'promptpay' | 'alipay'>('promptpay')
 
   function clearAutoLogout() {
     if (autoLogoutTimer.value) {
@@ -83,11 +91,13 @@ export const useKioskStore = defineStore('kiosk', () => {
       const res = await api.post('/pos/card-read', { uid })
       const data = res.data
 
+      const role = data.user?.role || data.role || 'student'
       currentUser.value = {
         id: data.user?.id || data.id || uid,
         name: data.user?.name || data.name || 'Unknown',
         nameTh: data.user?.nameTh || data.nameTh,
-        role: data.user?.role || data.role || 'student',
+        role,
+        roleLabel: data.user?.role_label || data.role_label || ROLE_LABEL_FALLBACK[role] || role,
         grade: data.user?.grade || data.grade,
         class: data.user?.class || data.class,
         cardUid: uid,
@@ -107,6 +117,7 @@ export const useKioskStore = defineStore('kiosk', () => {
           name: 'Somchai Jaidee',
           nameTh: 'สมชาย ใจดี',
           role: 'student',
+          roleLabel: ROLE_LABEL_FALLBACK.student,
           grade: 'K1',
           class: 'Sunflower',
           cardUid: uid,
@@ -119,6 +130,7 @@ export const useKioskStore = defineStore('kiosk', () => {
           name: 'Anna Smith',
           nameTh: 'แอนนา สมิธ',
           role: 'teacher',
+          roleLabel: ROLE_LABEL_FALLBACK.teacher,
           cardUid: uid,
         }
         wallet.value = { balance: 1250.00, currency: 'THB' }
@@ -179,6 +191,7 @@ export const useKioskStore = defineStore('kiosk', () => {
     autoLogoutSeconds,
     isLoading,
     error,
+    selectedMethod,
     readCard,
     clearSession,
     startAutoLogout,

@@ -7,6 +7,12 @@ export default {
   theme: {
     extend: {
       colors: {
+        brand: {
+          primary: '#1264E3',
+          tint:    '#EAF1FD',
+          success: '#03BA81',
+          danger:  '#FF5252',
+        },
         dulwich: {
           50:  '#e8eef8',
           100: '#c6d4ee',

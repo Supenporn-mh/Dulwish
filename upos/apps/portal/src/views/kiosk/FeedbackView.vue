@@ -49,12 +49,12 @@ async function submitFeedback() {
   phase.value = 'success'
 
   setTimeout(() => {
-    router.push('/kiosk/home')
+    router.push('/kiosk/topup')
   }, 3000)
 }
 
 function goBack() {
-  router.push('/kiosk/home')
+  router.push('/kiosk/topup')
 }
 </script>
 
