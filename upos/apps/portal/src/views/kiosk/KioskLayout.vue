@@ -62,8 +62,8 @@ onUnmounted(() => {
   <div class="w-screen h-screen overflow-hidden flex items-center justify-center" style="background: #D9DEE5">
     <div class="w-full max-w-[430px] h-full relative flex flex-col overflow-hidden" style="background: #D9DEE5">
       <!-- Main content area -->
-      <div class="flex-1 overflow-hidden p-3">
-        <div class="w-full h-full rounded-2xl overflow-hidden flex flex-col" style="background: #fff; border: 1px solid var(--color-border-tertiary); box-shadow: 0 1px 4px rgba(0,0,0,0.08)">
+      <div class="flex-1 overflow-hidden p-4">
+        <div class="w-full h-full rounded-[24px] overflow-hidden flex flex-col p-2" style="background: #fff; border: 1px solid #D8DCE3; box-shadow: 0 8px 24px rgba(20,30,50,0.14)">
           <RouterView />
         </div>
       </div>
