@@ -116,7 +116,7 @@ function backToMethod() {
 
 const breadcrumb = computed(() => {
   if (phase.value === 'method') return 'เลือกวิธีการชำระเงิน'
-  if (phase.value === 'amount') return 'กรอกจำนวน'
+  if (phase.value === 'amount') return ''
   if (phase.value === 'qr') return 'สแกน QR'
   return 'สำเร็จ'
 })
@@ -138,7 +138,7 @@ if (!user.value) router.replace('/kiosk/idle')
 
     <!-- Top bar -->
     <div class="relative flex items-center justify-center px-5 pt-4 pb-3 flex-shrink-0" style="background: var(--color-bg-surface); border-bottom: 0.5px solid #E0E0E5">
-      <span class="absolute" style="left: 20px; font-size: 11px; color: var(--color-text-tertiary)">{{ breadcrumb }}</span>
+      <span v-if="breadcrumb" class="absolute" style="left: 20px; font-size: 11px; color: var(--color-text-tertiary)">{{ breadcrumb }}</span>
       <h1 class="font-semibold" style="font-size: 15px; color: var(--color-primary)">เติมเงิน</h1>
     </div>
 
@@ -185,44 +185,44 @@ if (!user.value) router.replace('/kiosk/idle')
     </div>
 
     <!-- ══ AMOUNT (Screen 4) ══════════════════════════════════════════ -->
-    <div v-else-if="phase === 'amount'" class="flex-1 flex flex-col pb-4">
+    <div v-else-if="phase === 'amount'" class="flex-1 flex flex-col px-3.5 pb-2.5 gap-2.5">
 
       <!-- Display -->
-      <div class="mx-5 mb-2 flex items-center justify-between px-5 py-4" style="border-radius: 8px; border: 0.5px solid var(--color-border-tertiary); background: var(--color-bg-surface)">
-        <span class="font-bold tabular-nums leading-none" :style="numericAmount > 0 ? 'font-size: 22px; color: var(--color-primary)' : 'font-size: 22px; color: var(--color-text-tertiary)'">{{ displayAmount }}</span>
-        <span style="font-size: 12px; color: var(--color-text-tertiary)">฿</span>
+      <div class="flex items-center justify-between" style="border-radius: 10px; border: 0.5px solid #E0E0E5; background: var(--color-bg-surface); padding: 12px 14px">
+        <span class="font-medium" :style="numericAmount > 0 ? 'font-size: 32px; color: var(--color-primary)' : 'font-size: 32px; color: var(--color-text-tertiary)'">{{ displayAmount }}</span>
+        <span style="font-size: 14px; color: var(--color-text-tertiary); flex-shrink: 0">฿</span>
       </div>
-      <p class="px-5 mb-3" style="font-size: 9px; color: var(--color-text-tertiary)">
+      <div style="font-size: 10px; color: var(--color-text-tertiary)">
         เติมเงินสูงสุด 5,000 บาท / ครั้ง
-      </p>
+      </div>
 
       <!-- Quick chips -->
-      <div class="flex gap-2 px-5 mb-3 overflow-x-auto scrollbar-none flex-shrink-0">
+      <div class="flex gap-1.5 flex-wrap">
         <button
           v-for="q in QUICK"
           :key="q"
           @click="setQuick(q)"
-          class="flex-shrink-0 px-4 h-9 rounded-full transition-colors"
-          style="font-size: 13px; font-weight: 600"
+          class="rounded-full transition-colors"
+          style="font-size: 12px; font-weight: 600; padding: 5px 13px"
           :style="numericAmount === q
-            ? 'background: var(--color-primary); color: #fff; border: 1px solid var(--color-primary)'
-            : 'background: transparent; color: var(--color-primary); border: 1px solid var(--color-primary)'"
+            ? 'background: var(--color-primary); color: #fff; border: 1.5px solid var(--color-primary)'
+            : 'background: #fff; color: var(--color-primary); border: 1.5px solid var(--color-primary)'"
         >{{ q }}</button>
       </div>
 
       <!-- Numpad -->
-      <div class="flex-1 mx-5 overflow-hidden" style="border-radius: 8px; background: var(--color-bg-surface); border: 0.5px solid var(--color-border-tertiary); min-height: 200px">
+      <div class="flex-1 overflow-hidden" style="border-radius: 10px; background: var(--color-bg-surface); border: 0.5px solid #E0E0E5">
         <template v-for="(row, ri) in [['7','8','9'],['4','5','6'],['1','2','3'],['0','00','C']]" :key="ri">
-          <div class="flex" :style="ri > 0 ? 'border-top: 0.5px solid var(--color-border-tertiary)' : ''">
+          <div class="flex" :style="ri > 0 ? 'border-top: 0.5px solid #E0E0E5' : ''">
             <button
               v-for="(key, ki) in row"
               :key="key"
               @click="numpadPress(key)"
-              class="flex-1 flex items-center justify-center py-[11px] transition-opacity active:opacity-50"
+              class="flex-1 flex items-center justify-center transition-opacity active:opacity-50"
               :style="[
-                ki > 0 ? 'border-left: 0.5px solid var(--color-border-tertiary)' : '',
-                key === 'C' ? 'color: var(--color-danger)' : 'color: var(--color-text-primary)',
-                'font-size: 17px; font-weight: 500; background: transparent; cursor: pointer;'
+                ki > 0 ? 'border-left: 0.5px solid #E0E0E5' : '',
+                key === 'C' ? 'color: var(--color-danger); font-weight: 600' : 'color: var(--color-text-primary); font-weight: 500',
+                'font-size: 22px; padding: 16px; background: transparent; cursor: pointer;'
               ].join(';')"
             >{{ key }}</button>
           </div>
@@ -230,23 +230,23 @@ if (!user.value) router.replace('/kiosk/idle')
       </div>
 
       <!-- Bottom bar -->
-      <div class="flex items-center gap-3 px-5 pt-4">
+      <div class="flex items-center gap-2.5 pt-1">
         <button
           @click="goBack"
           class="flex items-center gap-1"
-          style="font-size: 13px; font-weight: 500; color: var(--color-primary); background: none; border: none; cursor: pointer"
+          style="font-size: 13px; font-weight: 600; color: var(--color-primary); background: none; border: none; cursor: pointer; flex-shrink: 0"
         >
-          <Icon name="chevronLeft" :size="14" color="var(--color-primary)" />
+          <Icon name="chevronLeft" :size="15" color="var(--color-primary)" />
           ย้อนกลับ
         </button>
         <button
           @click="confirmAmount"
           :disabled="!canConfirm"
           class="flex-1 transition-all"
-          style="height: 44px; border-radius: 8px; font-size: 16px; font-weight: 500"
+          style="height: 46px; border-radius: 8px; font-size: 15px; font-weight: 600"
           :style="canConfirm
             ? 'background: var(--color-primary); color: #fff; border: none; cursor: pointer;'
-            : 'background: var(--color-bg-secondary); color: var(--color-text-tertiary); border: none; cursor: not-allowed;'"
+            : 'background: #DCDCDC; color: #A0A0A0; border: none; cursor: not-allowed;'"
         >ยืนยัน</button>
       </div>
     </div>

@@ -44,17 +44,19 @@
   }
 
   .btn-confirm-disabled {
-    @apply flex-1 rounded-lg font-bold bg-[#DCDCDC] text-[#A0A0A0] cursor-not-allowed select-none;
-    height: 44px;
+    @apply flex-1 rounded-lg font-semibold bg-[#DCDCDC] text-[#A0A0A0] cursor-not-allowed select-none;
+    height: 46px;
+    font-size: 15px;
   }
 
   .btn-confirm-active {
-    @apply flex-1 rounded-lg font-bold bg-brand-primary text-white cursor-pointer transition-all duration-150 active:scale-95 select-none;
-    height: 44px;
+    @apply flex-1 rounded-lg font-semibold bg-brand-primary text-white cursor-pointer transition-all duration-150 active:scale-95 select-none;
+    height: 46px;
+    font-size: 15px;
   }
 
   .back-link {
-    @apply inline-flex items-center gap-1 text-brand-primary font-medium flex-shrink-0 select-none;
+    @apply inline-flex items-center gap-1 text-brand-primary font-semibold flex-shrink-0 select-none;
     font-size: 13px;
   }
 }

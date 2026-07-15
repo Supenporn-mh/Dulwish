@@ -22,9 +22,9 @@ const formattedTime = computed(() => {
 </script>
 
 <template>
-  <div class="user-card" :style="{ minHeight: compact ? 'auto' : '120px' }">
+  <div class="user-card" :class="{ compact }" :style="{ minHeight: compact ? 'auto' : '120px' }">
     <div class="uc-name">{{ name }}</div>
-    <div class="uc-lbl">ยอดเงินคงเหลือ (บาท)</div>
+    <div class="uc-lbl">{{ compact ? 'ยอดคงเหลือ' : 'ยอดเงินคงเหลือ (บาท)' }}</div>
     <div class="uc-amount">฿{{ formattedBalance }}</div>
 
     <template v-if="!compact">
@@ -70,6 +70,30 @@ const formattedTime = computed(() => {
   height: 90px;
   background: rgba(255, 255, 255, .04);
   border-radius: 50%;
+}
+.user-card.compact {
+  border-radius: 14px;
+  padding: 14px;
+}
+.user-card.compact::before {
+  right: -16px;
+  top: -16px;
+  width: 90px;
+  height: 90px;
+}
+.user-card.compact::after {
+  display: none;
+}
+.user-card.compact .uc-name {
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+.user-card.compact .uc-lbl {
+  margin-bottom: 4px;
+}
+.user-card.compact .uc-amount {
+  font-size: 24px;
+  margin-bottom: 0;
 }
 .uc-avatar {
   position: absolute;

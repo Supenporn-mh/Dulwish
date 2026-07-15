@@ -45,7 +45,7 @@ const qrSS = computed(() => String(qrCountdown.value % 60).padStart(2, '0'))
 const qrProgressPercent = computed(() => (qrCountdown.value / 300) * 100)
 
 const breadcrumb = computed(() => {
-  if (phase.value === 'amount') return 'กรอกจำนวน'
+  if (phase.value === 'amount') return ''
   if (phase.value === 'qr') return 'สแกน QR'
   return 'สำเร็จ'
 })
@@ -139,13 +139,13 @@ onUnmounted(() => {
   <div class="w-screen h-screen overflow-hidden flex flex-col" style="background: #F0F2F5">
     <!-- Top bar -->
     <div class="relative flex items-center justify-center px-5 pt-4 pb-3 flex-shrink-0 bg-white" style="border-bottom: 0.5px solid #E0E0E5">
-      <span class="absolute" style="left: 20px; font-size: 11px; color: #9A9AB0">{{ breadcrumb }}</span>
+      <span v-if="breadcrumb" class="absolute" style="left: 20px; font-size: 11px; color: #9A9AB0">{{ breadcrumb }}</span>
       <h1 class="font-semibold" style="font-size: 15px; color: #1264E3">เติมเงิน</h1>
     </div>
 
     <!-- ═ Screen 4: Amount entry ═ -->
     <template v-if="phase === 'amount'">
-      <div class="flex-1 overflow-y-auto px-5 flex flex-col gap-3 min-h-0">
+      <div class="flex-1 overflow-y-auto px-3.5 flex flex-col gap-2.5 min-h-0">
         <UserCard
           :name="displayName"
           :member-code="user?.id ?? ''"
@@ -154,41 +154,41 @@ onUnmounted(() => {
           compact
         />
 
-        <div class="flex items-center justify-between rounded-lg bg-white px-3 py-[10px]" style="border: 0.5px solid #E0E0E0">
+        <div class="flex items-center justify-between" style="border-radius: 10px; background: #fff; border: 0.5px solid #E0E0E5; padding: 12px 14px">
           <span
             class="font-medium"
-            :style="numericAmount > 0 ? 'font-size: 22px; color: #1264E3' : 'font-size: 22px; color: #A0A0A0'"
+            :style="numericAmount > 0 ? 'font-size: 32px; color: #1264E3' : 'font-size: 32px; color: #A0A0A0'"
           >{{ numericAmount > 0 ? displayAmount : '0.00' }}</span>
-          <span class="text-gray-400" style="font-size: 12px">฿</span>
+          <span class="text-gray-400" style="font-size: 14px; flex-shrink: 0">฿</span>
         </div>
-        <div class="text-gray-400" style="font-size: 9px">เติมเงินสูงสุด {{ MAX_AMOUNT.toLocaleString() }} บาท / ครั้ง</div>
+        <div class="text-gray-400" style="font-size: 10px">เติมเงินสูงสุด {{ MAX_AMOUNT.toLocaleString() }} บาท / ครั้ง</div>
 
-        <div class="flex gap-2 overflow-x-auto">
+        <div class="flex gap-1.5 flex-wrap">
           <button
             v-for="q in QUICK"
             :key="q"
-            class="flex-shrink-0 rounded-full bg-white text-brand-primary px-4 py-1"
-            style="border: 1px solid #1264E3; font-size: 13px"
+            class="rounded-full bg-white text-brand-primary"
+            style="border: 1.5px solid #1264E3; font-size: 12px; font-weight: 600; padding: 5px 13px"
             @click="setQuick(q)"
           >{{ q }}</button>
         </div>
 
-        <div class="rounded-lg bg-white overflow-hidden" style="border: 0.5px solid #E0E0E0">
-          <div v-for="(row, ri) in NUMPAD_ROWS" :key="ri" class="grid grid-cols-3" :style="ri > 0 ? 'border-top: 0.5px solid #E0E0E0' : ''">
+        <div class="flex-1 overflow-hidden" style="border-radius: 10px; background: #fff; border: 0.5px solid #E0E0E5">
+          <div v-for="(row, ri) in NUMPAD_ROWS" :key="ri" class="grid grid-cols-3" :style="ri > 0 ? 'border-top: 0.5px solid #E0E0E5' : ''">
             <button
               v-for="key in row"
               :key="key"
-              class="flex items-center justify-center py-[11px] active:bg-gray-50"
-              :style="key === 'C' ? 'font-size: 17px; font-weight: 500; color: #FF5252' : 'font-size: 17px; font-weight: 500; color: #1A1A1A'"
+              class="flex items-center justify-center active:bg-gray-50"
+              :style="key === 'C' ? 'font-size: 22px; font-weight: 600; color: #FF5252; padding: 16px' : 'font-size: 22px; font-weight: 500; color: #1A1A1A; padding: 16px'"
               @click="numpadPress(key)"
             >{{ key }}</button>
           </div>
         </div>
       </div>
 
-      <div class="flex-shrink-0 flex items-center gap-2 px-5 pb-4 pt-2">
+      <div class="flex-shrink-0 flex items-center gap-2.5 px-3.5 pb-4 pt-1">
         <button class="back-link" @click="goBackFromAmount">
-          <Icon name="chevronLeft" :size="13" color="#1264E3" />
+          <Icon name="chevronLeft" :size="15" color="#1264E3" />
           ย้อนกลับ
         </button>
         <button v-if="!canConfirm" class="btn-confirm-disabled" disabled>ยืนยัน</button>
