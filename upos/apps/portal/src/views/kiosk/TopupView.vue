@@ -36,9 +36,14 @@ const qrSS      = computed(() => String(qrCountdown.value % 60).padStart(2, '0')
 const qrExpired = computed(() => qrCountdown.value <= 0)
 
 // ── Methods ───────────────────────────────────────────────────────────────
-const methodLabel = computed(() =>
-  store.selectedMethod === 'promptpay' ? 'พร้อมเพย์' : 'Alipay'
-)
+const METHOD_LABELS: Record<string, string> = {
+  promptpay: 'พร้อมเพย์',
+  alipay: 'Alipay',
+  wechat: 'WeChat Pay',
+}
+const methodLabel = computed(() => METHOD_LABELS[store.selectedMethod] ?? store.selectedMethod)
+
+const FEEDBACK_FORM_URL = 'https://okontekconnect.sg.larksuite.com/share/base/form/shrlgI0kruWBrrAJOdGlQLpeiFc'
 
 // ── Numpad ────────────────────────────────────────────────────────────────
 function numpadPress(key: string) {
@@ -61,9 +66,9 @@ function goBack() {
 }
 
 function selectItem(id: string) {
-  if (id === 'history')  { router.push('/kiosk/balance');  return }
-  if (id === 'feedback') { router.push('/kiosk/feedback'); return }
-  store.selectedMethod = id as 'promptpay' | 'alipay'
+  if (id === 'history')  { router.push('/kiosk/balance'); return }
+  if (id === 'feedback') { window.open(FEEDBACK_FORM_URL, '_blank'); return }
+  store.selectedMethod = id as 'promptpay' | 'alipay' | 'wechat'
   phase.value = 'amount'
 }
 
@@ -110,7 +115,7 @@ function backToMethod() {
 }
 
 const breadcrumb = computed(() => {
-  if (phase.value === 'method') return 'เลือกวิธีเติมเงิน'
+  if (phase.value === 'method') return 'เลือกวิธีการชำระเงิน'
   if (phase.value === 'amount') return 'กรอกจำนวน'
   if (phase.value === 'qr') return 'สแกน QR'
   return 'สำเร็จ'
@@ -151,29 +156,15 @@ if (!user.value) router.replace('/kiosk/idle')
 
     <!-- ══ METHOD (Screen 2) ══════════════════════════════════════════ -->
     <div v-if="phase === 'method'" class="flex-1 px-5 pb-8">
-      <h2 class="mb-3" style="font-size: 13px; font-weight: 500; color: var(--color-text-primary)">เลือกวิธีการเติมเงิน</h2>
+      <h2 class="mb-3" style="font-size: 13px; font-weight: 500; color: var(--color-text-primary)">เลือกวิธีการชำระเงิน</h2>
 
       <div class="flex flex-col" style="gap: 8px">
         <template v-for="item in [
           { id: 'promptpay', label: 'พร้อมเพย์', icon: 'qrcode' },
           { id: 'alipay',    label: 'Alipay',    icon: 'card' },
-        ]" :key="item.id">
-          <button @click="selectItem(item.id)" class="menu-row">
-            <div class="m-icon">
-              <Icon :name="item.icon" :size="20" color="var(--color-primary)" />
-            </div>
-            <div class="flex-1" style="font-size: 14px; font-weight: 500; color: var(--color-text-primary)">
-              {{ item.label }}
-            </div>
-            <Icon name="chevronRight" :size="18" color="var(--color-text-tertiary)" />
-          </button>
-        </template>
-
-        <div style="height: 0.5px; background: #E0E0E5; margin: 2px 0" />
-
-        <template v-for="item in [
+          { id: 'wechat',    label: 'WeChat Pay', icon: 'wechat' },
           { id: 'history',   label: 'ประวัติการทำรายการ', icon: 'receipt' },
-          { id: 'feedback',  label: 'ส่งความเห็น', icon: 'smile' },
+          { id: 'feedback',  label: 'ประเมินความพึงพอใจ', icon: 'smile' },
         ]" :key="item.id">
           <button @click="selectItem(item.id)" class="menu-row">
             <div class="m-icon">

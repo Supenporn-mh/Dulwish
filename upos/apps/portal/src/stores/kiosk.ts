@@ -48,7 +48,7 @@ export const useKioskStore = defineStore('kiosk', () => {
   const currentUser = ref<KioskUser | null>(null)
   const wallet = ref<KioskWallet | null>(null)
   const error = ref('')
-  const selectedMethod = ref<'promptpay' | 'alipay'>('promptpay')
+  const selectedMethod = ref<'promptpay' | 'alipay' | 'wechat'>('promptpay')
 
   async function readCard(uid: string): Promise<boolean> {
     error.value = ''

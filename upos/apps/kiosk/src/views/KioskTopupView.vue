@@ -33,7 +33,12 @@ const numericAmount = computed(() => parseInt(inputStr.value || '0', 10))
 const displayAmount = computed(() => numericAmount.value.toLocaleString('th-TH', { minimumFractionDigits: 2 }))
 const canConfirm = computed(() => numericAmount.value >= MIN_AMOUNT && numericAmount.value <= MAX_AMOUNT)
 
-const methodLabel = computed(() => (store.selectedMethod === 'promptpay' ? 'พร้อมเพย์' : 'Alipay'))
+const METHOD_LABELS: Record<string, string> = {
+  promptpay: 'พร้อมเพย์',
+  alipay: 'Alipay',
+  wechat: 'WeChat Pay',
+}
+const methodLabel = computed(() => METHOD_LABELS[store.selectedMethod] ?? store.selectedMethod)
 
 const qrMM = computed(() => Math.floor(qrCountdown.value / 60))
 const qrSS = computed(() => String(qrCountdown.value % 60).padStart(2, '0'))

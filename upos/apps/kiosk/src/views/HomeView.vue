@@ -14,23 +14,24 @@ const wallet = computed(() => store.wallet)
 
 const displayName = computed(() => user.value?.nameTh || user.value?.name || 'ผู้ใช้')
 
-const PAY_METHODS = [
+const MENU_ITEMS = [
   { key: 'promptpay', label: 'พร้อมเพย์', icon: 'qrcode' },
   { key: 'alipay', label: 'Alipay', icon: 'card' },
-]
-const OTHER_ITEMS = [
+  { key: 'wechat', label: 'WeChat Pay', icon: 'wechat' },
   { key: 'history', label: 'ประวัติการทำรายการ', icon: 'receipt' },
-  { key: 'feedback', label: 'ส่งความเห็น', icon: 'smile' },
+  { key: 'feedback', label: 'ประเมินความพึงพอใจ', icon: 'smile' },
 ]
 
+const FEEDBACK_FORM_URL = 'https://okontekconnect.sg.larksuite.com/share/base/form/shrlgI0kruWBrrAJOdGlQLpeiFc'
+
 function selectItem(key: string) {
-  if (key === 'promptpay' || key === 'alipay') {
+  if (key === 'promptpay' || key === 'alipay' || key === 'wechat') {
     store.selectedMethod = key
     router.push('/topup')
   } else if (key === 'history') {
     router.push('/balance')
   } else if (key === 'feedback') {
-    router.push('/feedback')
+    window.open(FEEDBACK_FORM_URL, '_blank')
   }
 }
 
@@ -44,7 +45,7 @@ function goBack() {
   <div class="w-screen h-screen overflow-hidden flex flex-col" style="background: #F0F0F5">
     <!-- Top bar -->
     <div class="relative flex items-center justify-center px-5 pt-4 pb-3 flex-shrink-0 bg-white" style="border-bottom: 0.5px solid #E0E0E5">
-      <span class="absolute" style="left: 20px; font-size: 11px; color: #9A9AB0">เลือกวิธีเติมเงิน</span>
+      <span class="absolute" style="left: 20px; font-size: 11px; color: #9A9AB0">เลือกวิธีการชำระเงิน</span>
       <h1 class="font-semibold" style="font-size: 15px; color: #1264E3">เติมเงิน</h1>
     </div>
 
@@ -59,26 +60,11 @@ function goBack() {
       />
 
       <div>
-        <div class="mb-2" style="font-size: 13px; font-weight: 600; color: #1A1A2E">เลือกวิธีการเติมเงิน</div>
+        <div class="mb-2" style="font-size: 13px; font-weight: 600; color: #1A1A2E">เลือกวิธีการชำระเงิน</div>
 
         <div class="flex flex-col" style="gap: 8px">
           <button
-            v-for="item in PAY_METHODS"
-            :key="item.key"
-            class="menu-row"
-            @click="selectItem(item.key)"
-          >
-            <div class="m-icon">
-              <Icon :name="item.icon" :size="20" color="#1264E3" />
-            </div>
-            <div class="flex-1 text-left" style="font-size: 14px; font-weight: 500; color: #1A1A2E">{{ item.label }}</div>
-            <Icon name="chevronRight" :size="18" color="#9A9AB0" />
-          </button>
-
-          <div style="height: 0.5px; background: #E0E0E5; margin: 2px 0" />
-
-          <button
-            v-for="item in OTHER_ITEMS"
+            v-for="item in MENU_ITEMS"
             :key="item.key"
             class="menu-row"
             @click="selectItem(item.key)"

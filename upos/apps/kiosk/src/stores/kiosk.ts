@@ -43,7 +43,7 @@ export const useKioskStore = defineStore('kiosk', () => {
   const autoLogoutInterval = ref<ReturnType<typeof setInterval> | null>(null)
   const isLoading = ref(false)
   const error = ref<string | null>(null)
-  const selectedMethod = ref<'promptpay' | 'alipay'>('promptpay')
+  const selectedMethod = ref<'promptpay' | 'alipay' | 'wechat'>('promptpay')
 
   function clearAutoLogout() {
     if (autoLogoutTimer.value) {
