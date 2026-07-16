@@ -224,6 +224,22 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       wallet.balance += order.totalAmount
       wallet.version += 1
       await wallet.save()
+
+      const originalTxn = await Transaction.findById(order.transactionId).select('items').lean()
+
+      await Transaction.create({
+        refNo: genRefNo(),
+        walletId: wallet._id,
+        type: 'refund',
+        amount: order.totalAmount,
+        balanceAfter: wallet.balance,
+        channel: 'mobile_web',
+        paymentMethod: 'card_wallet',
+        status: 'success',
+        relatedOrderId: order._id,
+        note: body.reason,
+        items: originalTxn?.items ?? [],
+      })
     }
 
     order.status = 'cancelled'

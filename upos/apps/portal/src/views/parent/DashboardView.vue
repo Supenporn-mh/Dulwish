@@ -19,7 +19,7 @@ const notifStore  = useNotificationStore()
 
 interface Transaction {
   id?: string; _id?: string
-  type: 'topup' | 'purchase' | 'buffet'
+  type: 'topup' | 'purchase' | 'buffet' | 'refund'
   description: string
   amount: number
   createdAt: string
@@ -70,6 +70,23 @@ const quickActions = computed(() => [
   { label: locale.t('ประวัติ', 'History'),         icon: PhReceipt,    color: '#FFF3E0', iconColor: '#FF9800', path: '/parent/history'  },
   { label: locale.t('แจ้งเตือน', 'Notifications'), icon: PhBell,      color: '#EEEDFE', iconColor: '#3C3489', path: null, isNotif: true },
 ])
+
+const BOOKING_STATUS_LABEL: Record<string, { th: string; en: string }> = {
+  confirmed:       { th: 'ยืนยันแล้ว',  en: 'Confirmed' },
+  cancelled:       { th: 'ยกเลิกแล้ว',  en: 'Cancelled' },
+  redeemed:        { th: 'รับแล้ว',     en: 'Redeemed' },
+  expired:         { th: 'หมดเวลา',     en: 'Expired' },
+  pending_payment: { th: 'รอชำระเงิน',  en: 'Pending Payment' },
+}
+function bookingStatusLabel(status: string): string {
+  const entry = BOOKING_STATUS_LABEL[status] ?? BOOKING_STATUS_LABEL.confirmed
+  return locale.lang === 'th' ? entry.th : entry.en
+}
+function bookingStatusClass(status: string): string {
+  if (status === 'cancelled') return 'booking-status--cancelled'
+  if (status === 'expired')   return 'booking-status--cancelled'
+  return ''
+}
 
 const todayLabel = computed(() => {
   const d = new Date()
@@ -123,6 +140,7 @@ async function fetchBookings(childId: string) {
     const res = await api.get(`/orders?from=${today}&to=${today}&student=${childId}`)
     const seenSessions = new Set<string>()
     apiBookings.value = (res.data?.orders ?? [])
+      .filter((o: any) => o.status !== 'cancelled')
       .map((o: any) => ({
         ...o,
         id: o.id ?? o._id,
@@ -188,16 +206,19 @@ watch(selectedChildId, id => { if (id) fetchChildData(id) })
 function txPhIcon(type: Transaction['type']) {
   if (type === 'topup')    return PhArrowUp
   if (type === 'purchase') return PhShoppingBag
+  if (type === 'refund')   return PhArrowUp
   return PhForkKnife
 }
 function txPhColor(type: Transaction['type']): string {
   if (type === 'topup')    return '#03BA81'
   if (type === 'purchase') return '#FF9800'
+  if (type === 'refund')   return '#03BA81'
   return '#1264E3'
 }
 function txIconBg(type: Transaction['type']): string {
   if (type === 'topup')    return 'bg-[#E0FAF3]'
   if (type === 'purchase') return 'bg-[#FFF3E0]'
+  if (type === 'refund')   return 'bg-[#E0FAF3]'
   return 'bg-[#EAF1FD]'
 }
 function txAmountClass(a: number): string { return a >= 0 ? 'text-[#03BA81]' : 'text-[#FF5252]' }
@@ -205,6 +226,7 @@ const TX_LABEL: Record<Transaction['type'], { th: string; en: string }> = {
   topup:   { th: 'เติมเงิน',  en: 'Top Up' },
   purchase:{ th: 'ชำระเงิน', en: 'Paid'   },
   buffet:  { th: 'บุฟเฟต์',  en: 'Buffet' },
+  refund:  { th: 'คืนเงิน',  en: 'Refund' },
 }
 function txDisplayLabel(tx: Transaction): string {
   if (!tx.description || tx.description === tx.type) {
@@ -387,8 +409,8 @@ onMounted(async () => {
                 </span>
               </div>
             </div>
-            <span class="booking-status">
-              {{ locale.t('ยืนยันแล้ว', 'Confirmed') }}
+            <span class="booking-status" :class="bookingStatusClass(bk.status)">
+              {{ bookingStatusLabel(bk.status) }}
             </span>
           </div>
           <!-- Items -->
@@ -569,6 +591,10 @@ onMounted(async () => {
   border-radius: 20px;
   background: #E0FAF3;
   color: #028A60;
+}
+.booking-status--cancelled {
+  background: #FFE0E0;
+  color: #C62828;
 }
 
 </style>
