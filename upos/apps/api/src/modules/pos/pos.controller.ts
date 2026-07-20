@@ -21,7 +21,51 @@ function mapUserType(role: string): 'member' | 'student' {
   return role === 'student' ? 'student' : 'member'
 }
 
+const KIOSK_ALLOWED_ROLES = ['student', 'teacher', 'staff', 'visitor']
+const KIOSK_ROLE_LABEL: Record<string, string> = {
+  student: 'นักเรียน',
+  teacher: 'ครู',
+  staff:   'เจ้าหน้าที่',
+  visitor: 'ผู้เยี่ยมชม',
+}
+const CARD_NOT_FOUND = { error: { code: 'CARD_001', message: 'Card not found or inactive' } }
+
 export const posController = new Elysia({ prefix: '/pos' })
+
+  // ── Kiosk Card Read (public — no auth; self-service kiosk tap/manual entry) ──
+  // Data minimization: unlike every other route in this file, this one is
+  // unauthenticated, so it returns only the fields the kiosk UI needs — never
+  // email/phone/passwordHash/pinHash/dob/guardianEmail/etc. Staff/admin/
+  // supervisor/parent cards are treated as not-found so an anonymous caller
+  // can't discover that such a card exists via this endpoint.
+  .get('/kiosk-card-read/:cardUid', async ({ params, set }) => {
+    const card = await Card.findOne({ cardUid: params.cardUid, status: 'active' }).lean()
+    if (!card) {
+      set.status = 404
+      return CARD_NOT_FOUND
+    }
+    const user = await User.findById(card.userId).lean()
+    if (!user || !KIOSK_ALLOWED_ROLES.includes(user.role)) {
+      set.status = 404
+      return CARD_NOT_FOUND
+    }
+    const wallet = await Wallet.findOne({ userId: user._id }).lean()
+    return {
+      user: {
+        uid:       user.uid,
+        name:      `${user.firstName} ${user.lastName}`.trim(),
+        grade:     user.studentProfile?.gradeLevel ?? '-',
+        classRoom: user.studentProfile?.className ?? '-',
+        role:      user.role,
+        roleLabel: KIOSK_ROLE_LABEL[user.role] ?? user.role,
+      },
+      wallet: {
+        balance:  wallet?.balance ?? 0,
+        currency: wallet?.currency ?? 'THB',
+      },
+    }
+  })
+
   .use(authPlugin(['cashier','supervisor','admin']))
 
   // ── Card Read ──────────────────────────────────────────────────────────────

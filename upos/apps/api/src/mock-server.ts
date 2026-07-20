@@ -549,6 +549,31 @@ const app = new Elysia()
     return { order }
   })
 
+  // ── Kiosk: public card read (mirrors real GET /pos/kiosk-card-read/:cardUid) ─
+  .get('/pos/kiosk-card-read/:cardUid', ({ params, set }: any) => {
+    const student: any = Object.values(STUDENTS).find(
+      (s: any) => s.cardUid === params.cardUid && s.cardStatus === 'active',
+    )
+    if (!student) {
+      set.status = 404
+      return { error: { code: 'CARD_001', message: 'Card not found or inactive' } }
+    }
+    return {
+      user: {
+        uid:       student.uid,
+        name:      `${student.firstName} ${student.lastName}`,
+        grade:     student.studentProfile?.gradeLevel ?? '-',
+        classRoom: student.studentProfile?.className ?? '-',
+        role:      student.role,
+        roleLabel: 'นักเรียน',
+      },
+      wallet: {
+        balance:  student.balance ?? 0,
+        currency: 'THB',
+      },
+    }
+  })
+
   // ── POS: card read ─────────────────────────────────────────────────────────
   .post('/pos/card-read', ({ body }: any) => {
     const uid = (body.cardUid ?? body.card_uid ?? '').toUpperCase().trim()

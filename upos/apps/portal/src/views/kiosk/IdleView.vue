@@ -42,14 +42,6 @@ async function handleCardRead(uid: string) {
   }
 }
 
-function demoStudent() {
-  handleCardRead('DEMO-STUDENT')
-}
-
-function demoTeacher() {
-  handleCardRead('DEMO-TEACHER')
-}
-
 const canSubmit = computed(() => cardInput.value.trim().length >= 4)
 
 function goManual() {
@@ -129,22 +121,10 @@ function submitCard() {
             <div style="flex: 1; height: 1px; background: var(--color-border-tertiary)"></div>
           </div>
 
-          <button class="btn-manual" @click="goManual">
+          <button class="btn-manual" style="margin-bottom: 0" @click="goManual">
             <Icon name="card" :size="16" color="var(--color-primary)" />
             {{ t('กรอกเลขบัตรด้วยตนเอง', 'Enter Card Number Manually') }}
           </button>
-
-          <div style="font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 8px; text-align: center">{{ t('Demo — จำลองการแตะบัตร', 'Demo — Simulate Card Tap') }}</div>
-          <div style="display: flex; gap: 8px; width: 100%">
-            <button class="demo-btn" :disabled="isLoading" @click="demoStudent">
-              <Icon name="person" :size="13" color="var(--color-primary)" />
-              Demo: {{ t('นักเรียน', 'Student') }}
-            </button>
-            <button class="demo-btn" :disabled="isLoading" @click="demoTeacher">
-              <Icon name="person" :size="13" color="var(--color-primary)" />
-              Demo: {{ t('ครู', 'Teacher') }}
-            </button>
-          </div>
         </div>
       </div>
 
@@ -265,17 +245,6 @@ function submitCard() {
 }
 .btn-manual:hover { background: var(--color-primary-tint); }
 .btn-manual:active { opacity: 0.8; }
-
-/* Demo buttons */
-.demo-btn {
-  flex: 1; height: 34px; border-radius: 8px;
-  background: var(--color-bg-surface); color: var(--color-primary);
-  border: 1px solid var(--color-primary); font-size: 11px; font-weight: 600;
-  cursor: pointer; transition: background 0.12s;
-  display: flex; align-items: center; justify-content: center; gap: 5px;
-}
-.demo-btn:hover:not(:disabled) { background: var(--color-primary-tint); }
-.demo-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Manual entry input */
 .card-input-wrap {
