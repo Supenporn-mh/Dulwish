@@ -366,12 +366,6 @@ async function submitChangePw() {
                 {{ new Date(n.createdAt).toLocaleTimeString(locale.lang==='th'?'th-TH':'en-GB', { hour:'2-digit', minute:'2-digit' }) }}
               </p>
             </div>
-            <button
-              @click.stop="notifStore.removeById(n.id)"
-              class="notif-dismiss"
-            >
-              <PhX :size="13" weight="bold" />
-            </button>
           </div>
         </div>
       </div>
