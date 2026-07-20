@@ -27,11 +27,14 @@ export interface Wallet {
 
 export interface Transaction {
   id: string
-  type: 'purchase' | 'topup' | 'refund'
+  type: 'purchase' | 'topup' | 'refund' | 'booking' | 'buffet'
   amount: number
   description: string
   createdAt: string
   balanceAfter?: number
+  refNo?: string
+  channel?: string
+  method?: string
 }
 
 export const useKioskStore = defineStore('kiosk', () => {
@@ -161,11 +164,13 @@ export const useKioskStore = defineStore('kiosk', () => {
     } catch {
       // Demo fallback
       transactions.value = [
-        { id: '1', type: 'purchase', amount: -45, description: 'อาหารกลางวัน - ข้าวผัด', createdAt: new Date(Date.now() - 3600000).toISOString() },
-        { id: '2', type: 'purchase', amount: -20, description: 'ขนม - คุกกี้ช็อกโกแลต', createdAt: new Date(Date.now() - 7200000).toISOString() },
-        { id: '3', type: 'topup', amount: 500, description: 'เติมเงินผ่าน QR Code', createdAt: new Date(Date.now() - 86400000).toISOString() },
-        { id: '4', type: 'purchase', amount: -35, description: 'อาหารเช้า - โจ๊ก', createdAt: new Date(Date.now() - 90000000).toISOString() },
-        { id: '5', type: 'purchase', amount: -25, description: 'เครื่องดื่ม - น้ำผลไม้', createdAt: new Date(Date.now() - 172800000).toISOString() },
+        { id: '1', type: 'purchase', amount: -45, description: 'อาหารกลางวัน - ข้าวผัด', createdAt: new Date(Date.now() - 3600000).toISOString(), refNo: 'ORD-20260720-005', channel: 'POS', method: 'RFID Card' },
+        { id: '2', type: 'buffet', amount: -80, description: 'บุฟเฟต์เช้า', createdAt: new Date(Date.now() - 5400000).toISOString(), refNo: 'BUF-20260720-002', channel: 'POS', method: 'RFID Card' },
+        { id: '3', type: 'purchase', amount: -20, description: 'ขนม - คุกกี้ช็อกโกแลต', createdAt: new Date(Date.now() - 7200000).toISOString(), refNo: 'ORD-20260720-004', channel: 'POS', method: 'RFID Card' },
+        { id: '4', type: 'booking', amount: 0, description: 'จองอาหารกลางวัน', createdAt: new Date(Date.now() - 64800000).toISOString(), refNo: 'BKG-20260719-001', channel: 'Mobile App', method: '-' },
+        { id: '5', type: 'topup', amount: 500, description: 'เติมเงินผ่าน QR Code', createdAt: new Date(Date.now() - 86400000).toISOString(), refNo: 'TOP-20260719-003', channel: 'Kiosk', method: 'QR Code' },
+        { id: '6', type: 'purchase', amount: -35, description: 'อาหารเช้า - โจ๊ก', createdAt: new Date(Date.now() - 90000000).toISOString(), refNo: 'ORD-20260719-002', channel: 'POS', method: 'RFID Card' },
+        { id: '7', type: 'purchase', amount: -25, description: 'เครื่องดื่ม - น้ำผลไม้', createdAt: new Date(Date.now() - 172800000).toISOString(), refNo: 'ORD-20260718-001', channel: 'POS', method: 'RFID Card' },
       ]
     }
   }
