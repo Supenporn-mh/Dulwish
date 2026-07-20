@@ -552,7 +552,7 @@ const app = new Elysia()
   // ── Kiosk: public card read (mirrors real GET /pos/kiosk-card-read/:cardUid) ─
   .get('/pos/kiosk-card-read/:cardUid', ({ params, set }: any) => {
     const student: any = Object.values(STUDENTS).find(
-      (s: any) => s.cardUid === params.cardUid && s.cardStatus === 'active',
+      (s: any) => s.cardUid === params.cardUid && s.cardStatus === 'active' && s.status === 'active',
     )
     if (!student) {
       set.status = 404

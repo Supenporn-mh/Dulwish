@@ -45,7 +45,7 @@ export const posController = new Elysia({ prefix: '/pos' })
       return CARD_NOT_FOUND
     }
     const user = await User.findById(card.userId).lean()
-    if (!user || !KIOSK_ALLOWED_ROLES.includes(user.role)) {
+    if (!user || user.status !== 'active' || !KIOSK_ALLOWED_ROLES.includes(user.role)) {
       set.status = 404
       return CARD_NOT_FOUND
     }
