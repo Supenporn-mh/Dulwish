@@ -20,6 +20,7 @@ export const useKioskStore = defineStore('kiosk', () => {
   const currentUser = ref<KioskUser | null>(null)
   const wallet = ref<KioskWallet | null>(null)
   const error = ref('')
+  const errorCode = ref('')
   const selectedMethod = ref<'promptpay' | 'alipay' | 'wechat'>('promptpay')
   const locale = ref<'th' | 'en'>((localStorage.getItem('kiosk-locale') as 'th' | 'en') || 'th')
 
@@ -30,6 +31,7 @@ export const useKioskStore = defineStore('kiosk', () => {
 
   async function readCard(uid: string): Promise<boolean> {
     error.value = ''
+    errorCode.value = ''
 
     try {
       const res = await api.get(`/pos/kiosk-card-read/${encodeURIComponent(uid)}`)
@@ -37,14 +39,16 @@ export const useKioskStore = defineStore('kiosk', () => {
       wallet.value = res.data.wallet ?? null
 
       if (!currentUser.value) {
+        errorCode.value = 'CARD_001'
         error.value = 'ไม่พบข้อมูลบัตร'
         return false
       }
       return true
-    } catch {
+    } catch (err: any) {
       currentUser.value = null
       wallet.value = null
-      error.value = 'ไม่พบข้อมูลบัตร'
+      errorCode.value = err?.response?.data?.error?.code ?? 'CARD_001'
+      error.value = errorCode.value === 'CARD_002' ? 'บัตรถูกระงับการใช้งาน' : 'ไม่พบข้อมูลบัตร'
       return false
     }
   }
@@ -53,6 +57,7 @@ export const useKioskStore = defineStore('kiosk', () => {
     currentUser.value = null
     wallet.value = null
     error.value = ''
+    errorCode.value = ''
   }
 
   function updateBalance(newBalance: number) {
@@ -61,5 +66,5 @@ export const useKioskStore = defineStore('kiosk', () => {
     }
   }
 
-  return { currentUser, wallet, error, selectedMethod, locale, toggleLocale, readCard, clearSession, updateBalance }
+  return { currentUser, wallet, error, errorCode, selectedMethod, locale, toggleLocale, readCard, clearSession, updateBalance }
 })

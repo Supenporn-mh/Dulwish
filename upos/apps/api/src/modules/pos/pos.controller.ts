@@ -28,7 +28,8 @@ const KIOSK_ROLE_LABEL: Record<string, string> = {
   staff:   'เจ้าหน้าที่',
   visitor: 'ผู้เยี่ยมชม',
 }
-const CARD_NOT_FOUND = { error: { code: 'CARD_001', message: 'Card not found or inactive' } }
+const CARD_NOT_FOUND = { error: { code: 'CARD_001', message: 'Card not found' } }
+const CARD_SUSPENDED = { error: { code: 'CARD_002', message: 'Card suspended or account inactive' } }
 
 export const posController = new Elysia({ prefix: '/pos' })
 
@@ -39,15 +40,20 @@ export const posController = new Elysia({ prefix: '/pos' })
   // supervisor/parent cards are treated as not-found so an anonymous caller
   // can't discover that such a card exists via this endpoint.
   .get('/kiosk-card-read/:cardUid', async ({ params, set }) => {
-    const card = await Card.findOne({ cardUid: params.cardUid, status: 'active' }).lean()
+    const card = await Card.findOne({ cardUid: params.cardUid }).lean()
     if (!card) {
       set.status = 404
       return CARD_NOT_FOUND
     }
     const user = await User.findById(card.userId).lean()
-    if (!user || user.status !== 'active' || !KIOSK_ALLOWED_ROLES.includes(user.role)) {
+    if (!user || !KIOSK_ALLOWED_ROLES.includes(user.role)) {
+      // role-gated cards stay indistinguishable from a nonexistent card
       set.status = 404
       return CARD_NOT_FOUND
+    }
+    if (card.status !== 'active' || user.status !== 'active') {
+      set.status = 403
+      return CARD_SUSPENDED
     }
     const wallet = await Wallet.findOne({ userId: user._id }).lean()
     return {

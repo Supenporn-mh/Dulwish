@@ -551,12 +551,14 @@ const app = new Elysia()
 
   // ── Kiosk: public card read (mirrors real GET /pos/kiosk-card-read/:cardUid) ─
   .get('/pos/kiosk-card-read/:cardUid', ({ params, set }: any) => {
-    const student: any = Object.values(STUDENTS).find(
-      (s: any) => s.cardUid === params.cardUid && s.cardStatus === 'active' && s.status === 'active',
-    )
+    const student: any = Object.values(STUDENTS).find((s: any) => s.cardUid === params.cardUid)
     if (!student) {
       set.status = 404
-      return { error: { code: 'CARD_001', message: 'Card not found or inactive' } }
+      return { error: { code: 'CARD_001', message: 'Card not found' } }
+    }
+    if (student.cardStatus !== 'active' || student.status !== 'active') {
+      set.status = 403
+      return { error: { code: 'CARD_002', message: 'Card suspended or account inactive' } }
     }
     return {
       user: {

@@ -9,9 +9,19 @@ const store = useKioskStore()
 
 const isLoading = ref(false)
 const errorMsg = ref('')
+const errorKind = ref<'' | 'notfound' | 'suspended'>('')
 const currentScreen = ref<'tap' | 'manual'>('tap')
 const cardInput = ref('')
 const cardInputEl = ref<HTMLInputElement | null>(null)
+
+const ERROR_SUB: Record<'notfound' | 'suspended', [string, string]> = {
+  notfound: ['ตรวจสอบเลขบัตรอีกครั้ง หรือติดต่อเจ้าหน้าที่', 'Check the card number and try again, or contact staff for assistance.'],
+  suspended: ['กรุณาติดต่อเจ้าหน้าที่เพื่อดำเนินการต่อ', 'Please contact staff to resolve this issue.'],
+}
+const ERROR_FIELD_MSG: Record<'notfound' | 'suspended', [string, string]> = {
+  notfound: ['ไม่พบบัตรเลขนี้ในระบบ', 'This card number was not found'],
+  suspended: ['บัตรนี้ถูกระงับ ไม่สามารถใช้งานได้', 'This card has been suspended'],
+}
 
 function t(th: string, en: string) {
   return store.locale === 'en' ? en : th
@@ -29,6 +39,7 @@ async function handleCardRead(uid: string) {
   if (isLoading.value) return
   isLoading.value = true
   errorMsg.value = ''
+  errorKind.value = ''
 
   const success = await store.readCard(uid)
 
@@ -37,15 +48,26 @@ async function handleCardRead(uid: string) {
   if (success) {
     router.push('/kiosk/topup')
   } else {
-    errorMsg.value = store.error ? t('ไม่พบข้อมูลบัตร', 'Card not found') : ''
-    setTimeout(() => { errorMsg.value = '' }, 3000)
+    const kind = store.errorCode === 'CARD_002' ? 'suspended' : 'notfound'
+    errorKind.value = kind
+    errorMsg.value = t(...ERROR_FIELD_MSG[kind])
   }
 }
 
 const canSubmit = computed(() => cardInput.value.trim().length >= 4)
+const errorSub = computed(() => {
+  const kind = errorKind.value
+  return kind ? t(...ERROR_SUB[kind]) : ''
+})
+
+function onCardInput() {
+  errorMsg.value = ''
+  errorKind.value = ''
+}
 
 function goManual() {
   errorMsg.value = ''
+  errorKind.value = ''
   currentScreen.value = 'manual'
   nextTick(() => cardInputEl.value?.focus())
 }
@@ -54,6 +76,7 @@ function goBack() {
   currentScreen.value = 'tap'
   cardInput.value = ''
   errorMsg.value = ''
+  errorKind.value = ''
 }
 
 function submitCard() {
@@ -106,15 +129,6 @@ function submitCard() {
           <div class="font-bold" style="font-size: 20px; color: var(--color-text-primary); margin-bottom: 6px; text-align: center">{{ t('แตะการ์ด', 'Tap Card') }}</div>
           <div style="font-size: 13px; color: var(--color-text-secondary); text-align: center; line-height: 1.5; margin-bottom: 28px">{{ t('วางบัตรใกล้เครื่องอ่านเพื่อเติมเงินเข้าบัญชีของคุณ', 'Place your card near the reader to top up your account') }}</div>
 
-          <!-- Error message -->
-          <div
-            v-if="errorMsg"
-            class="w-full text-center px-4 py-2"
-            style="border-radius: 8px; background: var(--color-danger); color: #fff; font-size: 12px; font-weight: 600; margin-bottom: 16px"
-          >
-            {{ errorMsg }}
-          </div>
-
           <div style="display: flex; align-items: center; gap: 12px; width: 100%; margin-bottom: 16px">
             <div style="flex: 1; height: 1px; background: var(--color-border-tertiary)"></div>
             <span style="font-size: 13px; color: var(--color-text-tertiary); white-space: nowrap">{{ t('หรือ', 'or') }}</span>
@@ -142,28 +156,36 @@ function submitCard() {
 
           <div style="font-size: 12px; font-weight: 600; color: var(--color-text-secondary); align-self: flex-start; margin-bottom: 6px; width: 100%">{{ t('เลขบัตร / Card Number', 'Card Number') }}</div>
           <div class="card-input-wrap">
-            <Icon name="card" :size="16" color="var(--color-text-tertiary)" />
+            <Icon
+              name="card"
+              :size="16"
+              :color="errorKind === 'suspended' ? 'var(--color-danger)' : errorKind === 'notfound' ? 'var(--color-warning)' : 'var(--color-text-tertiary)'"
+            />
             <input
               ref="cardInputEl"
               v-model="cardInput"
               type="text"
               class="card-input"
+              :class="errorKind"
               :placeholder="t('เช่น 1234567890', 'e.g. 1234567890')"
               maxlength="20"
               autocomplete="off"
+              @input="onCardInput"
               @keyup.enter="submitCard"
             />
           </div>
-          <div style="font-size: 11px; color: var(--color-text-tertiary); align-self: flex-start; margin-bottom: 16px">* {{ t('กรอกอย่างน้อย 4 ตัวอักษร', 'Enter at least 4 characters') }}</div>
 
-          <!-- Error message -->
-          <div
-            v-if="errorMsg"
-            class="w-full text-center px-4 py-2"
-            style="border-radius: 8px; background: var(--color-danger); color: #fff; font-size: 12px; font-weight: 600; margin-bottom: 12px"
-          >
+          <div v-if="errorKind" class="field-msg" :class="errorKind">
+            <Icon
+              :name="errorKind === 'suspended' ? 'circleX' : 'warning'"
+              :size="13"
+              :color="errorKind === 'suspended' ? 'var(--color-danger)' : 'var(--color-warning)'"
+            />
             {{ errorMsg }}
           </div>
+          <div v-else style="font-size: 11px; color: var(--color-text-tertiary); align-self: flex-start; margin-bottom: 16px">* {{ t('กรอกอย่างน้อย 4 ตัวอักษร', 'Enter at least 4 characters') }}</div>
+
+          <div v-if="errorKind" class="err-sub">{{ errorSub }}</div>
 
           <button class="btn-submit" :disabled="!canSubmit || isLoading" @click="submitCard">
             <Icon name="check" :size="16" color="#fff" />
@@ -263,6 +285,14 @@ function submitCard() {
 }
 .card-input::placeholder { color: var(--color-text-tertiary); letter-spacing: 0; font-family: inherit; font-weight: 400; font-size: 13px; }
 .card-input:focus { border-color: var(--color-primary); background: var(--color-bg-surface); }
+.card-input.notfound { border-color: var(--color-warning) !important; background: var(--color-warning-bg) !important; }
+.card-input.suspended { border-color: var(--color-danger) !important; background: var(--color-danger-bg) !important; }
+
+.field-msg { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; align-self: flex-start; margin-bottom: 8px; }
+.field-msg.notfound { color: var(--color-warning); }
+.field-msg.suspended { color: var(--color-danger); }
+
+.err-sub { font-size: 12px; color: var(--color-text-secondary); text-align: center; line-height: 1.5; margin-bottom: 16px; }
 
 .btn-submit {
   width: 100%; height: 46px; border-radius: 10px;
