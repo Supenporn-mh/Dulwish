@@ -120,14 +120,19 @@ function submitCard() {
         <div class="bg-circle bg-circle-2"></div>
 
         <div class="idle-card">
-          <div class="nfc-wrap">
-            <div class="nfc-ring">
+          <div class="rfid-animation">
+            <div class="card-icon">
               <Icon name="nfc" :size="36" color="var(--color-primary)" />
+            </div>
+            <div class="rfid-waves">
+              <div class="wave"></div>
+              <div class="wave"></div>
+              <div class="wave"></div>
             </div>
           </div>
 
           <div class="font-bold" style="font-size: 20px; color: var(--color-text-primary); margin-bottom: 6px; text-align: center">{{ t('แตะการ์ด', 'Tap Card') }}</div>
-          <div style="font-size: 13px; color: var(--color-text-secondary); text-align: center; line-height: 1.5; margin-bottom: 28px">{{ t('วางบัตรใกล้เครื่องอ่านเพื่อเติมเงินเข้าบัญชีของคุณ', 'Place your card near the reader to top up your account') }}</div>
+          <div class="text-breathe" style="font-size: 13px; color: var(--color-text-secondary); text-align: center; line-height: 1.5; margin-bottom: 28px">{{ t('วางบัตรใกล้เครื่องอ่านเพื่อเติมเงินเข้าบัญชีของคุณ', 'Place your card near the reader to top up your account') }}</div>
 
           <div style="display: flex; align-items: center; gap: 12px; width: 100%; margin-bottom: 16px">
             <div style="flex: 1; height: 1px; background: var(--color-border-tertiary)"></div>
@@ -238,23 +243,66 @@ function submitCard() {
   position: relative; z-index: 1;
 }
 
-/* NFC ring */
-.nfc-wrap { display: flex; justify-content: center; margin-bottom: 20px; }
-.nfc-ring {
+/* RFID tap animation */
+.rfid-animation {
+  position: relative;
+  width: 72px; height: 72px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 20px;
+}
+.card-icon {
+  position: relative; z-index: 1;
   width: 72px; height: 72px; border-radius: 50%;
   background: var(--color-primary-tint);
   display: flex; align-items: center; justify-content: center;
-  position: relative;
-  animation: nfc-pulse 2.4s ease-in-out infinite;
+  overflow: hidden;
+  transform-origin: center bottom;
+  animation: card-icon-animation 3s infinite ease-in-out;
 }
-.nfc-ring::before, .nfc-ring::after {
-  content: ''; position: absolute; border-radius: 50%;
-  border: 1.5px solid rgba(18,100,227,.18);
+.card-icon::after {
+  content: '';
+  position: absolute; top: 0; left: -150%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0) 0%,
+    rgba(255,255,255,0.5) 50%,
+    rgba(255,255,255,0) 100%);
+  transform: skewX(-25deg);
+  animation: flash 3s infinite ease-in-out;
+  animation-delay: 1.5s;
 }
-.nfc-ring::before { width: 92px; height: 92px; animation: nfc-ripple 2.4s ease-out infinite; }
-.nfc-ring::after  { width: 112px; height: 112px; animation: nfc-ripple 2.4s ease-out infinite; animation-delay: 0.65s; }
-@keyframes nfc-pulse  { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
-@keyframes nfc-ripple { 0% { opacity: 0.5; transform: scale(0.82); } 100% { opacity: 0; transform: scale(1.1); } }
+@keyframes card-icon-animation {
+  0%   { transform: rotate(-10deg); }
+  50%  { transform: rotate(0deg); }
+  100% { transform: rotate(-10deg); }
+}
+@keyframes flash {
+  0%, 70% { left: -150%; }
+  100%    { left: 150%; }
+}
+
+.rfid-waves { position: absolute; top: 50%; left: 50%; }
+.wave {
+  position: absolute; top: 50%; left: 50%;
+  width: 90px; height: 90px; margin: -45px 0 0 -45px;
+  border-radius: 50%;
+  animation: wave-animation 3s infinite linear;
+}
+.wave:nth-child(2) { animation-delay: 1s; }
+.wave:nth-child(3) { animation-delay: 2s; }
+@keyframes wave-animation {
+  0%   { transform: scale(0.5); opacity: 0; background-color: var(--color-primary); }
+  20%  { transform: scale(0.75); opacity: 0.3; }
+  100% { transform: scale(1.5); opacity: 0; background-color: #EACB46; }
+}
+
+.text-breathe {
+  animation: breathe 3s infinite linear;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.8; }
+  50%      { opacity: 0.5; }
+}
 
 /* Manual entry button */
 .btn-manual {
