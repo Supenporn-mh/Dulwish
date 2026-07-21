@@ -8,9 +8,9 @@ import Icon from './Icon.vue'
 const router = useRouter()
 const store  = useKioskStore()
 
-type Phase = 'method' | 'amount' | 'qr' | 'success'
+type Phase = 'menu' | 'amount' | 'method' | 'qr' | 'success'
 
-const phase          = ref<Phase>('method')
+const phase          = ref<Phase>('menu')
 const inputStr       = ref('0')
 const isProcessing   = ref(false)
 const successAt      = ref<Date | null>(null)
@@ -61,8 +61,9 @@ function setQuick(amt: number) { inputStr.value = String(amt) }
 // ── Navigation ────────────────────────────────────────────────────────────
 function goBack() {
   if (qrTimer) clearInterval(qrTimer)
-  if (phase.value === 'amount') { phase.value = 'method'; inputStr.value = '0'; return }
-  if (phase.value === 'qr')    { phase.value = 'amount'; return }
+  if (phase.value === 'method') { phase.value = 'amount'; return }
+  if (phase.value === 'amount') { phase.value = 'menu'; inputStr.value = '0'; return }
+  if (phase.value === 'qr')     { phase.value = 'method'; return }
   store.clearSession()
   router.push('/kiosk/idle')
 }
@@ -70,12 +71,16 @@ function goBack() {
 function selectItem(id: string) {
   if (id === 'history')  { router.push('/kiosk/balance'); return }
   if (id === 'feedback') { window.open(FEEDBACK_FORM_URL, '_blank'); return }
-  store.selectedMethod = id as 'promptpay' | 'alipay' | 'wechat'
-  phase.value = 'amount'
+  if (id === 'topup')    { phase.value = 'amount' }
 }
 
 function confirmAmount() {
   if (!canConfirm.value) return
+  phase.value = 'method'
+}
+
+function selectMethod(id: string) {
+  store.selectedMethod = id as 'promptpay' | 'alipay' | 'wechat'
   phase.value = 'qr'
   qrCountdown.value = 300
   startQrTimer()
@@ -110,15 +115,16 @@ function simulateServiceError() {
   router.push('/kiosk/error/503')
 }
 
-function backToMethod() {
+function backToMenu() {
   inputStr.value = '0'
-  phase.value = 'method'
+  phase.value = 'menu'
   router.push('/kiosk/topup')
 }
 
 const breadcrumb = computed(() => {
-  if (phase.value === 'method') return t('เลือกวิธีการชำระเงิน', 'Select Payment Method')
+  if (phase.value === 'menu') return t('เลือกรายการ', 'Select Menu')
   if (phase.value === 'amount') return ''
+  if (phase.value === 'method') return t('เลือกวิธีการชำระเงิน', 'Select Payment Method')
   if (phase.value === 'qr') return t('สแกน QR', 'Scan QR')
   return t('สำเร็จ', 'Success')
 })
@@ -131,12 +137,16 @@ const formattedSuccess = computed(() => {
   })
 })
 
-const menuItems = computed(() => [
+const mainMenuItems = computed(() => [
+  { id: 'topup',     label: t('เติมเงิน', 'Top Up'), icon: 'arrowUp' },
+  { id: 'history',   label: t('ประวัติการทำรายการ', 'Transaction History'), icon: 'receipt' },
+  { id: 'feedback',  label: t('ประเมินความพึงพอใจ', 'Satisfaction Survey'), icon: 'smile' },
+])
+
+const channelItems = computed(() => [
   { id: 'promptpay', label: t('พร้อมเพย์', 'PromptPay'), icon: 'qrcode' },
   { id: 'alipay',    label: 'Alipay', icon: 'card' },
   { id: 'wechat',    label: 'WeChat Pay', icon: 'wechat' },
-  { id: 'history',   label: t('ประวัติการทำรายการ', 'Transaction History'), icon: 'receipt' },
-  { id: 'feedback',  label: t('ประเมินความพึงพอใจ', 'Satisfaction Survey'), icon: 'smile' },
 ])
 
 onUnmounted(() => { if (qrTimer) clearInterval(qrTimer) })
@@ -164,12 +174,12 @@ if (!user.value) router.replace('/kiosk/idle')
       />
     </div>
 
-    <!-- ══ METHOD (Screen 2) ══════════════════════════════════════════ -->
-    <div v-if="phase === 'method'" class="flex-1 px-5 pb-8">
-      <h2 class="mb-3" style="font-size: 13px; font-weight: 500; color: var(--color-text-primary)">{{ t('เลือกวิธีการชำระเงิน', 'Select Payment Method') }}</h2>
+    <!-- ══ MENU (Screen 1: main actions) ══════════════════════════════ -->
+    <div v-if="phase === 'menu'" class="flex-1 px-5 pb-8">
+      <h2 class="mb-3" style="font-size: 13px; font-weight: 500; color: var(--color-text-primary)">{{ t('เลือกรายการ', 'Select Menu') }}</h2>
 
       <div class="flex flex-col" style="gap: 8px">
-        <template v-for="item in menuItems" :key="item.id">
+        <template v-for="item in mainMenuItems" :key="item.id">
           <button @click="selectItem(item.id)" class="menu-row">
             <div class="m-icon">
               <Icon :name="item.icon" :size="20" color="var(--color-primary)" />
@@ -253,6 +263,30 @@ if (!user.value) router.replace('/kiosk/idle')
             : 'background: #DCDCDC; color: #A0A0A0; border: none; cursor: not-allowed;'"
         >{{ t('ยืนยัน', 'Confirm') }}</button>
       </div>
+    </div>
+
+    <!-- ══ METHOD (Screen: select payment channel, after amount) ══════ -->
+    <div v-else-if="phase === 'method'" class="flex-1 px-5 pb-8">
+      <h2 class="mb-3" style="font-size: 13px; font-weight: 500; color: var(--color-text-primary)">{{ t('เลือกวิธีการชำระเงิน', 'Select Payment Method') }}</h2>
+
+      <div class="flex flex-col" style="gap: 8px">
+        <template v-for="item in channelItems" :key="item.id">
+          <button @click="selectMethod(item.id)" class="menu-row">
+            <div class="m-icon">
+              <Icon :name="item.icon" :size="20" color="var(--color-primary)" />
+            </div>
+            <div class="flex-1" style="font-size: 14px; font-weight: 500; color: var(--color-text-primary)">
+              {{ item.label }}
+            </div>
+            <Icon name="chevronRight" :size="18" color="var(--color-text-tertiary)" />
+          </button>
+        </template>
+      </div>
+
+      <button @click="goBack" class="btn-lg btn-secondary w-full mt-4" style="background: #fff">
+        <Icon name="chevronLeft" :size="16" />
+        {{ t('ย้อนกลับ', 'Back') }}
+      </button>
     </div>
 
     <!-- ══ QR (Screen 3) ══════════════════════════════════════════════ -->
@@ -339,7 +373,7 @@ if (!user.value) router.replace('/kiosk/idle')
         </p>
       </div>
 
-      <button @click="backToMethod" class="btn-lg btn-primary w-full">
+      <button @click="backToMenu" class="btn-lg btn-primary w-full">
         {{ t('กลับไปหน้าเติมเงิน', 'Back to Top Up') }}
       </button>
     </div>
