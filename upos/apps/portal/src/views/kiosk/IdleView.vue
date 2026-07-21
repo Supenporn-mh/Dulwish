@@ -122,12 +122,12 @@ function submitCard() {
         <div class="idle-card">
           <div class="rfid-animation">
             <div class="card-icon">
-              <Icon name="card" :size="32" color="var(--color-primary)" />
+              <Icon name="nfc" :size="36" color="var(--color-primary)" />
             </div>
-            <div class="rfid-signal">
-              <span class="signal-arc arc-1"></span>
-              <span class="signal-arc arc-2"></span>
-              <span class="signal-arc arc-3"></span>
+            <div class="rfid-waves">
+              <div class="wave"></div>
+              <div class="wave"></div>
+              <div class="wave"></div>
             </div>
           </div>
 
@@ -243,7 +243,7 @@ function submitCard() {
   position: relative; z-index: 1;
 }
 
-/* RFID tap animation: card taps down, tilted wifi-style signal arcs pulse from the corner */
+/* RFID tap animation */
 .rfid-animation {
   position: relative;
   width: 72px; height: 72px;
@@ -255,39 +255,45 @@ function submitCard() {
   width: 72px; height: 72px; border-radius: 50%;
   background: var(--color-primary-tint);
   display: flex; align-items: center; justify-content: center;
-  animation: card-tap 1.8s infinite cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  transform-origin: center bottom;
+  animation: card-icon-animation 3s infinite ease-in-out;
 }
-@keyframes card-tap {
-  0%, 40%, 100% { transform: translateY(0); }
-  18% { transform: translateY(7px); }
-  30% { transform: translateY(0); }
+.card-icon::after {
+  content: '';
+  position: absolute; top: 0; left: -150%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0) 0%,
+    rgba(255,255,255,0.5) 50%,
+    rgba(255,255,255,0) 100%);
+  transform: skewX(-25deg);
+  animation: flash 3s infinite ease-in-out;
+  animation-delay: 1.5s;
+}
+@keyframes card-icon-animation {
+  0%   { transform: rotate(-10deg); }
+  50%  { transform: rotate(0deg); }
+  100% { transform: rotate(-10deg); }
+}
+@keyframes flash {
+  0%, 70% { left: -150%; }
+  100%    { left: 150%; }
 }
 
-.rfid-signal {
-  position: absolute;
-  top: -4px; right: -4px;
-  width: 38px; height: 38px;
-  transform: rotate(-45deg);
-  pointer-events: none;
-}
-.signal-arc {
-  position: absolute;
-  top: 50%; left: 50%;
+.rfid-waves { position: absolute; top: 50%; left: 50%; }
+.wave {
+  position: absolute; top: 50%; left: 50%;
+  width: 90px; height: 90px; margin: -45px 0 0 -45px;
   border-radius: 50%;
-  border: 2.5px solid var(--color-primary);
-  border-bottom-color: transparent;
-  border-left-color: transparent;
-  opacity: 0;
-  animation: signal-pulse 1.8s infinite;
+  animation: wave-animation 3s infinite linear;
 }
-.arc-1 { width: 12px; height: 12px; margin: -6px 0 0 -6px; animation-delay: 0.05s; }
-.arc-2 { width: 22px; height: 22px; margin: -11px 0 0 -11px; animation-delay: 0.2s; }
-.arc-3 { width: 32px; height: 32px; margin: -16px 0 0 -16px; animation-delay: 0.35s; }
-@keyframes signal-pulse {
-  0%   { opacity: 0; transform: scale(0.7); }
-  15%  { opacity: 1; transform: scale(1); }
-  40%  { opacity: 0; transform: scale(1.1); }
-  100% { opacity: 0; }
+.wave:nth-child(2) { animation-delay: 1s; }
+.wave:nth-child(3) { animation-delay: 2s; }
+@keyframes wave-animation {
+  0%   { transform: scale(0.5); opacity: 0; background-color: var(--color-primary); }
+  20%  { transform: scale(0.75); opacity: 0.3; }
+  100% { transform: scale(1.5); opacity: 0; background-color: #EACB46; }
 }
 
 .text-breathe {
