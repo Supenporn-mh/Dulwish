@@ -58,7 +58,7 @@
               <td class="center" style="font-size:13px">{{ mealLabel(s.meal) }}</td>
               <td class="center" style="font-size:13px;font-family:monospace">{{ s.startTime }} – {{ s.endTime }}</td>
               <td class="center" style="font-size:13px">{{ s.capacity }}</td>
-              <td class="center" style="font-size:13px">{{ s.cutoffHours }} ชั่วโมง</td>
+              <td class="center" style="font-size:13px">{{ s.cutoffMinutes }} นาที</td>
               <td class="center">
                 <span :class="['ts-status', s.enabled ? 'ts-status-on' : 'ts-status-off']">
                   <PhCheckCircle v-if="s.enabled" :size="13" weight="fill" />
@@ -144,10 +144,10 @@
               <input v-model.number="form.capacity" type="number" class="ts-input" min="1" />
             </div>
 
-            <!-- ชั่วโมงตัดรอบ -->
+            <!-- นาทีตัดรอบ -->
             <div class="ts-field">
-              <label class="ts-label">ชั่วโมงตัดรอบ</label>
-              <input v-model.number="form.cutoffHours" type="number" class="ts-input" min="0" step="0.5" />
+              <label class="ts-label">นาทีตัดรอบ</label>
+              <input v-model.number="form.cutoffMinutes" type="number" class="ts-input" min="0" step="1" />
             </div>
 
             <!-- Toggle -->
@@ -193,7 +193,7 @@ interface SlotDoc {
   startTime: string
   endTime: string
   capacity: number
-  cutoffHours: number
+  cutoffMinutes: number
   description: string
   enabled: boolean
 }
@@ -219,7 +219,7 @@ function mpToRow(mp: MealPeriod): SlotDoc {
     startTime: mp.startTime,
     endTime: mp.endTime,
     capacity: mp.seatCapacity,
-    cutoffHours: mp.cutoffMinutes / 60,
+    cutoffMinutes: mp.cutoffMinutes,
     description: mp.description ?? '',
     enabled: mp.active,
   }
@@ -231,7 +231,7 @@ function rowToPayload(f: FormShape): Record<string, unknown> {
     name: f.name,
     startTime: f.startTime,
     endTime: f.endTime,
-    cutoffMinutes: Math.round(f.cutoffHours * 60),
+    cutoffMinutes: f.cutoffMinutes,
     seatCapacity: f.capacity,
     description: f.description,
     active: f.enabled,
@@ -256,14 +256,14 @@ type FormShape = {
   startTime: string
   endTime: string
   capacity: number
-  cutoffHours: number
+  cutoffMinutes: number
   description: string
   enabled: boolean
 }
 
 const blankForm = (): FormShape => ({
   name: '', meal: 'breakfast', startTime: '07:00', endTime: '09:00',
-  capacity: 120, cutoffHours: 1, description: '', enabled: true,
+  capacity: 120, cutoffMinutes: 60, description: '', enabled: true,
 })
 const form = ref<FormShape>(blankForm())
 
@@ -304,7 +304,7 @@ function openEdit(s: SlotDoc) {
     startTime: s.startTime,
     endTime: s.endTime,
     capacity: s.capacity,
-    cutoffHours: s.cutoffHours,
+    cutoffMinutes: s.cutoffMinutes,
     description: s.description,
     enabled: s.enabled,
   }
