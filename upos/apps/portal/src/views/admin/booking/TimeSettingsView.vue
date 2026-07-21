@@ -39,7 +39,7 @@
             <th class="center">มื้ออาหาร</th>
             <th class="center">เวลา</th>
             <th class="center">ความจุ</th>
-            <th class="center">ชั่วโมงตัดรอบ</th>
+            <th class="center">นาทีตัดรอบ</th>
             <th class="center">สถานะ</th>
             <th class="center" style="width:100px">การดำเนินการ</th>
           </tr>
