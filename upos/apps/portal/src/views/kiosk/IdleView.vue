@@ -122,7 +122,7 @@ function submitCard() {
         <div class="idle-card">
           <div class="rfid-animation">
             <div class="card-icon">
-              <Icon name="nfc" :size="36" color="var(--color-primary)" />
+              <img src="/images/decor-card.png" alt="Card icon" class="card-icon-img" />
             </div>
             <div class="rfid-waves">
               <div class="wave"></div>
@@ -246,19 +246,19 @@ function submitCard() {
 /* RFID tap animation */
 .rfid-animation {
   position: relative;
-  width: 72px; height: 72px;
+  width: 110px; height: 72px;
   display: flex; align-items: center; justify-content: center;
   margin-bottom: 20px;
 }
 .card-icon {
   position: relative; z-index: 1;
-  width: 72px; height: 72px; border-radius: 50%;
-  background: var(--color-primary-tint);
-  display: flex; align-items: center; justify-content: center;
+  width: 108px; border-radius: 10px;
   overflow: hidden;
   transform-origin: center bottom;
   animation: card-icon-animation 3s infinite ease-in-out;
+  box-shadow: 0 6px 18px rgba(18,100,227,.22);
 }
+.card-icon-img { display: block; width: 100%; height: auto; }
 .card-icon::after {
   content: '';
   position: absolute; top: 0; left: -150%;
