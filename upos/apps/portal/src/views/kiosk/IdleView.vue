@@ -235,7 +235,6 @@ function submitCard() {
 .idle-card {
   background: var(--color-bg-surface);
   border-radius: 20px;
-  border: 0.5px solid var(--color-border-tertiary);
   box-shadow: 0 8px 32px rgba(18,100,227,.08), 0 2px 8px rgba(0,0,0,.04);
   width: 100%; max-width: 400px;
   padding: 28px 28px 24px;
