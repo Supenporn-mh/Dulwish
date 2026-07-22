@@ -78,7 +78,7 @@ function submitCard() {
       <span style="font-size: 11px; color: #9A9AB0; min-width: 60px">
         {{ currentScreen === 'tap' ? t('แตะบัตร', 'Tap Card') : t('กรอกเลขบัตร', 'Enter Card') }}
       </span>
-      <h1 class="absolute left-1/2 -translate-x-1/2 font-semibold" style="font-size: 15px; color: #1264E3">{{ t('เติมเงิน', 'Top Up') }}</h1>
+      <h1 class="absolute left-1/2 -translate-x-1/2 font-semibold" style="font-size: 15px; color: #1264E3">{{ t('บัตรสมาชิก', 'Card') }}</h1>
       <div style="font-size: 13px; font-weight: 600; color: #1264E3; display: flex; align-items: center; gap: 6px; min-width: 60px; justify-content: flex-end">
         <span
           style="cursor: pointer; padding: 2px 6px; border-radius: 4px"
