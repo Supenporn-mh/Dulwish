@@ -10,6 +10,7 @@ export interface ParentChild {
   grade?:      string
   walletId?:   string
   balance:     number
+  foodAllergy?: string
 }
 
 export interface TodayBooking {

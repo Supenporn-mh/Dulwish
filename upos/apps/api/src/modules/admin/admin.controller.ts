@@ -328,6 +328,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
         guardianEmail:  s.studentProfile?.guardianEmail  ?? '',
         guardianEmail2: s.studentProfile?.guardianEmail2 ?? '',
         familyCode:     s.studentProfile?.familyCode    ?? '',
+        foodAllergy:    s.studentProfile?.foodAllergy    ?? '',
         cardUid:        card?.cardUid    ?? null,
         cardStatus:     card?.status     ?? null,
         balance:        wallet?.balance       ?? 0,
@@ -356,6 +357,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
           guardianEmail:  (body as any).guardianEmail  ?? '',
           guardianEmail2: (body as any).guardianEmail2 ?? '',
           familyCode:     (body as any).familyCode     ?? '',
+          foodAllergy:    (body as any).foodAllergy    ?? '',
         },
       })
       await Wallet.create({ userId: student._id, balance: 0 })
@@ -373,6 +375,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
       guardianEmail:  t.Optional(t.String()),
       guardianEmail2: t.Optional(t.String()),
       familyCode:     t.Optional(t.String()),
+      foodAllergy:    t.Optional(t.String({ maxLength: 300 })),
       uid:            t.Optional(t.String()),
     }),
   })
@@ -389,6 +392,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
     if (b.guardianEmail  !== undefined) update['studentProfile.guardianEmail']   = b.guardianEmail
     if (b.guardianEmail2 !== undefined) update['studentProfile.guardianEmail2']  = b.guardianEmail2
     if (b.familyCode     !== undefined) update['studentProfile.familyCode']      = b.familyCode
+    if (b.foodAllergy    !== undefined) update['studentProfile.foodAllergy']     = b.foodAllergy
 
     const student = await User.findOneAndUpdate(
       { uid: params.uid, role: 'student' },
@@ -406,6 +410,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
       guardianEmail:  t.Optional(t.String()),
       guardianEmail2: t.Optional(t.String()),
       familyCode:     t.Optional(t.String()),
+      foodAllergy:    t.Optional(t.String({ maxLength: 300 })),
       status:         t.Optional(t.String()),
     }),
   })

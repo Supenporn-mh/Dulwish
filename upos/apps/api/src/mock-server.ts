@@ -28,7 +28,7 @@ const GRADES_ORDER = ['K1','K2','P1','P2','P3','P4','P5','P6','S1','S2','S3','S4
 const PRE_ORDER_GRADES = ['K1','K2']
 
 let STUDENTS: Record<string, any> = {
-  'STD-K1-0001': { _id: 'std001', uid: 'STD-K1-0001', role: 'student', firstName: 'สมหญิง',  lastName: 'ใจดี',      studentProfile: { gradeLevel: 'K1', familyCode: 'FAM-001' }, guardianEmail: 'suchat@dulwich.ac.th', cardUid: '04A3B5C6', cardStatus: 'active',   balance: 850,  lowThreshold: 200, parentCount: 1, status: 'active' },
+  'STD-K1-0001': { _id: 'std001', uid: 'STD-K1-0001', role: 'student', firstName: 'สมหญิง',  lastName: 'ใจดี',      studentProfile: { gradeLevel: 'K1', familyCode: 'FAM-001', foodAllergy: 'แพ้ถั่วลิสง' }, guardianEmail: 'suchat@dulwich.ac.th', cardUid: '04A3B5C6', cardStatus: 'active',   balance: 850,  lowThreshold: 200, parentCount: 1, status: 'active' },
   'STD-K1-0012': { _id: 'std010', uid: 'STD-K1-0012', role: 'student', firstName: 'ปรีชา',   lastName: 'มานะ',      studentProfile: { gradeLevel: 'K1', familyCode: '' },        guardianEmail: 'preecha@gmail.com',    cardUid: '04E7F8A9', cardStatus: 'lost',    balance: 0,    lowThreshold: 200, parentCount: 0, status: 'active' },
   'STD-K2-0008': { _id: 'std003', uid: 'STD-K2-0008', role: 'student', firstName: 'มานี',    lastName: 'สุขดี',     studentProfile: { gradeLevel: 'K2', familyCode: 'FAM-002' }, guardianEmail: 'somying@gmail.com',    cardUid: '04C3D4E5', cardStatus: 'active',   balance: 150,  lowThreshold: 200, parentCount: 1, status: 'active' },
   'STD-P1-0005': { _id: 'std011', uid: 'STD-P1-0005', role: 'student', firstName: 'กานดา',   lastName: 'ศรีสวัสดิ์', studentProfile: { gradeLevel: 'P1', familyCode: '' },        guardianEmail: 'kanda.s@example.com',  cardUid: '04F1A2B3', cardStatus: 'active',   balance: 400,  lowThreshold: 200, parentCount: 1, status: 'active' },
@@ -377,6 +377,7 @@ const app = new Elysia()
     const student = STUDENTS[enrollment.studentUid]
     return {
       valid: true,
+      type: 'student',
       student: {
         uid:        student.uid,
         firstName:  student.firstName,
@@ -386,9 +387,19 @@ const app = new Elysia()
     }
   }, { body: t.Object({ code: t.String() }) })
 
+  // ── Auth: send OTP for enrollment-code registration (demo: returns otp in response) ──
+  .post('/auth/send-registration-otp', ({ body, set }: any) => {
+    const enrollment = ENROLLMENT_CODES[(body.enrollmentCode ?? '').toUpperCase().trim()]
+    if (!enrollment) { set.status = 400; return { error: { code: 'ENR_001', message: 'ไม่พบรหัสลงทะเบียน' } } }
+    if (enrollment.used) { set.status = 400; return { error: { code: 'ENR_002', message: 'รหัสนี้ถูกใช้งานแล้ว' } } }
+    const otp       = generateOtp()
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
+    return { expiresAt: expiresAt.toISOString(), demoOtp: otp }
+  }, { body: t.Object({ enrollmentCode: t.String(), contact: t.String() }) })
+
   // ── Auth: parent register ──────────────────────────────────────────────────
   .post('/auth/parent-register', ({ body, set }: any) => {
-    const { enrollmentCode, firstName, lastName } = body
+    const { enrollmentCode, firstName, lastName, foodAllergy } = body
     const enrollment = ENROLLMENT_CODES[enrollmentCode.toUpperCase().trim()]
     if (!enrollment || enrollment.used) {
       set.status = 400; return { error: { code: 'ENR_001', message: 'รหัสลงทะเบียนไม่ถูกต้อง' } }
@@ -398,6 +409,10 @@ const app = new Elysia()
     const sid = enrollment.studentUid
     STUDENT_PENDING_CODES[sid] = (STUDENT_PENDING_CODES[sid] ?? []).filter((k: string) => k !== enrollmentCode.toUpperCase().trim())
     if (STUDENTS[sid]) STUDENTS[sid].parentCount = (STUDENTS[sid].parentCount ?? 0) + 1
+    if (STUDENTS[sid] && foodAllergy !== undefined) {
+      STUDENTS[sid].studentProfile = STUDENTS[sid].studentProfile ?? {}
+      STUDENTS[sid].studentProfile.foodAllergy = String(foodAllergy).trim()
+    }
     const newId = `prt_new_${Date.now()}`
     const newUid = `PRT-${String(Object.keys(USERS).length + 1).padStart(4,'0')}`
     const newParent = { _id: newId, uid: newUid, role: 'parent', firstName, lastName, status: 'active' }
@@ -406,7 +421,7 @@ const app = new Elysia()
     STUDENT_TO_PARENT[enrollment.studentUid] = newUid
     const payload = { userId: newId, role: 'parent', uid: newUid }
     return { accessToken: signAccess(payload), refreshToken: signRefresh(payload), user: newParent }
-  }, { body: t.Object({ enrollmentCode: t.String(), firstName: t.String(), lastName: t.String(), password: t.String() }) })
+  }, { body: t.Object({ enrollmentCode: t.String(), firstName: t.String(), lastName: t.String(), password: t.String(), foodAllergy: t.Optional(t.String({ maxLength: 300 })) }) })
 
   // ── Users: me/children ─────────────────────────────────────────────────────
   .get('/users/me/children', ({ headers }: any) => {
@@ -426,6 +441,7 @@ const app = new Elysia()
         grade:       s.studentProfile?.gradeLevel,
         walletId:    wallet._id,
         balance:     wallet.balance,
+        foodAllergy: s.studentProfile?.foodAllergy ?? '',
       }
     })
     return { children }
@@ -482,13 +498,19 @@ const app = new Elysia()
       WALLETS[student._id] = { _id: `w_${student._id}`, userId: student._id, balance: 0 }
     }
 
+    if (body.foodAllergy !== undefined) {
+      student.studentProfile = student.studentProfile ?? {}
+      student.studentProfile.foodAllergy = String(body.foodAllergy).trim()
+    }
+
     return {
       success: true,
       student: {
-        uid:        student.uid,
-        firstName:  student.firstName,
-        lastName:   student.lastName,
-        gradeLevel: student.studentProfile?.gradeLevel,
+        uid:         student.uid,
+        firstName:   student.firstName,
+        lastName:    student.lastName,
+        gradeLevel:  student.studentProfile?.gradeLevel,
+        foodAllergy: student.studentProfile?.foodAllergy ?? null,
       },
     }
   })
@@ -688,6 +710,7 @@ const app = new Elysia()
       lastName:     s.lastName,
       gradeLevel:   s.studentProfile?.gradeLevel ?? '',
       familyCode:   s.studentProfile?.familyCode ?? '',
+      foodAllergy:  s.studentProfile?.foodAllergy ?? '',
       guardianEmail: s.guardianEmail,
       cardUid:      s.cardUid,
       cardStatus:   s.cardStatus ?? 'active',
@@ -715,6 +738,7 @@ const app = new Elysia()
       studentProfile: {
         gradeLevel:  b.gradeLevel ?? '',
         familyCode:  b.familyCode ? b.familyCode.toUpperCase().trim() : '',
+        foodAllergy: b.foodAllergy ?? '',
       },
       guardianEmail: b.guardianEmail ?? '',
       cardUid:      undefined,
@@ -736,6 +760,7 @@ const app = new Elysia()
     if (b.lastName   !== undefined) s.lastName   = b.lastName.trim()
     if (b.gradeLevel !== undefined) s.studentProfile.gradeLevel = b.gradeLevel
     if (b.familyCode !== undefined) s.studentProfile.familyCode = b.familyCode ? b.familyCode.toUpperCase().trim() : ''
+    if (b.foodAllergy !== undefined) s.studentProfile.foodAllergy = b.foodAllergy
     if (b.guardianEmail !== undefined) s.guardianEmail = b.guardianEmail
     if (b.lowThreshold  !== undefined) s.lowThreshold  = b.lowThreshold
     if (b.status        !== undefined) s.status        = b.status

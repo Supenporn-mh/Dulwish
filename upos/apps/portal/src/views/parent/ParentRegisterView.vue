@@ -66,6 +66,7 @@ const firstName       = ref('')
 const lastName        = ref('')
 const password        = ref('')
 const confirmPw       = ref('')
+const foodAllergy     = ref('')
 const showPw          = ref(false)
 const registerLoading = ref(false)
 const step4Error      = ref('')
@@ -272,6 +273,7 @@ async function handleRegister() {
       }
       if (ctType === 'phone') body.phone = ctVal
       else body.email = ctVal.toLowerCase()
+      if (foodAllergy.value.trim()) body.foodAllergy = foodAllergy.value.trim()
       const res = await api.post('/auth/parent-register', body)
       // auto-login with returned tokens — no need to re-enter credentials
       if (res.data?.accessToken) {
@@ -623,6 +625,20 @@ async function handleRegister() {
             <label class="field-label">{{ locale.t('ยืนยันรหัสผ่าน', 'Confirm Password') }} <span style="color: var(--color-danger)">*</span></label>
             <input v-model="confirmPw" :type="showPw ? 'text' : 'password'" :placeholder="locale.t('ยืนยันรหัสผ่าน', 'Confirm password')" class="field-input mt-1" />
             <p v-if="pwMismatch" class="field-error mt-1">{{ locale.t('รหัสผ่านไม่ตรงกัน', 'Passwords do not match') }}</p>
+          </div>
+        </div>
+
+        <div v-if="foundStudent" class="card mb-4">
+          <div class="card-body">
+            <label class="field-label">{{ locale.t('ข้อมูลอาหารที่แพ้ (ถ้ามี)', 'Food Allergy Info (optional)') }}</label>
+            <textarea
+              v-model="foodAllergy"
+              rows="2"
+              maxlength="300"
+              :placeholder="locale.t('เช่น แพ้ถั่ว, แพ้นม, แพ้อาหารทะเล', 'e.g. nut allergy, dairy allergy, seafood allergy')"
+              class="field-input mt-1"
+              style="resize: none; width: 100%;"
+            />
           </div>
         </div>
 

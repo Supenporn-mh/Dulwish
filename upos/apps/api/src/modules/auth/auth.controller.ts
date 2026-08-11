@@ -177,7 +177,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   })
 
   .post('/parent-register', async ({ body, set }) => {
-    const { enrollmentCode, firstName, lastName, password, email, phone, otp } = body
+    const { enrollmentCode, firstName, lastName, password, email, phone, otp, foodAllergy } = body
 
     // Validate OTP
     const contact = (phone ?? email ?? '').trim().toLowerCase()
@@ -207,6 +207,13 @@ export const authController = new Elysia({ prefix: '/auth' })
     if (existingLink) {
       set.status = 400
       return { error: { code: 'ENR_004', message: 'นักเรียนคนนี้มีผู้ปกครองในระบบแล้ว' } }
+    }
+
+    if (foodAllergy !== undefined) {
+      await User.updateOne(
+        { _id: enrollment.studentUserId },
+        { $set: { 'studentProfile.foodAllergy': foodAllergy.trim() } },
+      )
     }
 
     const passwordHash = await bcrypt.hash(password, 10)
@@ -252,6 +259,7 @@ export const authController = new Elysia({ prefix: '/auth' })
       phone:          t.Optional(t.String()),
       otp:            t.String({ minLength: 6, maxLength: 6 }),
       password:       t.String({ minLength: 8 }),
+      foodAllergy:    t.Optional(t.String({ maxLength: 300 })),
     }),
   })
 

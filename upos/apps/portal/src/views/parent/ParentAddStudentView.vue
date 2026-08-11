@@ -90,6 +90,23 @@
         {{ locale.t('ต้องการเพิ่ม', 'Would you like to add') }} <strong>{{ student?.firstName }} {{ student?.lastName }}</strong> {{ locale.t('เป็นนักเรียนของคุณใช่ไหม?', 'as your student?') }}
       </p>
 
+      <div class="card mb-4">
+        <div class="card-body">
+          <label class="text-caption block mb-2" style="color: var(--color-text-secondary)">
+            {{ locale.t('ข้อมูลอาหารที่แพ้ (ถ้ามี)', 'Food Allergy Info (optional)') }}
+          </label>
+          <textarea
+            v-model="foodAllergy"
+            rows="2"
+            maxlength="300"
+            :disabled="adding"
+            :placeholder="locale.t('เช่น แพ้ถั่ว, แพ้นม, แพ้อาหารทะเล', 'e.g. nut allergy, dairy allergy, seafood allergy')"
+            class="w-full text-body-md bg-transparent outline-none resize-none"
+            style="border: none; color: var(--color-text-primary);"
+          />
+        </div>
+      </div>
+
       <!-- Error -->
       <div v-if="addError" class="notif notif-danger mb-4">
         <div class="notif-icon"><PhWarning :size="16" /></div>
@@ -135,6 +152,7 @@ const verifyError    = ref('')
 const student        = ref<{ firstName: string; lastName: string; gradeLevel: string | null } | null>(null)
 const adding         = ref(false)
 const addError       = ref('')
+const foodAllergy    = ref('')
 
 async function handleVerify() {
   if (!enrollmentCode.value.trim()) return
@@ -155,7 +173,10 @@ async function handleAdd() {
   adding.value = true
   addError.value = ''
   try {
-    await api.post('/users/me/add-student', { enrollmentCode: enrollmentCode.value.trim() })
+    await api.post('/users/me/add-student', {
+      enrollmentCode: enrollmentCode.value.trim(),
+      foodAllergy:    foodAllergy.value.trim() || undefined,
+    })
     router.push('/parent/dashboard')
   } catch (e: any) {
     addError.value = e?.response?.data?.error?.message ?? locale.t('เกิดข้อผิดพลาด กรุณาลองใหม่', 'An error occurred, please try again')

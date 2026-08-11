@@ -419,6 +419,10 @@
               </div>
             </div>
             <div class="edit-field">
+              <label class="promo-label">ข้อมูลอาหารที่แพ้ <span style="color:#AEAEB2;font-weight:400">(ถ้ามี)</span></label>
+              <textarea v-model="addForm.foodAllergy" class="edit-input" rows="2" maxlength="300" placeholder="เช่น แพ้ถั่ว, แพ้นม, แพ้อาหารทะเล" style="resize:none"></textarea>
+            </div>
+            <div class="edit-field">
               <label class="promo-label">รหัสนักเรียน <span style="color:#AEAEB2;font-weight:400">(ระบบจะสร้างให้อัตโนมัติถ้าไม่กรอก)</span></label>
               <input v-model="addForm.uid" class="edit-input" placeholder="เช่น STD-P1-0001" style="font-family:monospace" />
             </div>
@@ -476,6 +480,10 @@
                 <label class="promo-label">อีเมล / เบอร์ผู้ปกครองคนที่ 2</label>
                 <input v-model="editTarget.guardianEmail2" class="edit-input" placeholder="parent2@example.com หรือ 08xxxxxxxx" />
               </div>
+            </div>
+            <div class="edit-field">
+              <label class="promo-label">ข้อมูลอาหารที่แพ้ <span style="color:#AEAEB2;font-weight:400">(ถ้ามี)</span></label>
+              <textarea v-model="editTarget.foodAllergy" class="edit-input" rows="2" maxlength="300" placeholder="เช่น แพ้ถั่ว, แพ้นม, แพ้อาหารทะเล" style="resize:none"></textarea>
             </div>
             <!-- RFID -->
             <div class="edit-field-row" style="align-items:flex-end">
@@ -878,6 +886,7 @@ interface Student {
   lowThreshold:   number
   parentCount:    number
   familyCode?:    string
+  foodAllergy?:   string
   canPreorder:    boolean
   buffetGroup:    'primary' | 'secondary'
   status:         'active' | 'inactive' | 'suspended'
@@ -933,20 +942,21 @@ const csvInput         = ref<HTMLInputElement | null>(null)
 interface AddForm {
   firstName: string; lastName: string; gradeLevel: string
   className: string; guardianEmail: string; guardianEmail2: string; uid: string
+  foodAllergy: string
 }
-const addForm    = ref<AddForm>({ firstName: '', lastName: '', gradeLevel: 'P1', className: '', guardianEmail: '', guardianEmail2: '', uid: '' })
+const addForm    = ref<AddForm>({ firstName: '', lastName: '', gradeLevel: 'P1', className: '', guardianEmail: '', guardianEmail2: '', uid: '', foodAllergy: '' })
 const addSaving  = ref(false)
 const addError   = ref('')
 
 function openAddModal() {
-  addForm.value   = { firstName: '', lastName: '', gradeLevel: 'P1', className: '', guardianEmail: '', guardianEmail2: '', uid: '' }
+  addForm.value   = { firstName: '', lastName: '', gradeLevel: 'P1', className: '', guardianEmail: '', guardianEmail2: '', uid: '', foodAllergy: '' }
   addError.value  = ''
   showAddModal.value = true
 }
 
 async function saveAdd() {
   if (addSaving.value) return
-  const { firstName, lastName, gradeLevel, className, guardianEmail, guardianEmail2, uid } = addForm.value
+  const { firstName, lastName, gradeLevel, className, guardianEmail, guardianEmail2, uid, foodAllergy } = addForm.value
   if (!firstName.trim() || !lastName.trim() || !gradeLevel) {
     addError.value = 'กรุณากรอกข้อมูลจำเป็นให้ครบ'
     return
@@ -957,6 +967,7 @@ async function saveAdd() {
     const payload: any = { firstName: firstName.trim(), lastName: lastName.trim(), gradeLevel, className: className.trim() }
     if (guardianEmail.trim())  payload.guardianEmail  = guardianEmail.trim()
     if (guardianEmail2.trim()) payload.guardianEmail2 = guardianEmail2.trim()
+    if (foodAllergy.trim()) payload.foodAllergy = foodAllergy.trim()
     if (uid.trim()) payload.uid = uid.trim()
     const res = await api.post('/admin/students', payload)
     const newStudent = mapStudent(res.data?.student ?? res.data)
@@ -1077,8 +1088,8 @@ async function saveEdit() {
   editSaving.value = true
   editError.value  = ''
   try {
-    const { uid, firstName, lastName, gradeLevel, className, guardianEmail, guardianEmail2, status } = editTarget.value
-    const res = await api.patch(`/admin/students/${uid}`, { firstName, lastName, gradeLevel, className, guardianEmail, guardianEmail2, status })
+    const { uid, firstName, lastName, gradeLevel, className, guardianEmail, guardianEmail2, status, foodAllergy } = editTarget.value
+    const res = await api.patch(`/admin/students/${uid}`, { firstName, lastName, gradeLevel, className, guardianEmail, guardianEmail2, status, foodAllergy })
     const updated = res.data?.student ?? res.data
     const mapped = mapStudent(updated)
     const idx = students.value.findIndex(s => s.uid === uid)
@@ -1562,6 +1573,7 @@ function mapStudent(s: any): Student {
     className:      s.className ?? s.class_name ?? s.studentProfile?.className ?? '',
     guardianEmail:  s.guardianEmail  ?? s.guardian_email  ?? s.studentProfile?.guardianEmail,
     guardianEmail2: s.guardianEmail2 ?? s.studentProfile?.guardianEmail2 ?? '',
+    foodAllergy:    s.foodAllergy ?? s.studentProfile?.foodAllergy ?? '',
     linkedParents:  s.linkedParents ?? [],
     cardUid:       s.cardUid ?? s.card_uid,
     cardStatus:    s.cardStatus ?? undefined,

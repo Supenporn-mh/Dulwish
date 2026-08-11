@@ -223,6 +223,13 @@ export const usersController = new Elysia({ prefix: '/users' })
       await Wallet.create({ userId: student._id, balance: 0 })
     }
 
+    if (body.foodAllergy !== undefined) {
+      await User.updateOne(
+        { _id: student._id },
+        { $set: { 'studentProfile.foodAllergy': body.foodAllergy.trim() } },
+      )
+    }
+
     await EnrollmentCode.updateOne(
       { _id: enrollment._id },
       { used: true, usedAt: new Date(), usedByParentId: currentUser._id },
@@ -231,12 +238,16 @@ export const usersController = new Elysia({ prefix: '/users' })
     return {
       success: true,
       student: {
-        uid:        student.uid,
-        firstName:  student.firstName,
-        lastName:   student.lastName,
-        gradeLevel: student.studentProfile?.gradeLevel ?? null,
+        uid:         student.uid,
+        firstName:   student.firstName,
+        lastName:    student.lastName,
+        gradeLevel:  student.studentProfile?.gradeLevel ?? null,
+        foodAllergy: body.foodAllergy !== undefined ? body.foodAllergy.trim() : (student.studentProfile?.foodAllergy ?? null),
       },
     }
   }, {
-    body: t.Object({ enrollmentCode: t.String({ minLength: 1 }) }),
+    body: t.Object({
+      enrollmentCode: t.String({ minLength: 1 }),
+      foodAllergy:    t.Optional(t.String({ maxLength: 300 })),
+    }),
   })

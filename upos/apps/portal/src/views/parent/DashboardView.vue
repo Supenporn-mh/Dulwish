@@ -8,7 +8,7 @@ import ChildCard from '@/components/ChildCard.vue'
 import {
   PhCreditCard, PhForkKnife, PhReceipt, PhBell,
   PhArrowUp, PhShoppingBag,
-  PhCaretRight, PhUserPlus, PhCalendarCheck,
+  PhCaretRight, PhUserPlus, PhCalendarCheck, PhWarning,
 } from '@phosphor-icons/vue'
 import { useNotificationStore } from '@/stores/notifications'
 
@@ -266,6 +266,7 @@ onMounted(async () => {
       grade:       c.grade ?? c.gradeLevel,
       walletId:    c.wallet?._id ?? c.walletId,
       balance:     c.wallet?.balance ?? c.balance ?? 0,
+      foodAllergy: c.foodAllergy ?? c.studentProfile?.foodAllergy ?? '',
     }))
     if (list.length > 0) parentStore.setChildren(list)
     else throw new Error('empty')
@@ -344,6 +345,15 @@ onMounted(async () => {
             ? 'width:20px; height:6px; background: var(--color-primary)'
             : 'width:6px;  height:6px; background: var(--color-border-secondary)'"
         />
+      </div>
+    </div>
+
+    <!-- Food allergy warning for selected child -->
+    <div v-if="selectedChild?.foodAllergy" class="notif notif-warning mx-4 md:mx-6 lg:mx-8 mb-3">
+      <div class="notif-icon"><PhWarning :size="16" /></div>
+      <div class="notif-content">
+        <p class="notif-title">{{ locale.t('ข้อมูลอาหารที่แพ้', 'Food Allergy') }}</p>
+        <p class="notif-desc">{{ selectedChild.foodAllergy }}</p>
       </div>
     </div>
 
