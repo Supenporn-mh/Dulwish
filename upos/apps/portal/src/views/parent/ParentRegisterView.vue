@@ -323,7 +323,7 @@ async function handleRegister() {
       <div class="w-14" />
     </div>
 
-  <div class="flex-1 flex justify-center overflow-y-auto" style="background: var(--color-bg-page)">
+  <div class="flex-1 flex justify-center" style="background: var(--color-bg-page)">
   <div class="w-full max-w-[430px] flex flex-col" style="background: var(--color-bg-page)">
 
     <!-- ── Step indicator ─────────────────────────────────────────────────── -->
@@ -650,7 +650,7 @@ async function handleRegister() {
   </div><!-- /centered content -->
 
     <!-- ── Bottom nav (full-width) ──────────────────────────────────────────── -->
-    <div class="bottom-nav">
+    <div class="reg-action-bar">
       <button @click="goBack" class="btn-back">{{ locale.t('ย้อนกลับ', 'Back') }}</button>
       <button @click="handleNext" :disabled="!canNext"
         class="btn-forward" :class="canNext ? 'btn-forward-active' : 'btn-forward-disabled'">
@@ -750,7 +750,6 @@ async function handleRegister() {
 /* ── Layout ──────────────────────────────────────────────────────────────── */
 .content-area {
   flex: 1;
-  overflow-y: auto;
   padding: 4px 16px 16px;
 }
 
@@ -1008,7 +1007,7 @@ async function handleRegister() {
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
 
 /* ── Bottom nav ──────────────────────────────────────────────────────────── */
-.bottom-nav {
+.reg-action-bar {
   flex-shrink: 0;
   display: flex; gap: 12px;
   padding: 12px 16px 28px;
