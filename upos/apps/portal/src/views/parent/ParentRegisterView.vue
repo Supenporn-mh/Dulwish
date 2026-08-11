@@ -310,7 +310,7 @@ async function handleRegister() {
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col" style="background: var(--color-bg-page)">
+  <div class="flex flex-col" style="height: 100vh; overflow: hidden; background: var(--color-bg-page)">
 
     <!-- ── Navbar (full-width) ───────────────────────────────────────────── -->
     <div class="navbar">
@@ -323,7 +323,7 @@ async function handleRegister() {
       <div class="w-14" />
     </div>
 
-  <div class="flex-1 flex justify-center" style="background: var(--color-bg-page)">
+  <div class="flex-1 flex justify-center" style="overflow: hidden; background: var(--color-bg-page)">
   <div class="w-full max-w-[430px] flex flex-col" style="background: var(--color-bg-page)">
 
     <!-- ── Step indicator ─────────────────────────────────────────────────── -->
@@ -750,6 +750,7 @@ async function handleRegister() {
 /* ── Layout ──────────────────────────────────────────────────────────────── */
 .content-area {
   flex: 1;
+  overflow-y: auto;
   padding: 4px 16px 16px;
 }
 
